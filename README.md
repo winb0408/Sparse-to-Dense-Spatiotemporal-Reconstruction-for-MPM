@@ -237,3 +237,18 @@ python scripts/check_eval_protocol.py \
 
 Replace the split path with your local prepared paired dataset root.
 ```
+
+---
+
+## Version Iteration Management
+
+To keep project versions organized on GitHub, use:
+
+- Workflow guide: `docs/GIT_WORKFLOW.md`
+- Experiment record template: `docs/EXPERIMENT_LOG_TEMPLATE.md`
+
+Recommended daily branch:
+
+```bash
+git checkout dev
+```
