@@ -246,6 +246,8 @@ To keep project versions organized on GitHub, use:
 
 - Workflow guide: `docs/GIT_WORKFLOW.md`
 - Experiment record template: `docs/EXPERIMENT_LOG_TEMPLATE.md`
+- PR checklist template: `.github/pull_request_template.md`
+- Change history: `CHANGELOG.md`
 
 Recommended daily branch:
 
