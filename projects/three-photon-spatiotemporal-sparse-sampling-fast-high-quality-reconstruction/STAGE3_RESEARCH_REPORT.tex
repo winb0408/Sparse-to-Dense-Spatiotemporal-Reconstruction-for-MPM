@@ -1,0 +1,174 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[UTF8]{ctex}
+\usepackage{geometry}
+\geometry{left=2.2cm,right=2.2cm,top=2.4cm,bottom=2.4cm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{xcolor}
+
+\title{三光子时空稀疏采样快速高质量重建：Stage-3 系统研究报告}
+\author{项目：three-photon-spatiotemporal-sparse-sampling-fast-high-quality-reconstruction}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+本报告对 threePM 课题在 Stage-3 阶段的研究工作进行系统整理，覆盖研究背景、研究目的、总体实验设计、具体实验方法、结果展示与分析、总结与讨论。实验主线聚焦于 2.5D 时空重建方案（以相邻时间窗帧作为输入，重建中心帧），并与 2D baseline 及不同窗口设置进行比较。基于当前 Stage-3 全量评测结果，模型在结构指标上相较噪声输入有提升，但在核心目标“相对既有基线持续提升”上未达到里程碑通过标准，外部审查结论为 Not Pass。报告最后给出下一阶段最小可执行改进路径。
+\end{abstract}
+
+\section{研究背景}
+三光子显微成像在深层组织观察中具有重要价值，但在实际采集中受限于光毒性、采集时间和信噪比，常采用稀疏采样策略。稀疏采样虽提高采集效率，但会导致图像质量下降，进而影响后续定量分析。该课题目标是在给定稀疏观测条件下，恢复高质量目标图像，兼顾重建质量与时空一致性。
+
+现有 2D 重建方法通常按帧独立处理，忽略时序邻域信息；而 3D 全体积方法对算力与数据组织要求更高。2.5D 方案在工程上具有折中优势：利用局部时序上下文提升重建质量，同时保持网络与训练流程可控。
+
+\section{研究目的}
+本阶段目标如下：
+\begin{enumerate}[leftmargin=2em]
+    \item 在完整评测集上验证 2.5D 方案（$w=3$）在长预算训练（180 epochs）下的稳定性；
+    \item 对比 Stage-2 pilot 结果，分析窗口大小与训练预算对重建效果的影响；
+    \item 形成可追踪的定量与定性证据，为后续论文写作与实验决策提供依据；
+    \item 接入外部审查（GLM-5）并据此给出下一阶段执行清单。
+\end{enumerate}
+
+\section{总体实验设计}
+\subsection{数据与任务定义}
+\begin{itemize}[leftmargin=2em]
+    \item 数据集：CIDC25\_paired\_A1F0（本阶段使用 full split 进行评测汇总）。
+    \item 输入输出：低质量（noisy/sparse）图像到高质量（dense/clean）图像重建。
+    \item 任务形态：\texttt{spatial\_2p5d}，输入时间窗口为 $[t-1,t,t+1]$（$w=3$），输出中心帧 $t$。
+\end{itemize}
+
+\subsection{对比设置}
+为保证横向可解释性，本报告纳入以下结果：
+\begin{itemize}[leftmargin=2em]
+    \item Baseline-2D (pilot)
+    \item 2.5D $w=3$ (pilot)
+    \item 2.5D $w=5$ (pilot)
+    \item 2.5D $w=3$ (Stage-3 full, 180 epochs)
+\end{itemize}
+
+\subsection{评估指标}
+主要指标包括 PSNR、SSIM、MS-SSIM、MAE、LPIPS、$\Delta$PSNR、$\Delta$SSIM、sSNR、FwPSNR。其中特别关注：
+\begin{itemize}[leftmargin=2em]
+    \item 绝对重建质量：PSNR/SSIM/MS-SSIM/LPIPS；
+    \item 相对输入收益：$\Delta$PSNR 与 $\Delta$SSIM；
+    \item 稳定性分布：样本级指标直方图与分位样例。
+\end{itemize}
+
+\section{具体实验方法}
+\subsection{模型与训练}
+采用 Swin-UNet 2D 骨干，在 2.5D 任务中将时间窗帧堆叠为输入通道。训练时采用混合损失（包含像素项、结构项及感知项），并保留 DINO 分支。Stage-3 运行配置为：
+\begin{itemize}[leftmargin=2em]
+    \item 运行名：\texttt{stage3\_2p5d\_w3\_e180\_full}
+    \item epoch 数：180
+    \item 输出评测目录：\texttt{eval\_results/stage3\_2p5d\_w3\_e180\_full\_eval/eval}
+\end{itemize}
+
+\subsection{可视化生成策略}
+本报告图表由脚本自动生成（\texttt{scripts/generate\_stage3\_figures.py}），输出到：
+\texttt{projects/three-photon-spatiotemporal-sparse-sampling-fast-high-quality-reconstruction/figures\_stage3/}。
+
+图表包括：
+\begin{itemize}[leftmargin=2em]
+    \item 跨阶段关键指标对比图；
+    \item Stage-3 样本级分布图（PSNR/SSIM/$\Delta$PSNR）；
+    \item Stage-3 定性重建样例图（低分位/中位/高分位）。
+\end{itemize}
+
+\section{结果展示与分析}
+\subsection{核心定量结果（Stage-3 full）}
+根据汇总文件 \texttt{summary\_stage3\_2p5d\_w3\_e180\_full.csv}：
+\begin{longtable}{lS[table-format=2.3]}
+\toprule
+指标 & {均值} \\
+\midrule
+PSNR & 25.125 \\
+SSIM & 0.639 \\
+MS-SSIM & 0.594 \\
+MAE & 0.0505 \\
+LPIPS & 0.630 \\
+$\Delta$PSNR & -0.535 \\
+$\Delta$SSIM & 0.245 \\
+sSNR & 1.359 \\
+FwPSNR & 25.105 \\
+\bottomrule
+\end{longtable}
+
+解读：模型对结构相似性（$\Delta$SSIM）有提升，但像素级峰值信噪比相对输入未提升（$\Delta$PSNR 为负），且 LPIPS 偏高，说明感知质量仍有改进空间。
+
+\subsection{跨阶段对比}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures_stage3/fig_metric_comparison.png}
+    \caption{跨阶段指标对比（Baseline-2D、2.5D pilot、Stage-3 full）}
+    \label{fig:metric_compare}
+\end{figure}
+
+从图 \ref{fig:metric_compare} 可见，2.5D 在 pilot 条件下可获得一定增益，但 Stage-3 full 结果未复现到期望水平，提示存在数据分布差异、训练策略或损失权重平衡问题。
+
+\subsection{样本分布与稳定性}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\textwidth]{figures_stage3/fig_stage3_distributions.png}
+    \caption{Stage-3 样本级分布（PSNR、SSIM、$\Delta$PSNR）}
+    \label{fig:dist}
+\end{figure}
+
+分布图显示结果方差较大，存在一批样本重建收益不足；尤其是 $\Delta$PSNR 分布含较多负值区间，说明模型在部分场景下未稳定优于输入。
+
+\subsection{定性结果}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\textwidth]{figures_stage3/fig_stage3_qualitative_examples.png}
+    \caption{Stage-3 定性样例（低分位/中位/高分位）}
+    \label{fig:qual}
+\end{figure}
+
+定性图可见：高分位样本中结构恢复较好，而低分位样本仍存在细节偏差与对比度恢复不足，和定量分布结论一致。
+
+\subsection{外部审查结论}
+根据 \texttt{STAGE3\_REVIEW\_GLM5.md}，外部审查给出 \textbf{Not Pass}，核心依据包括：
+\begin{itemize}[leftmargin=2em]
+    \item 绝对质量指标未达到预期（尤其 SSIM、LPIPS）；
+    \item 相对改进不一致（$\Delta$PSNR 为负）；
+    \item 指标间存在不一致，需进一步排查训练与损失权重配置。
+\end{itemize}
+
+\section{总结与讨论}
+\subsection{阶段结论}
+Stage-3 已完成完整训练与评测收敛，并形成了可复现实验产物与图表证据；但就里程碑判定而言，\textbf{当前阶段不通过}。因此，当前产物适合作为“中期研究记录”，尚不宜冻结为最终论文主结果。
+
+\subsection{问题定位}
+主要问题集中在以下三点：
+\begin{enumerate}[leftmargin=2em]
+    \item 感知质量偏弱（LPIPS 高）；
+    \item 样本级收益不稳定（$\Delta$PSNR 分布跨越较大且含负区间）；
+    \item Stage-2 到 Stage-3 的泛化迁移不足（pilot 优势未稳定延续到 full split）。
+\end{enumerate}
+
+\subsection{下一步建议（最小可执行）}
+与 \texttt{STAGE3\_NEXT\_ACTIONS.md} 一致，建议按以下顺序推进：
+\begin{enumerate}[leftmargin=2em]
+    \item 复核训练/验证曲线，确认是否过拟合或欠拟合；
+    \item 调整损失项权重（重点感知分支与结构分支平衡）；
+    \item 在同一 split 上做严格 paired 对比（Stage-2/2D vs Stage-3/2.5D）；
+    \item 增加一个窗口或融合策略消融；
+    \item 更新报告并再次提交外部审查。
+\end{enumerate}
+
+\section*{附录：文件索引}
+\begin{itemize}[leftmargin=2em]
+    \item 阶段报告：\texttt{STAGE3\_REPORT.md}
+    \item 审查意见：\texttt{STAGE3\_REVIEW\_GLM5.md}
+    \item 后续动作：\texttt{STAGE3\_NEXT\_ACTIONS.md}
+    \item 本文图表目录：\texttt{figures\_stage3/}
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,43 @@
+{
+  "topic": "三光子时空稀疏采样的快速高质量重建",
+  "topic_slug": "three-photon-spatiotemporal-sparse-sampling-fast-high-quality-reconstruction",
+  "project_root": "/data2/wjb/threePM",
+  "status": "stage3_running",
+  "current_round": 9,
+  "completed": [
+    "Cursor MCP reviewer config created in /data2/wjb/threePM/.cursor/mcp.json",
+    "ARIS skills mapped into workspace via /data2/wjb/threePM/skills symlink",
+    "Isolated output directory initialized",
+    "Initial baseline/result snapshot documented",
+    "P0 protocol audit document generated",
+    "Unified summary table generated from eval_results/**/summary*.csv",
+    "Round 2 appended with dimensionality-risk assessment",
+    "External GLM-5 critique completed and persisted",
+    "P0 stack-policy fail-fast implemented in dataset loader path",
+    "New CLI flags: --stack_policy and --stack_frame_index",
+    "Protocol guardrail script added: scripts/check_eval_protocol.py",
+    "README updated with stack safety and guardrail usage",
+    "Final report generated with external reviewer end-review",
+    "Stage-2 2.5D pipeline implemented and smoke-tested",
+    "Executed stage2 2p5d pilot training/eval with DINO branch enabled",
+    "Executed matched baseline2d pilot training/eval for fair comparison",
+    "Generated stage2 figures and interim report with reviewer audit",
+    "Extended 2.5D experiments completed (w3_e6, w5_e6)",
+    "Stage-2 extended report and GLM5 review completed",
+    "Stage-3 autonomous 12h pipeline launched in background"
+  ],
+  "pending_p0": [
+    "Claim-scope correction in narrative/results docs"
+  ],
+  "pending_p1": [
+    "Full-split 2.5D verification",
+    "3D track implementation",
+    "Temporal consistency metrics"
+  ],
+  "blocked": [],
+  "next_action": "Wait for stage3 pipeline completion; then inspect STAGE3_REPORT and STAGE3_REVIEW_GLM5 outputs.",
+  "artifacts": {
+    "auto_review": "/data2/wjb/threePM/projects/three-photon-spatiotemporal-sparse-sampling-fast-high-quality-reconstruction/AUTO_REVIEW.md",
+    "state": "/data2/wjb/threePM/projects/three-photon-spatiotemporal-sparse-sampling-fast-high-quality-reconstruction/REVIEW_STATE.json"
+  }
+}

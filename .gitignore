@@ -1,0 +1,50 @@
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment and IDE files
+.env
+.venv/
+venv/
+.idea/
+.vscode/
+.cursor/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large datasets and experiment outputs
+ThreePM_openDatasets/
+runs/
+eval_results/
+eval_results*/
+outputs/
+outputs_*/
+outputs_DD/
+visualizations/
+figures/
+figures_*/
+figures_stage2/
+figures_cidc25_3d/
+projects/**/figures_stage2/
+projects/**/figures_stage2_round2/
+projects/**/figures_stage3/
+projects/**/stage2_pilot_data/
+projects/**/refine-logs/
+projects/**/stage3_logs/
+
+# Model checkpoints and weights
+*.pth
+*.pt
+pretrained_weights/
+
+# Logs and archives
+*.log
+*.zip
+
