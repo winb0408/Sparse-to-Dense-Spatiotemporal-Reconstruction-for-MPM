@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ThreePM 实验方案交互可视化</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #131a2e;
+      --line: #2a355a;
+      --text: #e8ecff;
+      --muted: #b3bfdc;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --scan: #5eead4;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2, h3 {
+      margin: 0 0 12px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .row {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    select, input, button {
+      width: 100%;
+      box-sizing: border-box;
+      background: #0d1430;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+    button {
+      cursor: pointer;
+      background: #1a2450;
+    }
+    button:hover {
+      background: #24306b;
+    }
+    .canvas-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    canvas {
+      width: 100%;
+      background: #070c1d;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      margin-right: 8px;
+      border: 1px solid var(--line);
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .danger { color: var(--danger); }
+    .mono {
+      font-family: "Consolas", "Menlo", monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>ThreePM 实验方案交互可视化工具</h1>
+    <p class="small">
+      用于快速模拟稀疏采样模式、估算采样率与相对采集负担，并预览SNR梯度设置。
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <h2>参数设置</h2>
+
+        <div class="row">
+          <label for="size">网格尺寸（可视化）</label>
+          <select id="size">
+            <option value="8">8 x 8</option>
+            <option value="16" selected>16 x 16</option>
+            <option value="32">32 x 32</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label for="factor">稀疏因子</label>
+          <select id="factor">
+            <option value="2">2x</option>
+            <option value="4" selected>4x</option>
+            <option value="8">8x</option>
+            <option value="16">16x</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label for="pattern">采样模式</label>
+          <select id="pattern">
+            <option value="rowskip">row-skip（隔行）</option>
+            <option value="colskip">col-skip（隔列）</option>
+            <option value="checkerboard" selected>checkerboard（棋盘格）</option>
+            <option value="grid">grid（规则网格）</option>
+            <option value="random">random（固定seed）</option>
+            <option value="diagonal">diagonal（对角线）</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label for="seed">随机种子（仅random）</label>
+          <input id="seed" type="number" value="42" min="0" step="1" />
+        </div>
+
+        <div class="row">
+          <label for="power">激光功率（mW）</label>
+          <select id="power">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="4" selected>4</option>
+            <option value="8">8</option>
+            <option value="15">15</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label for="dwell">停留时间（us/pixel）</label>
+          <select id="dwell">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <button id="refreshBtn">刷新模拟</button>
+        </div>
+        <div class="row">
+          <button id="exportBtn">导出当前配置JSON</button>
+        </div>
+
+        <div class="row">
+          <span class="pill ok">推荐</span>
+          <span class="small">Pilot阶段：2x模式对比 + 5档功率梯度 + 小规模联合退化</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>可视化与结果</h2>
+        <div class="canvas-wrap">
+          <div>
+            <h3>采样mask可视化</h3>
+            <canvas id="maskCanvas" width="520" height="520"></canvas>
+          </div>
+          <div>
+            <h3>SNR/剂量趋势（简化模拟）</h3>
+            <canvas id="snrCanvas" width="520" height="520"></canvas>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 12px;">模拟摘要</h3>
+        <div id="summary" class="mono"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const sizeEl = document.getElementById("size");
+    const factorEl = document.getElementById("factor");
+    const patternEl = document.getElementById("pattern");
+    const seedEl = document.getElementById("seed");
+    const powerEl = document.getElementById("power");
+    const dwellEl = document.getElementById("dwell");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const exportBtn = document.getElementById("exportBtn");
+    const summaryEl = document.getElementById("summary");
+
+    const maskCanvas = document.getElementById("maskCanvas");
+    const snrCanvas = document.getElementById("snrCanvas");
+    const mctx = maskCanvas.getContext("2d");
+    const sctx = snrCanvas.getContext("2d");
+
+    function lcg(seed) {
+      let s = seed % 2147483647;
+      if (s <= 0) s += 2147483646;
+      return function() {
+        s = (s * 16807) % 2147483647;
+        return (s - 1) / 2147483646;
+      };
+    }
+
+    function buildMask(n, factor, pattern, seed) {
+      const mask = Array.from({ length: n }, () => Array(n).fill(0));
+      const rng = lcg(seed);
+
+      if (pattern === "rowskip") {
+        const step = Math.max(1, factor / 2);
+        for (let y = 0; y < n; y += step) {
+          for (let x = 0; x < n; x++) mask[y][x] = 1;
+        }
+      } else if (pattern === "colskip") {
+        const step = Math.max(1, factor / 2);
+        for (let x = 0; x < n; x += step) {
+          for (let y = 0; y < n; y++) mask[y][x] = 1;
+        }
+      } else if (pattern === "checkerboard") {
+        const step = Math.max(2, factor / 2);
+        for (let y = 0; y < n; y++) {
+          for (let x = 0; x < n; x++) {
+            if (((x + y) % step) === 0) mask[y][x] = 1;
+          }
+        }
+      } else if (pattern === "grid") {
+        const k = Math.max(1, Math.round(Math.sqrt(factor)));
+        for (let y = 0; y < n; y += k) {
+          for (let x = 0; x < n; x += k) mask[y][x] = 1;
+        }
+      } else if (pattern === "random") {
+        const target = Math.max(1, Math.floor((n * n) / factor));
+        let count = 0;
+        while (count < target) {
+          const y = Math.floor(rng() * n);
+          const x = Math.floor(rng() * n);
+          if (!mask[y][x]) {
+            mask[y][x] = 1;
+            count++;
+          }
+        }
+      } else if (pattern === "diagonal") {
+        const stride = Math.max(1, factor / 2);
+        for (let y = 0; y < n; y++) {
+          for (let x = 0; x < n; x++) {
+            if ((x - y + n) % stride === 0) mask[y][x] = 1;
+          }
+        }
+      }
+      return mask;
+    }
+
+    function drawMask(mask) {
+      const n = mask.length;
+      const w = maskCanvas.width;
+      const h = maskCanvas.height;
+      mctx.clearRect(0, 0, w, h);
+      mctx.fillStyle = "#070c1d";
+      mctx.fillRect(0, 0, w, h);
+
+      const cell = Math.floor(Math.min(w, h) / n);
+      const offsetX = Math.floor((w - cell * n) / 2);
+      const offsetY = Math.floor((h - cell * n) / 2);
+
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          const v = mask[y][x];
+          mctx.fillStyle = v ? "#5eead4" : "#1f2b4f";
+          mctx.fillRect(offsetX + x * cell, offsetY + y * cell, cell - 1, cell - 1);
+        }
+      }
+    }
+
+    function estimateSNR(power, dwell) {
+      // 简化模拟：SNR与 sqrt(power * dwell) 正相关
+      return 20 * Math.log10(Math.max(1e-6, Math.sqrt(power * dwell)));
+    }
+
+    function drawSNR(currentPower, currentDwell) {
+      const powers = [1, 2, 4, 8, 15];
+      const w = snrCanvas.width;
+      const h = snrCanvas.height;
+      const pad = 50;
+      sctx.clearRect(0, 0, w, h);
+      sctx.fillStyle = "#070c1d";
+      sctx.fillRect(0, 0, w, h);
+
+      const snrs = powers.map(p => estimateSNR(p, currentDwell));
+      const minV = Math.min(...snrs) - 1;
+      const maxV = Math.max(...snrs) + 1;
+
+      sctx.strokeStyle = "#3a4b80";
+      sctx.lineWidth = 1;
+      sctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
+
+      // y labels
+      sctx.fillStyle = "#b3bfdc";
+      sctx.font = "12px sans-serif";
+      for (let i = 0; i <= 4; i++) {
+        const y = pad + (h - 2 * pad) * i / 4;
+        const value = (maxV - (maxV - minV) * i / 4).toFixed(1);
+        sctx.fillText(value, 8, y + 4);
+        sctx.strokeStyle = "#24335f";
+        sctx.beginPath();
+        sctx.moveTo(pad, y);
+        sctx.lineTo(w - pad, y);
+        sctx.stroke();
+      }
+
+      sctx.strokeStyle = "#60a5fa";
+      sctx.lineWidth = 2;
+      sctx.beginPath();
+      powers.forEach((p, i) => {
+        const x = pad + (w - 2 * pad) * i / (powers.length - 1);
+        const y = pad + (h - 2 * pad) * (maxV - snrs[i]) / (maxV - minV);
+        if (i === 0) sctx.moveTo(x, y);
+        else sctx.lineTo(x, y);
+      });
+      sctx.stroke();
+
+      powers.forEach((p, i) => {
+        const x = pad + (w - 2 * pad) * i / (powers.length - 1);
+        const y = pad + (h - 2 * pad) * (maxV - snrs[i]) / (maxV - minV);
+        const isCurrent = p === currentPower;
+        sctx.fillStyle = isCurrent ? "#fbbf24" : "#93c5fd";
+        sctx.beginPath();
+        sctx.arc(x, y, isCurrent ? 6 : 4, 0, Math.PI * 2);
+        sctx.fill();
+        sctx.fillStyle = "#c7d2fe";
+        sctx.fillText(`${p}mW`, x - 12, h - pad + 18);
+      });
+    }
+
+    function run() {
+      const n = parseInt(sizeEl.value, 10);
+      const factor = parseInt(factorEl.value, 10);
+      const pattern = patternEl.value;
+      const seed = parseInt(seedEl.value || "42", 10);
+      const power = parseFloat(powerEl.value);
+      const dwell = parseFloat(dwellEl.value);
+
+      const mask = buildMask(n, factor, pattern, seed);
+      drawMask(mask);
+      drawSNR(power, dwell);
+
+      let sampled = 0;
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) sampled += mask[y][x];
+      }
+      const total = n * n;
+      const ratio = sampled / total;
+      const snrEst = estimateSNR(power, dwell);
+      const relativeDose = ratio * power * dwell;
+
+      let risk = "低";
+      if (relativeDose > 25) risk = "高";
+      else if (relativeDose > 10) risk = "中";
+
+      summaryEl.textContent =
+`当前配置
+- 稀疏因子: ${factor}x
+- 模式: ${pattern}
+- 网格尺寸: ${n} x ${n}
+- 采样点: ${sampled}/${total} (${(ratio * 100).toFixed(2)}%)
+- 激光功率: ${power} mW
+- 停留时间: ${dwell} us/pixel
+
+简化估计
+- 估计SNR(dB): ${snrEst.toFixed(2)}
+- 相对光剂量指数: ${relativeDose.toFixed(2)}
+- 光漂白风险等级(经验): ${risk}
+
+建议
+- Pilot优先对比 2x rowskip/colskip/checkerboard
+- 若风险偏高，优先降功率，其次降重复次数
+- 同FOV请保留 dense-high pre/post 以评估漂移和漂白`;
+    }
+
+    function exportCurrentConfig() {
+      const config = {
+        export_time: new Date().toISOString(),
+        visualization: {
+          grid_size: parseInt(sizeEl.value, 10),
+          sparsity_factor: parseInt(factorEl.value, 10),
+          pattern: patternEl.value,
+          random_seed: parseInt(seedEl.value || "42", 10)
+        },
+        acquisition_params: {
+          laser_power_mw: parseFloat(powerEl.value),
+          dwell_time_us_per_pixel: parseFloat(dwellEl.value)
+        },
+        notes: "Generated from realdata_acquisition_planner.html"
+      };
+
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      a.href = url;
+      a.download = `threepm_config_${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    refreshBtn.addEventListener("click", run);
+    exportBtn.addEventListener("click", exportCurrentConfig);
+    [sizeEl, factorEl, patternEl, seedEl, powerEl, dwellEl].forEach(el => {
+      el.addEventListener("change", run);
+    });
+    run();
+  </script>
+</body>
+</html>

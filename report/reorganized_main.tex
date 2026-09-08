@@ -1,0 +1,609 @@
+% !TeX program = xelatex
+\documentclass[UTF8, scheme=plain, 11pt, a4paper]{ctexart}
+
+\usepackage[margin=2.35cm]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!65!black,
+  citecolor=green!45!black,
+  urlcolor=blue!65!black,
+  unicode=true
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small 3PM Sparse Reconstruction}
+\rhead{\small Reorganized Research Report}
+\rfoot{\thepage}
+
+\titleformat{\section}{\large\bfseries}{}{0em}{\thesection\quad}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{\thesubsection\quad}
+\titleformat{\subsubsection}{\normalsize\bfseries}{}{0em}{\thesubsubsection\quad}
+
+\newcommand{\psnr}{\mathrm{PSNR}}
+\newcommand{\ssim}{\mathrm{SSIM}}
+\newcommand{\msssim}{\mathrm{MS\text{-}SSIM}}
+\newcommand{\MSE}{\mathrm{MSE}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Kfactor}{K}
+
+\graphicspath{{../eval_sparse3d_k2_fullimg/qualitative/}{../eval_sparse3d_k2_fullimg/qualitative_purple/}{../eval_sparse3d_k4_fullimg/qualitative/}{../eval_mdc25_sparse/qualitative/}{../eval_pollen_sparse/qualitative_pseudocolor_v3/}}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{1.6cm}
+  {\LARGE\bfseries 三光子显微稀疏采样重建研究报告\\[0.5em]
+  基于数据维度约束的 2D / 2.5D / 3D 方法重整\par}
+  \vspace{0.8em}
+  {\large Sparse Sampling Reconstruction for Three-Photon Microscopy:\\
+  A Dimension-Aware Reorganization of 2D, 2.5D and 3D Reconstruction Protocols\par}
+  \vspace{1.6em}
+  {\normalsize
+  \textbf{项目：} 3PM Sparse-to-Dense Reconstruction Pipeline\\[0.35em]
+  \textbf{核心数据：} CIDC25 3D stack / MDC25-2D + MDC25-3D / pollen 2D real sparse\\[0.35em]
+  \textbf{报告依据：} \texttt{docs/DATASET\_PROTOCOL.md}、\texttt{docs/RESULT\_TAXONOMY.md}、CIDC25/MDC25/pollen 现有评估汇总\\[0.35em]
+  \textbf{编译方式：} XeLaTeX\par}
+  \vspace{1.2em}
+  {\small \today}
+  \vfill
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\begin{abstract}
+三光子显微成像在深层组织观测中具有高穿透、低散射优势，但受限于光子预算、扫描速度与光毒性之间的矛盾。稀疏采样后重建是一条直接的加速路径：通过降低空间或轴向采样密度减少采集成本，再用学习模型恢复稠密图像或体数据。本项目前期已经完成大量 2D、2.5D、3D 模型与 CIDC25、MDC25、pollen 数据集上的实验，但由于数据维度、模型维度与评估目标混杂，导致结果解释不稳定。
+
+本报告依据重整后的实验主线，首先冻结数据集协议：CIDC25 作为 3D stack 主数据集，MDC25 拆分为 2D Nuclei 与 3D Tribolium 两个子协议，pollen 当前作为 2D real sparse 外部样本。随后，将 2D 模型限定为 2D 图像或 3D 逐切面 baseline，将 2.5D 模型定义为邻切面输入、中心切面输出，将 3D 模型限定为体块输入、体块输出。基于该协议，本报告系统整理实验目标、总体设计、稀疏退化建模、重建方法、PSF 物理先验、主要结果和局限性。
+
+现有结果支持两个相对稳健的结论：第一，在 CIDC25/F0 协议内，2.5D + Z sparse 是中心切面重建的强路径，K=4 时达到 50.10 dB / 0.9912，K=2 时达到 51.72 dB / 0.9942；第二，3D + Wiener 初始化在困难 XY sparse 场景下明显改善 K=4 表现，由普通 3D 的 21.19 dB / 0.5251 提升到 38.50 dB / 0.9169。MDC25 与 pollen 结果目前更适合作为跨数据压力测试或外部迁移探索，不应与 CIDC25 主结果混排。
+\end{abstract}
+
+\section*{图文阅读方式}
+\addcontentsline{toc}{section}{图文阅读方式}
+
+本文正文以实验逻辑、方法定义和定量结果为主；为避免图像打断主线，所有可视化证据集中放在文末\textbf{附录~\ref{app:figure_atlas} 图集}。正文中的关键结论会标注对应图号：
+
+\begin{itemize}[leftmargin=*]
+  \item 图~\ref{fig:qual_xy}：XY 稀疏下 K=2/K=4 的定性重建对比。
+  \item 图~\ref{fig:qual_z}：Z 稀疏下 2.5D 中心切面重建优势。
+  \item 图~\ref{fig:qual_xyz}：XYZ 联合稀疏下的困难场景对比。
+  \item 图~\ref{fig:oblique_xy}：3D 斜视投影，用于观察体结构连续性。
+  \item 图~\ref{fig:mdc25_best5} 与图~\ref{fig:pollen_transfer}：分别对应 MDC25 压力测试和 pollen 外部迁移探索。
+\end{itemize}
+
+\section{引言}
+
+\subsection{问题背景}
+
+三光子显微镜（Three-Photon Microscopy, 3PM）适合深层组织和活体神经活动观测。与传统双光子显微镜相比，三光子激发具有更深的穿透能力和更低的离焦背景，但同时带来更严格的光子预算限制。为了获得足够信噪比，系统通常需要更长驻留时间或更高激光功率；前者降低成像速度，后者增加光漂白与光毒性风险。
+
+因此，项目的核心工程目标是：在尽量少采样的情况下恢复接近 dense / GT 的图像或体数据。该问题可以抽象为：给定稀疏观测 $Y$ 与采样掩码 $M$，学习一个重建映射 $f_\theta$，使
+\begin{equation}
+  \hat{X} = f_\theta(Y, M) \approx X,
+\end{equation}
+其中 $X$ 是稠密参考图像或体数据，$\hat{X}$ 是模型重建结果。
+
+\subsection{前期混乱点}
+
+项目早期将 2D、2.5D、3D 模型都放到 CIDC25、MDC25、pollen 等数据上测试，并用相似的 \texttt{sparse3d\_*} 命名组织结果。这种做法虽然有利于快速探索，但带来三个解释问题：
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{数据维度混杂：} CIDC25 是 3D stack，MDC25 同时包含 2D 和 3D 子数据，pollen 当前经过 mean projection 后是 2D 图像。
+  \item \textbf{模型输出目标不同：} 2D 输出单帧，2.5D 输出中心切面，3D 输出体块。三者不能在所有数据上直接并列为同一种任务。
+  \item \textbf{评估口径不一致：} MDC25 已有结果中 2D、2.5D、3D 的帧数分别为 64、14、16；pollen 评估也混入跨维度权重，因此不能作为主 benchmark 总排名。
+\end{enumerate}
+
+本报告的重整原则是：\textbf{先定义数据协议，再定义可比较的模型族，最后组织结果和结论。}
+
+\subsection{本文贡献}
+
+本报告形成如下阶段性贡献：
+
+\begin{enumerate}[leftmargin=*]
+  \item 提出并冻结数据集--模型维度协议，明确 CIDC25、MDC25-2D、MDC25-3D、pollen 的主实验边界。
+  \item 重新组织 2D、2.5D、3D 稀疏重建方法，区分逐切面 baseline、中心切面重建与体重建。
+  \item 系统总结 CIDC25/F0 上的 K=2 与 K=4 结果，明确 2.5D+Z 与 3D+Wiener+XY 两条有效路径。
+  \item 将 MDC25 与 pollen 结果降级为压力测试和外部迁移探索，避免错误支撑主结论。
+  \item 总结当前不足，为下一轮重评估、论文图表与实验补充提供清晰路线。
+\end{enumerate}
+
+\section{实验目标}
+
+本项目的实验目标可以分为主目标和辅助目标。
+
+\subsection{主目标}
+
+\begin{description}[leftmargin=*, style=nextline]
+  \item[目标一：建立维度一致的稀疏重建 benchmark]
+  在同一数据协议内比较 2D、2.5D、3D 方法，避免跨维度、跨数据集的大排名。
+
+  \item[目标二：判断不同稀疏模式下的最优模型族]
+  比较 XY、Z、XYZ 三类稀疏退化下，逐切面 2D、邻切面 2.5D 与体块 3D 的适用边界。
+
+  \item[目标三：评估 PSF 物理先验的有效注入方式]
+  比较 PSF channel、PSF consistency loss、Wiener 初始化三种物理先验融合方式，判断哪些可以作为主贡献，哪些只能作为负结果或消融。
+\end{description}
+
+\subsection{辅助目标}
+
+\begin{itemize}[leftmargin=*]
+  \item 在 MDC25 上做跨数据压力测试，检验主线方法是否具有可迁移性。
+  \item 在 pollen 真实稀疏样本上做外部形态泛化探索，观察模型在真实采样分布上的失败模式。
+  \item 形成可维护的文档与报告结构，使后续论文写作、图表整理和实验复现不再依赖零散目录。
+\end{itemize}
+
+\section{总体设计}
+
+\subsection{数据集协议}
+
+本项目采用表~\ref{tab:dataset_protocol} 的数据协议。该协议是后续所有训练、评估和论文表格的入口。
+
+\begin{table}[H]
+  \centering
+  \caption{数据集身份与主实验边界}
+  \label{tab:dataset_protocol}
+  \begin{tabular}{p{3.2cm}p{4.0cm}p{5.5cm}}
+    \toprule
+    数据集 & 当前身份 & 主实验使用方式 \\
+    \midrule
+    CIDC25 & 3D stack / volume & 2D slice baseline；2.5D center-slice；3D volume reconstruction \\
+    MDC25-2D Nuclei & 2D 图像数据 & 2D XY sparse / denoising baseline \\
+    MDC25-3D Tribolium & 3D stack 数据 & 2D / 2.5D / 3D 分层对照 \\
+    pollen & 2D real sparse 外部样本 & 2D transfer / qualitative structural check \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{模型族定义}
+
+\begin{table}[H]
+  \centering
+  \caption{2D、2.5D、3D 模型族定义}
+  \label{tab:model_family}
+  \begin{tabular}{p{2.2cm}p{4.5cm}p{4.5cm}p{3.2cm}}
+    \toprule
+    模型族 & 输入 & 输出 & 主实验含义 \\
+    \midrule
+    2D & $[B,C,H,W]$ 单张图或单切面 & $[B,1,H,W]$ & 2D 重建或逐切面 baseline \\
+    2.5D & $[B,C\times W_z,H,W]$ 邻切面堆叠 & $[B,1,H,W]$ 中心切面 & 利用邻切面恢复中心切面 \\
+    3D & $[B,C,Z,H,W]$ 体块 & $[B,1,Z,H,W]$ 体块 & 真正体重建 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{主实验合法矩阵}
+
+\begin{table}[H]
+  \centering
+  \caption{数据协议与模型族的合法组合}
+  \label{tab:valid_matrix}
+  \begin{tabular}{lccc}
+    \toprule
+    数据协议 & 2D 模型 & 2.5D 模型 & 3D 模型 \\
+    \midrule
+    CIDC25-3D & 合法：逐切面 baseline & 合法：中心切面重建 & 合法：体重建 \\
+    MDC25-2D & 合法：仅 XY & 不作为主实验 & 不作为主实验 \\
+    MDC25-3D & 合法：逐切面 baseline & 合法：中心切面重建 & 合法：体重建 \\
+    pollen-2D & 合法：外部 2D 样本 & 仅迁移探索 & 仅迁移探索 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{结果分层策略}
+
+结果不再按全项目 PSNR 排名，而按以下层次组织：
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{正文主实验：} CIDC25/F0 3D sparse reconstruction，按 K、sparse mode、model family 分组。
+  \item \textbf{消融实验：} PSF channel、PSF loss、Wiener 初始化、mask 通道等。
+  \item \textbf{压力测试：} MDC25 K2 结果。由于当前帧数不齐，暂不进入正文主表。
+  \item \textbf{迁移探索：} pollen 2D real sparse。只说明外部泛化趋势和失败边界。
+\end{enumerate}
+
+\section{具体方法}
+
+\subsection{稀疏采样建模}
+
+设干净 3D stack 为
+\begin{equation}
+  X \in \R^{Z \times H \times W}.
+\end{equation}
+稀疏观测记为 $Y$，采样掩码记为 $M$。
+
+\subsubsection{XY 稀疏}
+
+XY 稀疏保留每个切面内的部分像素：
+\begin{equation}
+  Y_{xy}(z,h,w) = M_{xy}(h,w) X(z,h,w), \quad M_{xy} \in \{0,1\}^{H\times W}.
+\end{equation}
+该模式模拟横向扫描间距增大或像素级稀疏扫描。对 2D 与 3D 数据均可解释。
+
+\subsubsection{Z 稀疏}
+
+Z 稀疏保留部分轴向切面：
+\begin{equation}
+  Y_z(z,h,w) = M_z(z) X(z,h,w), \quad M_z(z) \in \{0,1\}.
+\end{equation}
+该模式只对 3D stack 有严格物理意义。缺失切面通过线性插值形成 warm-start。
+
+\subsubsection{XYZ 稀疏}
+
+XYZ 稀疏组合 XY 与 Z 退化：
+\begin{equation}
+  Y_{xyz}(z,h,w) = M_z(z) M_{xy}(h,w) X(z,h,w).
+\end{equation}
+它是最困难的联合稀疏场景，也最容易暴露模型对空间和轴向信息的联合恢复能力。
+
+\subsection{Warm-start 与 Mask 输入}
+
+稀疏观测先通过插值或物理初始化变成 dense-looking 初值 $\widetilde{Y}$。模型输入通常为：
+\begin{equation}
+  I = \mathrm{concat}(\widetilde{Y}, M).
+\end{equation}
+其中 $M$ 是显式采样掩码。对 2D 与 3D 模型，mask 通道能帮助网络区分真实观测与插值生成区域。
+
+\subsection{2D 重建}
+
+2D 模型使用 Swin-UNet 2D，对每张图或每个切面独立重建：
+\begin{equation}
+  \hat{X}_{2D}(h,w) = f^{2D}_\theta(\widetilde{Y}(h,w), M(h,w)).
+\end{equation}
+在 3D 数据中，2D 模型只代表逐切面 baseline，不具备体输出能力。
+
+\subsection{2.5D 中心切面重建}
+
+2.5D 模型仍使用 2D Swin-UNet，但将邻近切面堆叠为 channel：
+\begin{equation}
+  I_{2.5D}(z) = [\widetilde{Y}_{z-r}, \ldots, \widetilde{Y}_z, \ldots, \widetilde{Y}_{z+r}],
+\end{equation}
+输出中心切面：
+\begin{equation}
+  \hat{X}_{2.5D}(z) = f^{2.5D}_\theta(I_{2.5D}(z)).
+\end{equation}
+该方法利用邻切面冗余，但输出仍是 2D，因此必须表述为中心切面重建。
+
+\subsection{3D 体重建}
+
+3D 模型使用 Video Swin-UNet，输入和输出都是体块：
+\begin{equation}
+  \hat{X}_{3D} = f^{3D}_\theta(\widetilde{Y}, M), \quad \widetilde{Y}, M, \hat{X}_{3D} \in \R^{Z_p \times H_p \times W_p}.
+\end{equation}
+该模型同时建模帧内空间结构与轴向结构，是严格意义上的体重建方法。
+
+\subsection{PSF 物理先验}
+
+三光子显微的成像退化与点扩散函数（Point Spread Function, PSF）有关。本项目探索三种引入 PSF 的方式。
+
+\subsubsection{PSF 输入通道}
+
+将 PSF map 作为附加通道输入模型：
+\begin{equation}
+  I = \mathrm{concat}(\widetilde{Y}, M, P_{psf}).
+\end{equation}
+该方法表达简单，但目前结果不显示稳定增益。
+
+\subsubsection{PSF 一致性损失}
+
+要求重建结果经 PSF 卷积后接近观测：
+\begin{equation}
+  \mathcal{L}_{psf} = \left\| P * \hat{X} - Y \right\|_2^2.
+\end{equation}
+当前训练预算下，该损失没有稳定超过 baseline。
+
+\subsubsection{Wiener 初始化}
+
+用 PSF 的频域响应 $H(f)$ 做 Wiener 预反卷积：
+\begin{equation}
+  \hat{X}_{wiener}(f) = \frac{H^*(f)}{|H(f)|^2 + K_n}Y(f).
+\end{equation}
+它不是简单增加网络参数，而是把物理先验转化为更好的输入初值。当前结果表明，这是 PSF 先验中最有效、最值得保留的方式。
+
+\subsection{训练目标}
+
+基础重建损失为：
+\begin{equation}
+  \mathcal{L} = \lambda_{mse}\mathcal{L}_{mse} + \lambda_{ssim}\mathcal{L}_{1-ms\text{-}ssim} + \lambda_{psf}\mathcal{L}_{psf}.
+\end{equation}
+多数主实验禁用 DINO 分支，以降低训练复杂度并专注于像素/结构重建。
+
+\section{实验设置}
+
+\subsection{CIDC25 主实验}
+
+CIDC25 作为 3D 主数据集。核心评估集为 Validation/F0，使用 200 帧，输出 PSNR 与 SSIM。现有主结果来自：
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{eval\_sparse3d\_k4\_fullimg/summary\_all.md}
+  \item \texttt{eval\_sparse3d\_k2\_fullimg/summary\_all.md}
+\end{itemize}
+
+\subsection{MDC25 压力测试}
+
+MDC25 包含 2D Nuclei 与 3D Tribolium 两个子协议。当前 \texttt{eval\_mdc25\_sparse/summary\_all.md} 中的结果混合 2D、2.5D、3D，且帧数不齐，因此只作为跨数据压力测试。
+
+\subsection{pollen 外部样本}
+
+pollen 当前由 100-frame stack mean projection 成 2D 图，因此定位为 2D real sparse 外部样本。已有 \texttt{eval\_pollen\_sparse/summary\_pollen.md} 可用于分析迁移表现，但不能作为 3D benchmark。
+
+\section{实验结果}
+
+\subsection{CIDC25 K=4 主结果}
+
+表~\ref{tab:cidc25_k4} 汇总 K=4 下的代表性结果。
+
+\begin{table}[H]
+  \centering
+  \caption{CIDC25/F0，K=4，200 帧代表结果}
+  \label{tab:cidc25_k4}
+  \begin{tabular}{llccc}
+    \toprule
+    方法 & 稀疏模式 & Frames & PSNR (dB) & SSIM \\
+    \midrule
+    Input baseline & Z & 200 & $74.14\pm8.29$ & $1.0000\pm0.0000$ \\
+    2.5D & Z & 200 & $50.10\pm2.46$ & $0.9912\pm0.0075$ \\
+    3D + Wiener & XY & 200 & $38.50\pm2.49$ & $0.9169\pm0.0309$ \\
+    2.5D & XYZ & 200 & $31.29\pm1.72$ & $0.8095\pm0.0324$ \\
+    2.5D & XY & 200 & $26.24\pm1.75$ & $0.7160\pm0.0264$ \\
+    2D & Z & 200 & $24.30\pm1.71$ & $0.6287\pm0.0924$ \\
+    2D & XY & 200 & $22.18\pm1.74$ & $0.5721\pm0.0994$ \\
+    3D & XY & 200 & $21.19\pm1.50$ & $0.5251\pm0.0986$ \\
+    3D & Z & 200 & $21.18\pm1.50$ & $0.5249\pm0.0986$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{分析}
+K=4 下最清晰的结论是：2.5D + Z 是中心切面重建强路径；3D 普通模型在 XY/Z/XYZ 下表现较低，但 3D + Wiener 在 XY 下显著提升，说明物理初始化对困难空间稀疏尤其关键。对应的定性结果可在图~\ref{fig:qual_xy}、图~\ref{fig:qual_z} 与图~\ref{fig:qual_xyz} 中查看。
+
+\subsection{CIDC25 K=2/K=4 联合结果}
+
+表~\ref{tab:cidc25_k2k4} 总结 K=2 与 K=4 的关键对比。
+
+\begin{table}[H]
+  \centering
+  \caption{CIDC25/F0，K=2/K=4 代表性对比}
+  \label{tab:cidc25_k2k4}
+  \begin{tabular}{llcc}
+    \toprule
+    方法 & 稀疏模式 & K=2 PSNR / SSIM & K=4 PSNR / SSIM \\
+    \midrule
+    2.5D & Z & 51.72 / 0.9942 & 50.10 / 0.9912 \\
+    3D & Z & 44.43 / 0.9763 & 21.18 / 0.5249 \\
+    2D & Z & 42.59 / 0.9621 & 24.30 / 0.6287 \\
+    3D & XY & 40.64 / 0.9459 & 21.19 / 0.5251 \\
+    3D + Wiener & XY & 40.61 / 0.9525 & 38.50 / 0.9169 \\
+    3D + Wiener & XYZ & 39.06 / 0.9249 & --- \\
+    2.5D + mask & XY & 37.80 / 0.9152 & --- \\
+    2D & XY & 27.90 / 0.8176 & 22.18 / 0.5721 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{分析}
+降低稀疏强度到 K=2 后，3D 模型在 XY、Z、XYZ 上均显著改善。尤其普通 3D 在 Z 上由 K=4 的 21.18 dB 提升到 K=2 的 44.43 dB，表明 3D 模型对采样密度高度敏感。另一方面，2.5D+Z 在 K=4 已经达到很高水平，K=2 只进一步小幅提升，说明 Z sparse 的中心切面任务本身更适合邻切面冗余建模。图~\ref{fig:oblique_xy}--\ref{fig:oblique_z} 从体结构投影角度补充说明 K=2/K=4 的空间连续性差异。
+
+\subsection{PSF 物理先验结果}
+
+当前 PSF 相关结果可以归纳为：
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Wiener 初始化有效：} K=4 XY 下，3D baseline 为 21.19 dB / 0.5251，3D+Wiener 达到 38.50 dB / 0.9169。
+  \item \textbf{PSF channel 与 PSF loss 未形成稳定收益：} 已有主线文档中将其定位为负结果或消融，而非主贡献。
+  \item \textbf{Wiener 的收益具有场景依赖性：} K=2 XY 下普通 3D 与 3D+Wiener 的 PSNR 接近，但 Wiener 的 SSIM 略高；K=4 XY 下收益极大。
+\end{itemize}
+
+\subsection{MDC25 压力测试}
+
+表~\ref{tab:mdc25} 总结 MDC25 K2 optimized evaluation 的现有结果。
+
+\begin{table}[H]
+  \centering
+  \caption{MDC25 K2 压力测试结果。注意：不同方法评估帧数不齐，不能作为主 benchmark 排名。}
+  \label{tab:mdc25}
+  \begin{tabular}{lccc}
+    \toprule
+    Run & Frames & PSNR & SSIM \\
+    \midrule
+    2.5D XYZ mask + Wiener & 14 & 15.94 & 0.1975 \\
+    2.5D XY mask + Wiener & 14 & 15.93 & 0.1983 \\
+    2.5D Z mask + Wiener & 14 & 15.57 & 0.1872 \\
+    3D XY + Wiener & 16 & 14.67 & 0.1291 \\
+    3D XYZ + Wiener & 16 & 14.67 & 0.1283 \\
+    3D Z + Wiener & 16 & 9.86 & 0.1592 \\
+    2D XY + Wiener & 64 & 7.13 & 0.0557 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{分析}
+MDC25 结果整体偏低，且评估帧数不一致。这说明当前权重或协议对 MDC25 的跨数据泛化能力不足，也说明该结果不应和 CIDC25 主实验合并。若希望将 MDC25 写入正文，需要先完成同帧集合重评，并明确区分 MDC25-2D 与 MDC25-3D。对应的代表性可视化见图~\ref{fig:mdc25_best5}。
+
+\subsection{pollen 外部 2D 样本}
+
+pollen 结果显示，部分 3D/2.5D 权重在 2D pollen mean-projection 图上取得较高 PSNR，但该现象不能说明 3D 体重建成功。原因是 pollen 当前评估输入已经是 2D 图，3D/2.5D 结果属于跨维度迁移探索。
+
+代表性观察包括：
+\begin{itemize}[leftmargin=*]
+  \item 2xXY 样本中，部分 3D XY 权重可达到约 28 dB，2D Z 权重也出现约 29.90 dB 的偶然高值。
+  \item 4xXY 样本中，3D XY + Wiener 约 26.57 dB / 0.6036，2.5D XY 约 24.00 dB / 0.5858。
+  \item 不同样本之间指标差异大，且许多结果的标准差为 0，说明评估更接近少样本/单样本验证。
+\end{itemize}
+
+\paragraph{分析}
+pollen 应用于外部形态泛化和视觉检查，而不是主 benchmark。后续若要建立 pollen 主实验，需要重新定义真实 2D 稀疏采样协议、训练/验证划分和评估样本量。对应的外部样本可视化见图~\ref{fig:pollen_transfer}。
+
+\section{讨论}
+
+\subsection{为什么 2.5D + Z 表现强}
+
+Z sparse 保留了完整的单帧空间结构，主要缺失的是轴向中间切面。2.5D 模型正好使用邻近切面恢复中心切面，因此任务假设与模型结构高度匹配。相比 3D 模型，2.5D 参数和训练难度更低；相比 2D 模型，2.5D 又能利用邻切面冗余。因此在中心切面重建任务中，2.5D+Z 是非常自然且有效的方案。
+
+但必须强调：2.5D 输出的是中心切面，不是完整体块。因此它适合作为高质量中心切面恢复路径，而不是严格 3D volume reconstruction 的替代品。
+
+\subsection{为什么 3D + Wiener 在 XY 上有效}
+
+XY sparse 直接破坏每个切面的空间采样密度。普通 warm-start 主要基于几何插值，难以恢复细节和频域结构。Wiener 初始化利用 PSF 先验对输入做频域预反卷积，相当于在网络之前提供更接近物理逆问题解的初值。因此，在 K=4 XY 这种困难空间稀疏条件下，3D+Wiener 大幅优于普通 3D。
+
+该结果说明：物理先验未必应该直接作为网络通道或损失项硬塞进去；更稳妥的路径是把物理知识转化为数据流中的高质量初始化，降低网络学习难度。
+
+\subsection{为什么不能混排 CIDC25、MDC25、pollen}
+
+三类数据的任务边界不同：
+
+\begin{itemize}[leftmargin=*]
+  \item CIDC25 是 3D stack，可作为 2D/2.5D/3D 分层比较的主场景。
+  \item MDC25 同时包含 2D 和 3D 子集，必须拆分协议；当前评估帧数不齐。
+  \item pollen 当前是 2D mean-projection 外部样本，不是 3D benchmark。
+\end{itemize}
+
+如果把这些结果混成一个 PSNR 排名，排名靠前的模型可能只是因为数据维度、采样模式或评估样本不同，而不是方法真实更优。因此报告和论文必须使用协议分层，而不是全局大排名。
+
+\section{不足与风险}
+
+\subsection{实验协议层面的不足}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{MDC25 尚未完成同帧对齐重评。} 当前 2D、2.5D、3D 分别使用 64、14、16 帧，无法进行严格公平比较。
+  \item \textbf{pollen 样本量与协议不足。} 当前 pollen 是 2D mean projection，且多为少样本/单样本评估，不足以形成主结论。
+  \item \textbf{CIDC25 主结果集中在 F0。} F1/F2/F3 噪声级尚未系统复验，无法证明结论在不同噪声水平下稳定。
+  \item \textbf{部分 K=4 结果显示异常敏感性。} 普通 3D 在 K=4 下表现偏低，而 K=2 显著提升，提示训练预算、初始化或数据管线仍需进一步排查。
+\end{enumerate}
+
+\subsection{方法层面的不足}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{2.5D 与 3D 的任务目标不同。} 2.5D 是中心切面输出，3D 是体块输出，二者只能在切面级指标上比较，不能简单替代。
+  \item \textbf{PSF channel/loss 未充分调参。} 当前负结果只能说明在现有预算和实现下不稳定，不能完全否定这类方法。
+  \item \textbf{Wiener 初始化参数依赖性未系统消融。} PSF sigma、噪声常数和采样模式之间的关系仍需进一步扫描。
+  \item \textbf{缺少真实 3PM 数据的严格配对 GT。} 当前外部 pollen 数据只能作为形态泛化探索，不能完全代表真实三光子体重建。
+\end{enumerate}
+
+\subsection{论文表达层面的风险}
+
+\begin{itemize}[leftmargin=*]
+  \item 不应宣称“2.5D 完成 3D 重建”，应表述为“邻切面上下文辅助中心切面重建”。
+  \item 不应把 pollen 上的 3D/2.5D 权重测试写成 3D benchmark，应写成 transfer probe。
+  \item 不应把 MDC25 当前结果写成严格跨数据验证，除非完成同帧、同协议重评。
+  \item 不应把 PSF channel/loss 写成正贡献，目前更适合写成消融负结果。
+\end{itemize}
+
+\section{后续工作}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{CIDC25 多噪声级复验：} 在 F1/F2/F3 上复验 2.5D+Z 与 3D+Wiener+XY 两条主线，验证噪声鲁棒性。
+  \item \textbf{MDC25 同帧重评：} 对 MDC25-3D 固定同一帧索引集合，重新评估 2D、2.5D、3D，形成可进入正文的独立表。
+  \item \textbf{pollen 2D 协议重建：} 只保留 2D 合法模型作为主结果；若使用 2.5D/3D 权重，明确标注为 transfer probe。
+  \item \textbf{Wiener 参数消融：} 扫描 PSF sigma、Wiener 噪声常数、K 值和 sparse mode，确定稳定区间。
+  \item \textbf{报告图表重构：} 主图按数据协议组织，而非按所有 run 排名；每张图只回答一个实验问题。
+\end{enumerate}
+
+\section{结论}
+
+本报告将项目从“所有模型在所有数据上测试”的探索状态，重整为“数据协议先行、模型维度匹配、结果分层解释”的论文式主线。现有证据支持两个可写入正文的核心结论：
+
+\begin{enumerate}[leftmargin=*]
+  \item 在 CIDC25 3D stack 的 Z sparse 设置下，2.5D 利用邻切面冗余，能稳定完成高质量中心切面重建。
+  \item 在困难 XY sparse 设置下，3D 模型结合 Wiener 物理初始化能显著提升重建质量，说明物理先验作为输入初始化比直接通道/损失注入更稳定。
+\end{enumerate}
+
+MDC25 与 pollen 当前结果应作为压力测试和迁移探索，用于揭示泛化不足和协议风险，而不是支撑主 benchmark 排名。后续工作的重点应放在：CIDC25 多噪声级复验、MDC25 同帧重评、pollen 2D 合法协议整理，以及 Wiener 物理初始化的系统消融。
+
+\appendix
+
+\section{项目文档索引}
+
+\begin{itemize}[leftmargin=*]
+  \item 数据协议：\texttt{docs/DATASET\_PROTOCOL.md}
+  \item 结果分层：\texttt{docs/RESULT\_TAXONOMY.md}
+  \item 主线说明：\texttt{report/SUCCESS\_PATH\_2D\_2P5D\_3D.md}
+  \item K=4 主结果：\texttt{eval\_sparse3d\_k4\_fullimg/summary\_all.md}
+  \item K=2/K=4 汇总：\texttt{eval\_sparse3d\_k2\_fullimg/summary\_all.md}
+  \item MDC25 压力测试：\texttt{eval\_mdc25\_sparse/summary\_all.md}
+  \item pollen 迁移探索：\texttt{eval\_pollen\_sparse/summary\_pollen.md}
+\end{itemize}
+
+\section{图集：关键结论对应的可视化证据}
+\label{app:figure_atlas}
+
+本图集集中展示正文结论对应的可视化证据。正文保留逻辑和定量表格，图像统一放在这里，便于按结论核对。
+
+\subsection{CIDC25 主实验图集}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{qual_panel_xy.png}
+  \caption{CIDC25/F0，XY 稀疏代表帧对比。该图用于核对空间稀疏下 K=2/K=4、2D/2.5D/3D 的定性差异；与正文表~\ref{tab:cidc25_k2k4} 中 XY 结果对应。}
+  \label{fig:qual_xy}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{qual_panel_z.png}
+  \caption{CIDC25/F0，Z 稀疏代表帧对比。该图对应正文关于 2.5D + Z sparse 的核心结论：邻切面上下文能稳定恢复中心切面。}
+  \label{fig:qual_z}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{qual_panel_xyz.png}
+  \caption{CIDC25/F0，XYZ 联合稀疏代表帧对比。该图用于观察复合稀疏下结构恢复难度和不同模型族的失败模式。}
+  \label{fig:qual_xyz}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\textwidth]{oblique_panel_xy.png}
+  \caption{CIDC25/F0，XY 稀疏下的 3D 斜视投影对比。该图用于补充说明体结构连续性，尤其是 K=2/K=4 下 3D 重建的空间连贯差异。}
+  \label{fig:oblique_xy}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\textwidth]{oblique_panel_z.png}
+  \caption{CIDC25/F0，Z 稀疏下的 3D 斜视投影对比。该图用于核对轴向稀疏重建中的体结构连续性。}
+  \label{fig:oblique_z}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\textwidth]{oblique_panel_xyz.png}
+  \caption{CIDC25/F0，XYZ 联合稀疏下的 3D 斜视投影对比。该图对应最困难复合稀疏场景。}
+  \label{fig:oblique_xyz}
+\end{figure}
+
+\subsection{MDC25 压力测试图集}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.96\textwidth]{mdc25_k2_best5_modes.png}
+  \caption{MDC25 K2 代表结果对比。该图仅用于跨数据压力测试，不进入 CIDC25 主 benchmark 排名；对应正文表~\ref{tab:mdc25}。}
+  \label{fig:mdc25_best5}
+\end{figure}
+
+\subsection{pollen 外部迁移图集}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.96\textwidth]{pollen-fov1-4xXY-32.5mW_best5.png}
+  \caption{pollen 2D real sparse 外部样本迁移示例。该图用于展示真实外部样本上的形态泛化与失败边界；不作为 3D 体重建 benchmark。}
+  \label{fig:pollen_transfer}
+\end{figure}
+
+\end{document}

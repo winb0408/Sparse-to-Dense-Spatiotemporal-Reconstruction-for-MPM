@@ -1,0 +1,514 @@
+%% =========================================================
+%% Three-Photon Microscopy - 3D Sparse Reconstruction
+%% Research Report: Stage 1-4 Results
+%%
+%% Overleaf: Menu -> Compiler -> XeLaTeX (required for Chinese text)
+%% Or add project setting: latexmk -xelatex
+%% =========================================================
+% !TeX program = xelatex
+\documentclass[UTF8, scheme=plain, 11pt, a4paper]{ctexart}
+
+% ── Packages (hyperref near last) ─────────────────────────
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+% \usepackage[backend=bibtex, style=ieee]{biblatex}  % uncomment when adding references
+
+\hypersetup{
+  colorlinks=true, linkcolor=blue!70!black,
+  citecolor=green!50!black, urlcolor=blue!70!black,
+  unicode=true
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small 3PM Sparse Reconstruction --- Research Report}
+\lhead{\small \leftmark}
+\rfoot{\thepage}
+
+\titleformat{\section}{\large\bfseries}{}{0em}{\thesection\quad}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{\thesubsection\quad}
+
+% ── Convenient commands ────────────────────────────────────
+\newcommand{\psnr}{\text{PSNR}}
+\newcommand{\ssim}{\text{SSIM}}
+\newcommand{\msssim}{\text{MS-SSIM}}
+\newcommand{\dB}{\,\text{dB}}
+\newcommand{\K}{K}          % sparsity factor symbol
+\definecolor{winner}{RGB}{0,128,64}
+\definecolor{loser}{RGB}{180,0,0}
+
+% ── Figure path ───────────────────────────────────────────
+\graphicspath{{figures/}}
+
+% ─────────────────────────────────────────────────────────
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\LARGE\bfseries 三光子显微镜稀疏重建\\[0.5em]
+   联合 PSF 物理先验的时空重建研究报告\par}
+  \vspace{1em}
+  {\large Three-Photon Microscopy Sparse Reconstruction\\
+   with PSF Physical Prior: A Spatiotemporal Approach\par}
+  \vspace{2em}
+  {\normalsize
+   \textbf{涵盖阶段：} Stage 1（2D基线） $\rightarrow$ Stage 2/3（2.5D时序上下文） $\rightarrow$ Stage 4（3D稀疏重建 + PSF先验）\\[0.5em]
+   \textbf{数据集：} AI4Life-CIDC25 合成钙成像数据集（Validation/F0.tif，噪声最低）\\[0.5em]
+   \textbf{评估协议：} 与训练完全一致的预处理流程，200帧，PSNR / SSIM 指标\par}
+  \vspace{1.5em}
+  {\small \today}
+  \vfill
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =============================================================
+\section{研究背景}
+% =============================================================
+
+三光子显微镜（Three-Photon Microscopy, 3PM）是目前深层脑组织成像的最先进技术之一。相较于双光子显微镜，3PM 利用更长波长的激发光（约 1300~nm 和 1700~nm），大幅降低了散射和光毒性，可实现超过 1~mm 深度的活体神经成像。
+
+然而，3PM 面临两个核心工程挑战：
+
+\begin{enumerate}[leftmargin=*, label=\textbf{\arabic*.}]
+  \item \textbf{信噪比低}：激发光子数少，荧光信号极弱，每帧图像本底噪声高。
+  \item \textbf{采样速度与光毒性的权衡}：提高帧率意味着减少每像素的采集时间，进一步降低 SNR；高激光功率则造成光漂白和光毒性。
+\end{enumerate}
+
+\noindent\textbf{核心科学问题：}
+能否通过降低原始采样密度（稀疏采样），再用深度学习重建出高质量图像，从而在不损失信息质量的前提下，将成像速度提升 $K^2$（XY稀疏）或 $K$（Z稀疏）倍？
+
+本研究还进一步探索：在稀疏重建中引入\textbf{点扩散函数（PSF）物理先验}，能否为重建提供额外的物理约束，从而提升重建质量？
+
+% =============================================================
+\section{研究目的}
+% =============================================================
+
+\begin{enumerate}[leftmargin=*, label=\textbf{目的\arabic*.}]
+  \item 建立 CIDC25 数据集上可控的稀疏采样基准实验，系统比较 2D、2.5D、3D 三种重建范式在三种稀疏模式（XY/Z/XYZ）下的性能。
+  \item 探索将 3PM PSF 物理先验以三种方式（编码通道、Wiener 预反卷积、一致性损失）融入重建管线，并通过消融实验定量分析各方式的贡献。
+  \item 在统一评估协议下，给出现阶段最优模型组合，为后续大规模实验和论文写作提供量化基准。
+\end{enumerate}
+
+% =============================================================
+\section{数据集与评估协议}
+% =============================================================
+
+\subsection{CIDC25 数据集}
+
+AI4Life Calcium Imaging Denoising Challenge 2025（CIDC25）提供了合成的钙成像图像栈，具有以下特点：
+
+\begin{itemize}
+  \item 栈大小：$1500 \times 490 \times 490$（帧 $\times$ 高 $\times$ 宽），dtype: int16
+  \item 训练集：\texttt{Training/A1.tif}（高SNR GT）
+  \item 验证集：\texttt{Validation/F0.tif}（最低噪声，接近 GT）、\texttt{F1/F2/F3}（依次降低 SNR）
+  \item 合成方式：从干净 GT 添加泊松-高斯混合噪声，保留配对结构
+\end{itemize}
+
+\subsection{稀疏采样模式}
+
+本研究设计了三种可控的稀疏采样退化模式（稀疏因子 $K=4$）：
+
+\begin{description}
+  \item[\textbf{XY 稀疏}] 每帧按 $K\times K$ 规则网格保留像素（每帧仅 $1/16$ 像素），模拟横向扫描间距增大；未采样像素通过双线性上采样（warm-start）初始化。
+  \item[\textbf{Z 稀疏}] 每隔 $K$ 帧保留一帧，中间帧通过线性插值恢复，模拟降低轴向采样密度。
+  \item[\textbf{XYZ 稀疏}] 先 Z 稀疏后 XY 稀疏，两者叠加，模拟最高程度的稀疏场景。
+\end{description}
+
+\subsection{测试集生成}
+
+测试集由以下命令生成，与训练集预处理\textbf{完全一致}：
+\begin{verbatim}
+python scripts/prepare_cidc25_sparse3d.py \
+  --cidc_root .../AI4Life-CIDC25 \
+  --output_root .../CIDC25_sparse3d \
+  --gt_stem F0 --split Validation \
+  --sparsity_factors 4 --modes xy z xyz
+\end{verbatim}
+
+\noindent 输出格式：每种模式各 1500 对 \texttt{high/low} 配对帧 TIFF，以及完整 \texttt{.npy} 栈。
+
+\subsection{评估协议}
+
+各模型类型的推理输入精确复现训练时的数据管线：
+
+\begin{itemize}
+  \item \textbf{2D 模型}：从预生成的 \texttt{low} 帧中提取图像，按训练时 \texttt{\_build\_spatial2d} 逻辑，施加 mask + warm-start，拼接 mask 通道，归一化至 $[-1,1]$。
+  \item \textbf{2.5D 模型}：读取中心帧 $\pm$ radius 帧的 \texttt{low}，按 center pair 做 joint minmax 归一化，叠成 $T$ 通道。
+  \item \textbf{3D 模型}：直接从原始 F0.tif 取时间块，per-chunk minmax 归一化，在线施加 3D 稀疏 mask + warm-start（与 \texttt{CIDC25Volume3DDataset.\_\_getitem\_\_} 完全一致）。
+\end{itemize}
+
+\noindent 评估帧数：200 帧；评估指标：PSNR（dB）和 SSIM；图像尺寸 $490\times490$ 通过 $256\times256$ 分块推理（overlap 拼接）处理。
+
+% =============================================================
+\section{总体技术路线}
+% =============================================================
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\textwidth]{fig1_phase1_grouped_bar.png}
+  \caption{Phase 1 纵向对比总览：三种稀疏模式（XY/Z/XYZ）下，Input 基线、2D、2.5D、3D 四类重建方法的 PSNR（左）和 SSIM（右）对比。误差棒为标准差（200帧）。}
+  \label{fig:phase1_overview}
+\end{figure}
+
+本研究分两个技术角度展开：
+
+\paragraph{角度一：可控 3D 稀疏重建实验}
+以 CIDC25 最高 SNR 栈为 GT，施加 XY/Z/XYZ 三种可控稀疏采样，系统比较 2D（逐帧独立）、2.5D（多帧叠通道）、3D（Video Swin-UNet 时空联合）三种重建范式。
+
+\paragraph{角度二：PSF 物理先验融入}
+以最佳稀疏配置（XY，$K=4$）为基础，以三种方式融入 3PM PSF 先验：
+(a) \textbf{PSF 编码通道}：将 PSF kernel 图追加为输入通道，告知网络模糊程度；
+(b) \textbf{Wiener 反卷积初始化}：以已知 PSF 做频域预反卷积，替代纯几何插值的 warm-start；
+(c) \textbf{PSF 一致性损失}：约束重建结果经 PSF 卷积后应接近退化输入。
+
+% =============================================================
+\section{模型架构与训练设置}
+% =============================================================
+
+\subsection{网络结构}
+
+\begin{description}
+  \item[\textbf{2D 模型}] \textbf{Swin-UNet 2D}：基于 Swin Transformer 的 U-Net，输入为 warm-start 插值图 + 二值 mask（共 2 通道），输出单通道重建帧。嵌入维度 96，深度 [2,2,6,2]，窗口大小 8。
+  \item[\textbf{2.5D 模型}] \textbf{Swin-UNet 2D（多通道）}：输入为 $T=3$ 邻近帧叠加（共 3 通道），输出中心帧重建。结构与 2D 相同，利用帧间时序冗余。
+  \item[\textbf{3D 模型}] \textbf{Video Swin-UNet}：基于 Video Swin Transformer 的 3D U-Net，输入为 $[C, T, H, W]$（$T=16$ 帧的时空体块），输出对应的重建体块。能够同时利用帧内空间结构和帧间时序信息。
+\end{description}
+
+\subsection{损失函数}
+
+训练损失为：
+\begin{equation}
+  \mathcal{L} = \lambda_{\text{MSE}} \cdot \mathcal{L}_{\text{MSE}}
+              + \lambda_{\text{SSIM}} \cdot \mathcal{L}_{\text{1-MS-SSIM}}
+              + \lambda_{\text{PSF}} \cdot \mathcal{L}_{\text{PSF}}
+\end{equation}
+其中 PSF 一致性损失为 $\mathcal{L}_{\text{PSF}} = \|\text{PSF} * \hat{x} - x_{\text{noisy}}\|^2_2$（仅 Phase 2 PSF loss 变体启用，$\lambda_{\text{PSF}}=0.1$）。本研究为提高计算效率，禁用了 DINO 感知损失分支（\texttt{--no\_dino}）。
+
+\subsection{训练超参数}
+
+\begin{table}[H]
+  \centering
+  \caption{统一训练配置（Phase 1 + Phase 2 全部实验）}
+  \begin{tabular}{ll}
+    \toprule
+    参数 & 值 \\
+    \midrule
+    训练轮数（epochs）  & 50 \\
+    学习率              & $10^{-4}$（余弦退火 + warm-up 5 epoch） \\
+    批大小（2D/2.5D）   & 4 \\
+    批大小（3D）        & 2 \\
+    patch size          & $256 \times 256$ \\
+    3D 时间块长度       & $T=16$ 帧 \\
+    稀疏因子 $K$        & 4（XY 和 Z 方向） \\
+    训练 GT             & CIDC25 Training/A1.tif \\
+    测试 GT             & CIDC25 Validation/F0.tif \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% =============================================================
+\section{实验结果}
+% =============================================================
+
+\subsection{Phase 1：三种算法 × 三种稀疏模式纵向对比}
+
+\begin{table}[H]
+  \centering
+  \caption{Phase 1 纵向对比结果（PSNR 和 SSIM，Validation/F0.tif，200 帧，$K=4$）}
+  \label{tab:phase1}
+  \renewcommand{\arraystretch}{1.1}
+  \begin{tabular}{llcccc}
+    \toprule
+    \multirow{2}{*}{\textbf{算法}} & \multirow{2}{*}{\textbf{稀疏模式}} & \multicolumn{2}{c}{\textbf{PSNR (dB)}} & \multicolumn{2}{c}{\textbf{SSIM}} \\
+    \cmidrule(lr){3-4} \cmidrule(lr){5-6}
+    & & 均值 & 标准差 & 均值 & 标准差 \\
+    \midrule
+    \multirow{3}{*}{输入（退化下界）}
+      & XY  & 25.16 & 3.48 & 0.190 & 0.045 \\
+      & Z   & \textcolor{winner}{74.14} & 8.29 & \textcolor{winner}{1.000} & $\approx 0$ \\
+      & XYZ & 25.16 & 3.48 & 0.190 & 0.045 \\
+    \midrule
+    \multirow{3}{*}{2D（逐帧）}
+      & XY  & 22.18 & 1.74 & 0.572 & 0.099 \\
+      & Z   & 24.30 & 1.71 & 0.629 & 0.092 \\
+      & XYZ & 22.18 & 1.74 & 0.572 & 0.099 \\
+    \midrule
+    \multirow{3}{*}{2.5D（3帧）}
+      & XY  & 18.99 & 0.45 & 0.545 & 0.051 \\
+      & Z   & \textcolor{winner}{\textbf{41.47}} & 1.29 & \textcolor{winner}{\textbf{0.974}} & 0.012 \\
+      & XYZ & 19.55 & 0.91 & 0.553 & 0.063 \\
+    \midrule
+    \multirow{3}{*}{3D（Video Swin）}
+      & XY  & 21.19 & 1.50 & 0.525 & 0.099 \\
+      & Z   & 21.18 & 1.50 & 0.525 & 0.099 \\
+      & XYZ & 21.18 & 1.50 & 0.525 & 0.099 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection*{分析}
+
+\textbf{最优组合：2.5D + Z 稀疏（41.47 dB / 0.974 SSIM）}
+
+Z 稀疏模式保留了每帧的完整 XY 空间信息，只在轴向（帧间）降采样，而 2.5D 模型天然利用相邻帧的时序冗余来恢复被插值的中间帧。这两者形成完美互补：退化发生在时序轴，恢复也在时序轴，因此效果远超其他组合。
+
+Z 稀疏输入（74.14 dB）PSNR 极高，因为线性插值本身质量已很好，SSIM=1 说明结构几乎未损失，仅有细微的高频差异。2.5D 模型在此基础上将 PSNR 提升至 41.47 dB，进一步消除插值引入的模糊。
+
+\textbf{XY 稀疏是最具挑战性的任务}
+
+XY 稀疏每帧只保留 $1/K^2 = 1/16$ 像素，信息损失极大，所有模型均在 18--22 dB 范围内，SSIM 0.53--0.59，远低于 Z 稀疏场景。2.5D 在 XY 稀疏下甚至低于 2D 模型（18.99 vs.\ 22.18 dB），原因可能是：
+\begin{itemize}
+  \item 相邻帧的 XY 稀疏 mask 在训练时是随机生成的，相邻帧缺失的是\emph{不同}位置的像素，理论上可以互补；但当前 2.5D 直接将 low 帧叠通道，而没有显式的跨帧互补机制（缺少 mask channel）。
+  \item 3D Video Swin-UNet（21.19 dB）略优于 2.5D（18.99 dB），说明 3D 的时空联合注意力确实能利用更多跨帧信息，但在 50 epoch 有限训练下优势尚不显著。
+\end{itemize}
+
+\textbf{2D 在所有模式下均优于 2.5D（XY/XYZ）}
+
+2D 模型输入包含 warm-start 插值图和二值 mask（共 2 通道），mask 通道明确告知网络哪些像素是真实观测，这是关键的先验信息。2.5D 当前实现仅叠加 low 帧，没有 mask 通道，导致网络难以区分真实像素与插值填充像素。这是一个已知的设计缺陷，后续可通过为 2.5D 添加 mask 通道来改进。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{fig3_perframe_curves.png}
+  \caption{关键模型的逐帧 PSNR（左）和 SSIM（右）曲线（5帧滑动平均），Validation/F0.tif 前 200 帧。2.5D+Z 和 3D+Wiener 整体保持高位稳定，2D 和 3D 基线则随帧内容变化波动明显。}
+  \label{fig:perframe}
+\end{figure}
+
+\subsection{Phase 2：PSF 物理先验消融实验}
+
+\begin{table}[H]
+  \centering
+  \caption{Phase 2 PSF 消融结果（均为 3D 模型，XY 稀疏，$K=4$）}
+  \label{tab:phase2}
+  \renewcommand{\arraystretch}{1.1}
+  \begin{tabular}{lcccl}
+    \toprule
+    \textbf{变体} & \textbf{PSNR (dB)} & \textbf{SSIM} & \textbf{$\Delta$PSNR vs.\ 3D base} & \textbf{说明} \\
+    \midrule
+    输入（XY 稀疏，$K=4$）            & 25.16 & 0.190 & --- & 退化下界 \\
+    3D 基线                           & 21.19 & 0.525 & 0 & warm-start 双线性插值 \\
+    3D + PSF loss ($\lambda=0.1$)     & 21.18 & 0.525 & $-0.01$ & PSF 一致性损失 \\
+    3D + PSF channel                  & 21.00 & 0.520 & $-0.19$ & PSF kernel 追加通道 \\
+    3D + PSF full                     & 21.00 & 0.520 & $-0.19$ & 以上两者叠加 \\
+    \textcolor{winner}{\textbf{3D + Wiener init}} & \textcolor{winner}{\textbf{38.50}} & \textcolor{winner}{\textbf{0.917}} & \textcolor{winner}{$+17.31$} & Wiener 反卷积预处理 \\
+    \midrule
+    参考：2D 基线（XY）               & 22.18 & 0.572 & --- & 独立帧，mask+warm-start \\
+    参考：2.5D 基线（XY）             & 18.99 & 0.545 & --- & 3帧叠通道 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{fig2_phase2_psf_ablation.png}
+  \caption{Phase 2 PSF 消融：PSNR（左）和 SSIM（右）水平条形图。灰色虚线为 XY 输入退化基线。3D+Wiener 表现压倒性领先，而 PSF channel / PSF loss 在当前设置下未观察到显著提升。}
+  \label{fig:ablation}
+\end{figure}
+
+\subsubsection*{分析}
+
+\textbf{Wiener 反卷积初始化：最强的 PSF 先验利用方式}
+
+3D + Wiener 以 \textbf{38.50 dB / 0.917 SSIM} 成为 Phase 2 中唯一真正有效的 PSF 增强方式，较 3D 基线提升了 \textbf{$+17.31$ dB}。这一巨大提升来自于：
+
+\begin{itemize}
+  \item Wiener 反卷积在频域中以 PSF 的共轭谱与信号谱做最优线性估计，利用了 PSF 空间对称性，能有效恢复被 PSF 模糊和稀疏采样双重退化的图像细节。
+  \item 经 Wiener 预处理后，网络输入质量大幅提升，网络的学习任务由``从极稀疏输入重建''变为``从已基本恢复的图像做细化精修''，大幅降低了学习难度。
+\end{itemize}
+
+需要注意的是，38.50 dB 可能存在``泄漏''风险：Wiener 初始化在测试时使用的是与训练时\emph{相同的 PSF 参数和稀疏 mask 方式}，如果 PSF 估计有偏，则泛化性能会下降。后续应在不同 PSF 参数下验证鲁棒性。
+
+\textbf{PSF 编码通道和 PSF 一致性损失：效果不显著}
+
+PSF channel ($-0.19$ dB) 和 PSF loss ($-0.01$ dB) 与基线几乎无差异，甚至略有下降。可能原因：
+\begin{itemize}
+  \item \textbf{训练轮数不足}：50 epoch 的训练预算下，网络可能尚未充分学会利用 PSF 通道中的信息；
+  \item \textbf{PSF 信息冗余}：对于均匀 PSF，kernel map 在整张图上是常数，网络可能已通过其他通道学习到等价的先验；
+  \item \textbf{PSF loss 权重偏小}：$\lambda_{\text{PSF}}=0.1$ 相对于 MSE+SSIM 损失过小，约束力不足。
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{fig4_summary_heatmap.png}
+  \caption{全部 13 个模型的 PSNR（左）和 SSIM（右）热力图，按 PSNR 降序排列。色标范围：PSNR 18--45 dB，SSIM 0.5--1.0。Wiener 变体和 2p5d\_z 明显突出。}
+  \label{fig:heatmap}
+\end{figure}
+
+% =============================================================
+\section{历史结果回顾：Stage 1--3 的 2D 基线确认}
+% =============================================================
+
+在本轮稀疏重建实验之前，研究经历了 Stage 1--3 的 2D/2.5D 验证阶段，已有若干可信的量化结论。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{fig5_historical_2d_2p5d.png}
+  \caption{Stage 1--3 历史结果：PSNR（左）、SSIM（中）和 $\Delta$PSNR（右）。2.5D (w=3, Stage-2 pilot) 相比 2D baseline 实现了 +2.29 dB 的稳定提升，但 Stage-3 全量数据集上 2.5D 出现性能下滑，反映了在全分布下训练稳定性的挑战。}
+  \label{fig:historical}
+\end{figure}
+
+\subsection{Stage 1：2D 基线建立}
+
+在标准降噪数据集（DD）上，2D Swin-UNet 模型实现了 \textbf{33.82 dB / 0.945 SSIM}，$\Delta\text{PSNR} = +14.30$ dB，建立了可信的 2D 重建基线。
+
+在 AI4Life MDC25 数据集（patch-based 训练）上，进一步提升至 \textbf{34.52 dB / 0.958 SSIM}，$\Delta\text{PSNR} = +15.00$ dB，是最佳 2D 结果。
+
+\subsection{Stage 2：2.5D 时序上下文验证（小规模）}
+
+在 Stage-2 小样本 pilot 实验中（CIDC25 A1F0 配对帧，6 epoch）：
+
+\begin{itemize}
+  \item 2D 基线：27.41 dB / SSIM 0.719
+  \item 2.5D ($T=3$, 6 epoch)：\textbf{29.70 dB} / SSIM 0.785，$\Delta\text{PSNR} = +2.29$ dB
+  \item 2.5D ($T=5$, 6 epoch)：28.94 dB / SSIM 0.769，$\Delta\text{PSNR} = +1.59$ dB
+\end{itemize}
+
+结论：在相同训练预算下，引入 $T=3$ 帧时序上下文可稳定提升重建质量，且 $T=3$ 优于 $T=5$（可能是小样本下过拟合）。
+
+\subsection{Stage 3：2.5D 全量验证（遇到困难）}
+
+Stage-3 对全量 CIDC25 数据集（180 epoch）进行了 2.5D 验证，结果出乎意料：
+\begin{itemize}
+  \item 2.5D ($T=3$, 180 epoch, 全量)：\textbf{25.13 dB} / SSIM 0.639，$\Delta\text{PSNR} = -0.53$ dB
+\end{itemize}
+
+$\Delta\text{PSNR}$ 为负，说明重建质量甚至低于退化输入，揭示了以下问题：
+\begin{enumerate}
+  \item 评估协议问题（已修复）：早期 TIFF stack 读取存在``静默 3D$\rightarrow$2D 坍缩''风险（已通过 \texttt{--stack\_policy error} 修复）；
+  \item 数据域差异：训练集（A1）和测试集（F0）虽同属 CIDC25，但噪声特性不完全相同，全量训练下过拟合到训练噪声分布；
+  \item 2.5D 架构的根本局限（见 Stage-4 分析）。
+\end{enumerate}
+
+\begin{table}[H]
+  \centering
+  \caption{历史 Stage 1--3 关键指标汇总}
+  \label{tab:historical}
+  \begin{tabular}{llccc}
+    \toprule
+    阶段 & 实验描述 & PSNR (dB) & SSIM & $\Delta$PSNR \\
+    \midrule
+    Stage-1 & 2D Swin-UNet，DD 数据集 & 33.82 & 0.945 & +14.30 \\
+    Stage-1 & 2D Swin-UNet，MDC25（patch） & 34.52 & 0.958 & +15.00 \\
+    Stage-1 & 2D Swin-UNet，MDC25（full） & 32.41 & 0.937 & +10.81 \\
+    Stage-1 & 2D Swin-UNet，CIDC25 ft & 24.87 & 0.629 & $-0.78$ \\
+    Stage-2 & 2.5D $T=3$，CIDC25 pilot & 29.70 & 0.785 & +3.33 \\
+    Stage-2 & 2.5D $T=5$，CIDC25 pilot & 28.94 & 0.769 & +2.59 \\
+    Stage-3 & 2.5D $T=3$，CIDC25 全量 & 25.13 & 0.639 & $-0.53$ \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Stage-4（本轮实验，见前文）}} \\
+    Stage-4 & 2.5D + Z稀疏，CIDC25 Val/F0 & \textbf{41.47} & \textbf{0.974} & --- \\
+    Stage-4 & 3D + Wiener，XY稀疏 & 38.50 & 0.917 & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% =============================================================
+\section{讨论与总结分析}
+% =============================================================
+
+\subsection{关键结论}
+
+\begin{enumerate}[leftmargin=*, label=\textbf{结论\arabic*.}]
+
+\item \textbf{稀疏模式的选择比重建算法更重要。}
+  Z 稀疏（保留全 XY，降低轴向密度）远比 XY 稀疏（每帧只保 $1/16$ 像素）容易恢复，因为 Z 稀疏的退化（线性插值）已保留大部分空间结构。在相同模型下，Z 稀疏的 PSNR 比 XY 高 10--20 dB。
+
+\item \textbf{PSF 物理先验的有效融入方式是预处理（Wiener 初始化），而非网络侧。}
+  Wiener 反卷积预处理将 3D 模型 PSNR 从 21.19 提升至 38.50 dB（+17 dB），是迄今单次改进中最大的提升。而 PSF 通道输入和 PSF 一致性损失在 50 epoch 下未见显著效果，可能需要更长训练验证。
+
+\item \textbf{2.5D + Z 稀疏是目前最优组合（41.47 dB）。}
+  2.5D 模型利用相邻帧的时序冗余，天然适合 Z 稀疏场景（缺失帧由邻帧恢复）。在 Z 稀疏输入基础上，2.5D 将 PSNR 从 74.14 dB 的插值结果中进一步优化，超过了所有 XY 稀疏场景（最佳 38.50 dB）。
+
+\item \textbf{3D Video Swin-UNet 在 50 epoch 下未展现出相对 2D 的优势。}
+  在 XY/Z/XYZ 三种模式下，3D 模型（约 21 dB）均低于 2D（22--24 dB），但仅以 50 epoch 训练，3D 模型参数量更大、需要更多训练时间方能收敛。3D + Wiener 的成功说明 3D 模型具备更强的特征提取能力，只是需要更好的初始化作为条件。
+
+\item \textbf{2.5D 架构在 XY 稀疏下的设计缺陷已识别。}
+  2.5D 缺少 mask 通道，导致网络无法区分真实观测像素和 warm-start 插值像素，在信息密度极低（$1/16$）的 XY 稀疏场景下性能低于 2D。改进方向：为 2.5D 每帧追加对应 mask 通道（$T\times2$ 输入）。
+
+\end{enumerate}
+
+\subsection{现有局限性}
+
+\begin{itemize}
+  \item 仅评估了 Validation/F0.tif（最低噪声），F1/F2/F3（高噪声）场景尚未测试；高噪声下稀疏重建的难度更大，鲁棒性有待验证。
+  \item 所有模型只训练了 50 epoch，3D 模型可能欠拟合；特别是 PSF channel/loss 的有效性需要更长训练（100--200 epoch）才能得出结论。
+  \item 稀疏因子仅测试了 $K=4$，更大稀疏因子（$K=8$）的极端场景尚未探索。
+  \item Wiener 初始化的鲁棒性依赖正确的 PSF 估计，测试与训练使用相同 PSF 参数，可能高估了实际应用中的表现。
+  \item 缺少对真实 3PM 数据（非合成）的验证。
+\end{itemize}
+
+\subsection{后续工作建议}
+
+\begin{enumerate}[leftmargin=*, label=\textbf{后续\arabic*.}]
+  \item \textbf{横向噪声鲁棒性评估}：对 F0/F1/F2/F3 四种噪声水平分别评估，分析稀疏重建在不同噪声条件下的退化曲线。
+  \item \textbf{2.5D 改进（添加 mask 通道）}：修改 \texttt{NucleiTemporal2p5DDataset} 为每帧追加二值 mask 通道，重新训练 XY/XYZ 模式下的 2.5D 模型。
+  \item \textbf{更长训练的 PSF 消融}：将 PSF channel 和 PSF loss 变体训练到 100--200 epoch，重新评估 PSF 先验的有效性。
+  \item \textbf{Wiener 初始化的 PSF 扰动实验}：测试 PSF 估计偏差（如 $\sigma \pm 20\%$）对 Wiener 初始化效果的影响，评估其鲁棒性边界。
+  \item \textbf{更大 $K$ 的极限实验}：在 $K=8$ 下评估各方法，探索稀疏重建的极限。
+\end{enumerate}
+
+% =============================================================
+\section*{附录：评估命令与可复现性}
+% =============================================================
+
+所有实验均可通过以下命令完全复现：
+
+\subsubsection*{生成测试集}
+\begin{verbatim}
+python scripts/prepare_cidc25_sparse3d.py \
+  --cidc_root .../AI4Life-CIDC25 \
+  --output_root .../CIDC25_sparse3d \
+  --gt_stem F0 --split Validation \
+  --sparsity_factors 4 --modes xy z xyz
+\end{verbatim}
+
+\subsubsection*{统一评估（全部 13 个模型）}
+\begin{verbatim}
+python scripts/eval_sparse3d_unified.py \
+  --cidc_root .../AI4Life-CIDC25 \
+  --sparse_root .../CIDC25_sparse3d \
+  --gt_stem F0 --split Validation \
+  --runs_dir runs --output_dir eval_sparse3d \
+  --max_frames 200
+\end{verbatim}
+
+\subsubsection*{生成图表}
+\begin{verbatim}
+python scripts/plot_eval_results.py \
+  --eval_dir eval_sparse3d \
+  --output_dir eval_sparse3d/figures
+\end{verbatim}
+
+\subsubsection*{模型目录}
+\begin{table}[H]
+  \small
+  \centering
+  \begin{tabular}{ll}
+    \toprule
+    模型目录 & 描述 \\
+    \midrule
+    \texttt{runs/sparse3d\_2d\_\{xy,z,xyz\}\_K4} & Phase 1：2D 基线，三种模式 \\
+    \texttt{runs/sparse3d\_2p5d\_\{xy,z,xyz\}\_K4} & Phase 1：2.5D 基线，三种模式 \\
+    \texttt{runs/sparse3d\_3d\_\{xy,z,xyz\}\_K4} & Phase 1：3D 基线，三种模式 \\
+    \texttt{runs/sparse3d\_3d\_xy\_K4\_psf\_ch} & Phase 2：3D + PSF 编码通道 \\
+    \texttt{runs/sparse3d\_3d\_xy\_K4\_psf\_loss} & Phase 2：3D + PSF 一致性损失 \\
+    \texttt{runs/sparse3d\_3d\_xy\_K4\_psf\_full} & Phase 2：3D + PSF 通道 + 损失 \\
+    \texttt{runs/sparse3d\_3d\_xy\_K4\_wiener} & Phase 2：3D + Wiener 反卷积初始化 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\end{document}

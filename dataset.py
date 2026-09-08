@@ -52,6 +52,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, Subset
+from scipy.ndimage import zoom
 
 # ── tifffile is mandatory — PIL truncates 16-bit to 8-bit ────────────────────
 try:
@@ -140,7 +141,7 @@ def load_tiff_float32(
 # 2.  Scientific normalisation
 # ═════════════════════════════════════════════════════════════════════════════
 
-NormMode = Literal["minmax", "zscore", "fixed"]
+NormMode = Literal["minmax", "zscore", "fixed", "minmax255", "fixed255"]
 
 
 def normalise_pair(
@@ -166,6 +167,7 @@ def normalise_pair(
     -------
     low_n, high_n : normalised float32 arrays.
       - 'minmax' / 'fixed'  →  ∈ [0, 1]
+      - 'minmax255' / 'fixed255' → ∈ [0, 255]
       - 'zscore'            →  zero-mean, unit-variance (can exceed [0,1])
     """
     if mode == "minmax":
@@ -176,6 +178,14 @@ def normalise_pair(
             ((low  - g_min) / denom).clip(0.0, 1.0).astype(np.float32),
             ((high - g_min) / denom).clip(0.0, 1.0).astype(np.float32),
         )
+    elif mode == "minmax255":
+        g_min = min(float(low.min()), float(high.min()))
+        g_max = max(float(low.max()), float(high.max()))
+        denom = g_max - g_min + 1e-8
+        return (
+            (((low  - g_min) / denom).clip(0.0, 1.0) * 255.0).astype(np.float32),
+            (((high - g_min) / denom).clip(0.0, 1.0) * 255.0).astype(np.float32),
+        )
     elif mode == "zscore":
         mu  = float(high.mean())
         std = float(high.std()) + 1e-8
@@ -183,10 +193,22 @@ def normalise_pair(
             ((low  - mu) / std).astype(np.float32),
             ((high - mu) / std).astype(np.float32),
         )
+    elif mode == "fixed255":
+        return (low.astype(np.float32) * 255.0, high.astype(np.float32) * 255.0)
     elif mode == "fixed":
         return low.astype(np.float32), high.astype(np.float32)
     else:
-        raise ValueError(f"Unknown norm_mode: {mode!r}. Choose minmax | zscore | fixed.")
+        raise ValueError(
+            f"Unknown norm_mode: {mode!r}. "
+            "Choose minmax | zscore | fixed | minmax255 | fixed255."
+        )
+
+
+def to_model_range(x: torch.Tensor, norm_mode: NormMode) -> torch.Tensor:
+    """Map input intensity to model range [-1, 1] based on normalisation mode."""
+    if norm_mode in ("minmax255", "fixed255"):
+        return x / 127.5 - 1.0
+    return x * 2.0 - 1.0
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -271,30 +293,42 @@ def make_mask_2d(
     H: int, W: int,
     sparsity_factor: int,
     pattern: str,
+    sparse_mode: str = "xy",
 ) -> torch.Tensor:
     """
     Binary sparse-scanning mask  [1, H, W].   1 = scanned pixel.
 
-    Patterns
-    --------
+    Sparse modes
+    ------------
+    x  : keep every K-th column, all rows present.
+    y  : keep every K-th row, all columns present.
+    xy : sparse both spatial axes using the selected pattern.
+
+    Patterns for xy
+    ---------------
     grid        : regular K×K lattice  (offset 0,0)
     interleaved : grid with random spatial offset  (for 3-D temporal diversity)
     random      : uniformly random 1/K² pixel selection
-    stripe      : every K-th column  (fast-axis scanning)
+    stripe      : legacy alias for x-sparse scanning
     """
     K    = sparsity_factor
     mask = torch.zeros(1, H, W)
-    if pattern in ("grid", "interleaved"):
-        oh = random.randint(0, K - 1) if pattern == "interleaved" else 0
-        ow = random.randint(0, K - 1) if pattern == "interleaved" else 0
-        mask[:, oh::K, ow::K] = 1.0
-    elif pattern == "random":
-        n = max(1, H * W // (K * K))
-        mask[0, torch.randint(0, H, (n,)), torch.randint(0, W, (n,))] = 1.0
-    elif pattern == "stripe":
+    if sparse_mode == "x" or pattern == "stripe":
         mask[:, :, random.randint(0, K - 1)::K] = 1.0
+    elif sparse_mode == "y":
+        mask[:, random.randint(0, K - 1)::K, :] = 1.0
+    elif sparse_mode == "xy":
+        if pattern in ("grid", "interleaved"):
+            oh = random.randint(0, K - 1) if pattern == "interleaved" else 0
+            ow = random.randint(0, K - 1) if pattern == "interleaved" else 0
+            mask[:, oh::K, ow::K] = 1.0
+        elif pattern == "random":
+            n = max(1, H * W // (K * K))
+            mask[0, torch.randint(0, H, (n,)), torch.randint(0, W, (n,))] = 1.0
+        else:
+            raise ValueError(f"Unknown scan_pattern for xy sparse mode: {pattern!r}")
     else:
-        raise ValueError(f"Unknown scan_pattern: {pattern!r}")
+        raise ValueError(f"Unknown 2D sparse_mode: {sparse_mode!r}")
     return mask
 
 
@@ -302,10 +336,34 @@ def make_mask_3d(
     T: int, H: int, W: int,
     sparsity_factor: int,
     pattern: str,
+    sparse_mode: str = "xy",
+    sparsity_factor_z: int = 1,
 ) -> torch.Tensor:
-    """Binary sparse-scanning mask  [1, T, H, W]."""
-    frames = [make_mask_2d(H, W, sparsity_factor, pattern) for _ in range(T)]
-    return torch.stack(frames, dim=1)               # [1, T, H, W]
+    """
+    Binary sparse-scanning mask  [1, T, H, W].
+
+    sparse_mode controls which axes are sparsified:
+      xy  : per-frame spatial mask only (all frames present)
+      z   : axial mask only (keep every K_z-th frame, full XY)
+      xyz : combined Z + XY sparsification
+    """
+    if sparse_mode in {"x", "y", "xy"}:
+        frames = [make_mask_2d(H, W, sparsity_factor, pattern, sparse_mode=sparse_mode) for _ in range(T)]
+        return torch.stack(frames, dim=1)
+
+    if sparse_mode == "z":
+        mask = torch.zeros(1, T, H, W)
+        mask[:, ::sparsity_factor_z, :, :] = 1.0
+        return mask
+
+    if sparse_mode == "xyz":
+        mask = torch.zeros(1, T, H, W)
+        for t in range(0, T, sparsity_factor_z):
+            frame_mask = make_mask_2d(H, W, sparsity_factor, pattern, sparse_mode="xy")
+            mask[:, t, :, :] = frame_mask[0]
+        return mask
+
+    raise ValueError(f"Unknown sparse_mode: {sparse_mode!r}")
 
 
 def warm_start_2d(
@@ -330,9 +388,16 @@ def warm_start_2d(
 def warm_start_3d(
     sparse: torch.Tensor,   # [1, T, H, W]  masked volume
     factor: int,
+    factor_z: int = 1,
 ) -> torch.Tensor:
     """
     Trilinear warm-start across (T, H, W).
+
+    Parameters
+    ----------
+    sparse : [1, T, H, W] zero-filled volume
+    factor : XY spatial downsample factor
+    factor_z : Z (temporal/axial) downsample factor, default 1 = no Z scaling
 
     Shape flow:
         [1, T, H, W]
@@ -341,13 +406,65 @@ def warm_start_3d(
          → squeeze(0)   → [1, T, H, W]
     """
     _, T, H, W = sparse.shape
+    sf_z = 1.0 / max(1, factor_z)
+    sf_xy = 1.0 / max(1, factor)
     x = sparse.unsqueeze(0)                                          # [1, 1, T, H, W]
     x = F.interpolate(x,
-                      scale_factor=(1.0, 1.0 / factor, 1.0 / factor),
+                      scale_factor=(sf_z, sf_xy, sf_xy),
                       mode="trilinear", align_corners=False)
     x = F.interpolate(x, size=(T, H, W),
                       mode="trilinear", align_corners=False)
     return x.squeeze(0)                                              # [1, T, H, W]
+
+
+# ── Wiener deconvolution initialisation ────────────────────────────────────
+
+def _build_psf_fft_2d(
+    H: int, W: int, sigma: float,
+) -> torch.Tensor:
+    """2D Gaussian PSF in Fourier domain, shape [H, W] complex."""
+    ky = torch.fft.fftfreq(H).unsqueeze(1)  # [H, 1]
+    kx = torch.fft.fftfreq(W).unsqueeze(0)  # [1, W]
+    freq_sq = ky ** 2 + kx ** 2
+    otf = torch.exp(-2.0 * (math.pi * sigma) ** 2 * freq_sq)
+    return otf  # real-valued OTF
+
+
+def wiener_init_2d(
+    img: torch.Tensor,          # [H, W]
+    psf_sigma: float,
+    noise_var: float = 0.01,
+) -> torch.Tensor:
+    """
+    Frequency-domain Wiener deconvolution for a single 2D frame.
+    Exploits PSF spatial symmetry to extract intra-frame signal.
+    Returns [H, W] float tensor.
+    """
+    H, W = img.shape
+    if psf_sigma < 1e-6:
+        return img
+    otf = _build_psf_fft_2d(H, W, psf_sigma).to(img.device)
+    img_fft = torch.fft.fft2(img)
+    wiener_filter = otf.conj() / (otf.abs() ** 2 + noise_var)
+    result = torch.fft.ifft2(img_fft * wiener_filter).real
+    return result.clamp(0.0, 1.0)
+
+
+def wiener_init_3d(
+    vol: torch.Tensor,          # [T, H, W]
+    psf_sigma_lateral: float,
+    psf_sigma_axial: float = 0.0,
+    noise_var: float = 0.01,
+) -> torch.Tensor:
+    """
+    Per-frame Wiener deconvolution for a 3D volume.
+    Returns [T, H, W] float tensor.
+    """
+    T, H, W = vol.shape
+    out = torch.empty_like(vol)
+    for t in range(T):
+        out[t] = wiener_init_2d(vol[t], psf_sigma_lateral, noise_var)
+    return out
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -511,9 +628,11 @@ class NucleiDenoisingDataset(Dataset):
         norm_mode:         NormMode  = "minmax",
         sparsity_factor:   int       = 4,
         scan_pattern:      str       = "grid",
+        sparse_mode:       str       = "xy",
         sparse_source:     Literal["low", "high"] = "low",
         use_mask_channel:  bool      = True,
         apply_psf:         bool      = False,
+        wiener_init:       bool      = False,
         psf_sigma_lateral: float     = 1.0,
         split_dir_override: Optional[str | Path] = None,
         stack_policy: str = "error",
@@ -551,9 +670,11 @@ class NucleiDenoisingDataset(Dataset):
         self.norm_mode         = norm_mode
         self.sparsity_factor   = sparsity_factor
         self.scan_pattern      = scan_pattern
+        self.sparse_mode       = sparse_mode
         self.sparse_source     = sparse_source
         self.use_mask_channel  = use_mask_channel
         self.apply_psf         = apply_psf
+        self.wiener_init       = wiener_init
         self.psf_sigma_lateral = psf_sigma_lateral
         self.stack_policy      = stack_policy
         self.stack_frame_index = stack_frame_index
@@ -621,8 +742,8 @@ class NucleiDenoisingDataset(Dataset):
             high_t = apply_psf_blur_2d(high_t, self.psf_sigma_lateral)
 
         # ── Step 6: Scale [0,1] → [-1,1] ────────────────────────────────────
-        low_m  = low_t  * 2.0 - 1.0
-        high_m = high_t * 2.0 - 1.0
+        low_m  = to_model_range(low_t, self.norm_mode)
+        high_m = to_model_range(high_t, self.norm_mode)
 
         # ── Step 7: Task-specific output ─────────────────────────────────────
         if self.task == "baseline":
@@ -683,14 +804,22 @@ class NucleiDenoisingDataset(Dataset):
         source = low_t if self.sparse_source == "low" else high_t   # [1, H, W]
 
         # Step 2: sparse mask
-        mask = make_mask_2d(H, W, self.sparsity_factor, self.scan_pattern)
+        mask = make_mask_2d(
+            H, W, self.sparsity_factor, self.scan_pattern, sparse_mode=self.sparse_mode
+        )
         # mask: [1, H, W]  ∈ {0, 1}
 
-        # Step 3 + 4: mask → warm-start bilinear inpaint
-        interp = warm_start_2d(source * mask, self.sparsity_factor)  # [1, H, W]
+        # Step 3 + 4: mask → warm-start / Wiener inpaint
+        sparse = source * mask
+        if self.wiener_init:
+            interp = wiener_init_2d(
+                sparse.squeeze(0), self.psf_sigma_lateral
+            ).unsqueeze(0)
+        else:
+            interp = warm_start_2d(sparse, self.sparsity_factor)  # [1, H, W]
 
         # Step 5: normalise inpainted image
-        interp_m = interp * 2.0 - 1.0                                # [1, H, W]
+        interp_m = to_model_range(interp, self.norm_mode)            # [1, H, W]
 
         # Step 6: assemble input channels
         if self.use_mask_channel:
@@ -805,8 +934,8 @@ class NucleiMixedDataset(Dataset):
         low_t, high_t = dihedral_augment(low_t, high_t)
         if self.apply_psf:
             high_t = apply_psf_blur_2d(high_t, self.psf_sigma_lateral)
-        low_m  = low_t * 2.0 - 1.0
-        high_m = high_t * 2.0 - 1.0
+        low_m  = to_model_range(low_t, self.norm_mode)
+        high_m = to_model_range(high_t, self.norm_mode)
         return low_m, high_m
 
     def _random_crop(
@@ -954,8 +1083,8 @@ class NucleiGridDataset(Dataset):
             high_t = apply_psf_blur_2d(high_t, self.psf_sigma_lateral)
 
         # Scale to model range [-1,1]
-        high_m  = high_t * 2.0 - 1.0
-        low_m   = low_t  * 2.0 - 1.0
+        high_m  = to_model_range(high_t, self.norm_mode)
+        low_m   = to_model_range(low_t, self.norm_mode)
 
         if self.task == "baseline":
             return low_m, high_m, meta
@@ -964,7 +1093,7 @@ class NucleiGridDataset(Dataset):
         mask    = make_mask_2d(ps, ps, self.sparsity_factor, self.scan_pattern)
         source  = low_t if self.sparse_source == "low" else high_t
         interp  = warm_start_2d(source * mask, self.sparsity_factor)
-        interp_m = interp * 2.0 - 1.0
+        interp_m = to_model_range(interp, self.norm_mode)
         inp      = torch.cat([interp_m, mask], dim=0) \
                    if self.use_mask_channel else interp_m
         return inp, high_m, meta
@@ -1121,9 +1250,528 @@ class NucleiTemporal2p5DDataset(Dataset):
             low_t = cat_aug[:-1]
             high_t = cat_aug[-1:].contiguous()
 
-        low_m = low_t * 2.0 - 1.0
-        high_m = high_t * 2.0 - 1.0
+        low_m = to_model_range(low_t, self.norm_mode)
+        high_m = to_model_range(high_t, self.norm_mode)
         return low_m, high_m
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 7c-bis. CIDC25Volume2p5DDataset — 2.5D volume sparse with mask channels
+# ═════════════════════════════════════════════════════════════════════════════
+
+class CIDC25Volume2p5DDataset(Dataset):
+    """
+    2.5D dataset for CIDC25 volume: extract T-frame sliding windows,
+    apply per-frame sparse mask, return 2D model input with mask channels.
+
+    Operates directly on the raw volume (like CIDC25Volume3DDataset)
+    instead of relying on pre-generated paired frames, so mask
+    information is preserved as explicit input channels.
+
+    Input:  [C_in, H_p, W_p]  where C_in = T * (1 + use_mask)
+            Layout: [f0_interp, f1_interp, ..., f0_mask, f1_mask, ...]
+    Target: [1, H_p, W_p]     center frame GT
+    """
+
+    def __init__(
+        self,
+        cidc25_root: str | Path,
+        split: str = "Training",
+        gt_stem: str = "A1",
+        mode: Literal["train", "test"] = "train",
+        patch_size: int = 256,
+        temporal_window: int = 3,
+        patches_per_stack: int = 200,
+        norm_mode: NormMode = "minmax",
+        sparse_mode: str = "xy",
+        sparsity_factor: int = 4,
+        sparsity_factor_z: int = 4,
+        scan_pattern: str = "grid",
+        use_mask_channel: bool = True,
+        wiener_init: bool = False,
+        psf_sigma_lateral: float = 1.0,
+    ):
+        super().__init__()
+        if temporal_window < 1 or temporal_window % 2 == 0:
+            raise ValueError("temporal_window must be a positive odd number.")
+        root = Path(cidc25_root) / split
+        gt_path = root / f"{gt_stem}.tif"
+        if not gt_path.exists():
+            available = sorted(p.name for p in root.glob("*.tif"))
+            raise FileNotFoundError(
+                f"GT stack not found: {gt_path}\nAvailable: {available}"
+            )
+
+        raw = tifffile.imread(str(gt_path))
+        while raw.ndim > 3:
+            raw = raw[:, 0]
+        if raw.dtype == np.uint16:
+            self.volume = raw.astype(np.float32) / 65535.0
+        elif raw.dtype == np.uint8:
+            self.volume = raw.astype(np.float32) / 255.0
+        else:
+            arr = raw.astype(np.float32)
+            vmin, vmax = arr.min(), arr.max()
+            self.volume = ((arr - vmin) / (vmax - vmin + 1e-8)).clip(0.0, 1.0)
+
+        self.F, self.H, self.W = self.volume.shape
+        self.mode = mode
+        self.patch_size = patch_size
+        self.temporal_window = temporal_window
+        self.radius = temporal_window // 2
+        self.patches_per_stack = patches_per_stack if mode == "train" else 1
+        self.norm_mode = norm_mode
+        self.sparse_mode = sparse_mode
+        self.sparsity_factor = sparsity_factor
+        self.sparsity_factor_z = sparsity_factor_z
+        self.scan_pattern = scan_pattern
+        self.use_mask_channel = use_mask_channel
+        self.wiener_init = wiener_init
+        self.psf_sigma_lateral = psf_sigma_lateral
+
+        print(f"[CIDC25Volume2p5D] Loaded {gt_path.name}: "
+              f"shape={self.volume.shape}, T_win={temporal_window}, "
+              f"sparse_mode={sparse_mode}, K={sparsity_factor}, "
+              f"mask_ch={use_mask_channel}, wiener={wiener_init}")
+
+    def __len__(self) -> int:
+        return self.patches_per_stack
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        T_w = self.temporal_window
+        H_p = min(self.patch_size, self.H)
+        W_p = min(self.patch_size, self.W)
+
+        if self.mode == "train":
+            center = random.randint(self.radius, max(self.radius, self.F - 1 - self.radius))
+            y0 = random.randint(0, max(0, self.H - H_p))
+            x0 = random.randint(0, max(0, self.W - W_p))
+        else:
+            center = self.F // 2
+            y0 = (self.H - H_p) // 2
+            x0 = (self.W - W_p) // 2
+
+        t_start = center - self.radius
+        t_end = center + self.radius + 1
+        frames_np = self.volume[t_start:t_end, y0:y0+H_p, x0:x0+W_p].copy()
+
+        if self.norm_mode == "minmax":
+            vmin, vmax = frames_np.min(), frames_np.max()
+            denom = vmax - vmin + 1e-8
+            frames_np = ((frames_np - vmin) / denom).clip(0.0, 1.0).astype(np.float32)
+
+        gt_center = torch.from_numpy(frames_np[self.radius]).unsqueeze(0)  # [1, H_p, W_p]
+
+        mask_3d = make_mask_3d(
+            T_w, H_p, W_p,
+            self.sparsity_factor,
+            self.scan_pattern,
+            sparse_mode=self.sparse_mode,
+            sparsity_factor_z=self.sparsity_factor_z,
+        )[0]  # [T, H_p, W_p]
+
+        interp_list = []
+        mask_list = []
+        for t in range(T_w):
+            frame_t = torch.from_numpy(frames_np[t]).unsqueeze(0)  # [1, H_p, W_p]
+            mask_t = mask_3d[t].unsqueeze(0)
+            sparse_t = frame_t * mask_t
+
+            if self.wiener_init:
+                interp_t = wiener_init_2d(
+                    sparse_t.squeeze(0), self.psf_sigma_lateral
+                ).unsqueeze(0)
+            else:
+                interp_t = warm_start_2d(sparse_t, self.sparsity_factor)
+
+            interp_list.append(interp_t)       # [1, H_p, W_p]
+            mask_list.append(mask_t)            # [1, H_p, W_p]
+
+        interp_all = torch.cat(interp_list, dim=0)  # [T, H_p, W_p]
+        interp_m = to_model_range(interp_all, self.norm_mode)
+        gt_m = to_model_range(gt_center, self.norm_mode)
+
+        if self.use_mask_channel:
+            mask_all = torch.cat(mask_list, dim=0)  # [T, H_p, W_p]
+            inp = torch.cat([interp_m, mask_all], dim=0)  # [2T, H_p, W_p]
+        else:
+            inp = interp_m  # [T, H_p, W_p]
+
+        if self.mode == "train":
+            cat = torch.cat([inp, gt_m], dim=0)
+            k = random.randint(0, 3)
+            flip = random.random() > 0.5
+            if flip:
+                cat = torch.flip(cat, dims=[-1])
+            if k > 0:
+                cat = torch.rot90(cat, k, dims=[-2, -1])
+            c_in = inp.shape[0]
+            inp = cat[:c_in]
+            gt_m = cat[c_in:c_in+1]
+
+        return inp, gt_m
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 7c-ter. SparseStack2p5DDataset — prebuilt stack-pair 2.5D with mask prior
+# ═════════════════════════════════════════════════════════════════════════════
+class SparseStack2p5DDataset(Dataset):
+    """2.5D dataset from pre-generated *_gt.npy / *_sparse.npy stack pairs."""
+
+    def __init__(
+        self,
+        root: str | Path,
+        split: str = "Training",
+        mode: Literal["train", "test"] = "train",
+        patch_size: int = 256,
+        temporal_window: int = 3,
+        patches_per_stack: int = 200,
+        norm_mode: NormMode = "minmax",
+        use_mask_channel: bool = True,
+        wiener_init: bool = False,
+        psf_sigma_lateral: float = 1.0,
+        max_stacks: Optional[int] = None,
+    ):
+        super().__init__()
+        if temporal_window < 3 or temporal_window % 2 == 0:
+            raise ValueError("temporal_window must be odd and >= 3")
+        stack_dir = Path(root) / split / "stacks"
+        if not stack_dir.is_dir():
+            raise FileNotFoundError(f"Missing stack dir: {stack_dir}")
+        gt_map = {p.stem.replace("_gt", ""): p for p in sorted(stack_dir.glob("*_gt.npy"))}
+        sp_map = {p.stem.replace("_sparse", ""): p for p in sorted(stack_dir.glob("*_sparse.npy"))}
+        keys = sorted(set(gt_map) & set(sp_map))
+        if not keys:
+            raise ValueError(f"No stack pairs found in {stack_dir}")
+        if max_stacks is not None and max_stacks > 0:
+            keys = keys[:max_stacks]
+        self.samples = [(k, gt_map[k], sp_map[k]) for k in keys]
+        self.mode = mode
+        self.patch_size = patch_size
+        self.temporal_window = temporal_window
+        self.radius = temporal_window // 2
+        self.patches_per_stack = patches_per_stack if mode == "train" else 1
+        self.norm_mode = norm_mode
+        self.use_mask_channel = use_mask_channel
+        self.wiener_init = wiener_init
+        self.psf_sigma_lateral = psf_sigma_lateral
+
+    def __len__(self) -> int:
+        return len(self.samples) * self.patches_per_stack
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        sidx = idx // self.patches_per_stack
+        _, gt_p, sp_p = self.samples[sidx]
+        gt_vol = np.load(gt_p).astype(np.float32)
+        sp_vol = np.load(sp_p).astype(np.float32)
+        F, H, W = gt_vol.shape
+        ps = min(self.patch_size, H, W)
+        c = random.randint(0, F - 1) if self.mode == "train" else (F // 2)
+        idxs = [min(max(c + d, 0), F - 1) for d in range(-self.radius, self.radius + 1)]
+        if self.mode == "train":
+            y0 = random.randint(0, max(0, H - ps))
+            x0 = random.randint(0, max(0, W - ps))
+        else:
+            y0 = (H - ps) // 2
+            x0 = (W - ps) // 2
+
+        gt_chunk = np.stack([gt_vol[i, y0:y0+ps, x0:x0+ps] for i in idxs], axis=0)
+        sp_chunk = np.stack([sp_vol[i, y0:y0+ps, x0:x0+ps] for i in idxs], axis=0)
+        if ps < self.patch_size:
+            scale = self.patch_size / float(ps)
+            gt_chunk = zoom(gt_chunk, (1.0, scale, scale), order=1).astype(np.float32)
+            sp_chunk = zoom(sp_chunk, (1.0, scale, scale), order=1).astype(np.float32)
+        if self.norm_mode == "minmax":
+            vmin = min(float(gt_chunk.min()), float(sp_chunk.min()))
+            vmax = max(float(gt_chunk.max()), float(sp_chunk.max()))
+            denom = vmax - vmin + 1e-8
+            gt_chunk = ((gt_chunk - vmin) / denom).clip(0.0, 1.0).astype(np.float32)
+            sp_chunk = ((sp_chunk - vmin) / denom).clip(0.0, 1.0).astype(np.float32)
+
+        gt_center = torch.from_numpy(gt_chunk[self.radius]).unsqueeze(0)  # [1,H,W]
+        sp_t = torch.from_numpy(sp_chunk.copy())  # [T,H,W]
+        interp_list = []
+        mask_list = []
+        for t in range(self.temporal_window):
+            src = sp_t[t].unsqueeze(0)
+            mask = (src > 1e-6).float()
+            if self.wiener_init:
+                interp = wiener_init_2d(src.squeeze(0), self.psf_sigma_lateral).unsqueeze(0)
+            else:
+                interp = src
+            interp_list.append(interp)
+            mask_list.append(mask)
+        interp_all = torch.cat(interp_list, dim=0)
+        inp = to_model_range(interp_all, self.norm_mode)
+        if self.use_mask_channel:
+            inp = torch.cat([inp, torch.cat(mask_list, dim=0)], dim=0)
+        gt_m = to_model_range(gt_center, self.norm_mode)
+        return inp, gt_m
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 7c. CIDC25Volume3DDataset — 3D volume sparse reconstruction
+# ═════════════════════════════════════════════════════════════════════════════
+
+class CIDC25Volume3DDataset(Dataset):
+    """
+    3D volume dataset for CIDC25 sparse reconstruction.
+
+    Loads full [F, H, W] stacks and extracts random 3D patches
+    [T_p, H_p, W_p] with on-the-fly sparsification.
+
+    Supports three sparse modes:
+      xy  : per-frame spatial mask (Z fully sampled)
+      z   : axial subsampling (XY fully sampled)
+      xyz : combined Z + XY sparsification
+
+    Input:  [C_in, T_p, H_p, W_p]   (warm-start + optional mask + optional PSF map)
+    Target: [1,    T_p, H_p, W_p]   (clean GT sub-volume)
+    """
+
+    def __init__(
+        self,
+        cidc25_root: str | Path,
+        split: str = "Training",
+        gt_stem: str = "A1",
+        mode: Literal["train", "test"] = "train",
+        patch_size: int = 256,
+        volume_patch_t: int = 16,
+        patches_per_stack: int = 200,
+        norm_mode: NormMode = "minmax",
+        sparse_mode: str = "xy",
+        sparsity_factor: int = 4,
+        sparsity_factor_z: int = 4,
+        scan_pattern: str = "grid",
+        use_mask_channel: bool = True,
+        psf_input_channel: bool = False,
+        psf_sigma_lateral: float = 1.0,
+        psf_sigma_axial: float = 3.0,
+        wiener_init: bool = False,
+    ):
+        super().__init__()
+        root = Path(cidc25_root) / split
+        gt_path = root / f"{gt_stem}.tif"
+        if not gt_path.exists():
+            available = sorted(p.name for p in root.glob("*.tif"))
+            raise FileNotFoundError(
+                f"GT stack not found: {gt_path}\nAvailable: {available}"
+            )
+
+        raw = tifffile.imread(str(gt_path))
+        while raw.ndim > 3:
+            raw = raw[:, 0]
+        if raw.dtype == np.uint16:
+            self.volume = raw.astype(np.float32) / 65535.0
+        elif raw.dtype == np.uint8:
+            self.volume = raw.astype(np.float32) / 255.0
+        else:
+            arr = raw.astype(np.float32)
+            vmin, vmax = arr.min(), arr.max()
+            self.volume = ((arr - vmin) / (vmax - vmin + 1e-8)).clip(0.0, 1.0)
+
+        self.F, self.H, self.W = self.volume.shape
+        self.mode = mode
+        self.patch_size = patch_size
+        self.volume_patch_t = volume_patch_t
+        self.patches_per_stack = patches_per_stack if mode == "train" else 1
+        self.norm_mode = norm_mode
+        self.sparse_mode = sparse_mode
+        self.sparsity_factor = sparsity_factor
+        self.sparsity_factor_z = sparsity_factor_z
+        self.scan_pattern = scan_pattern
+        self.use_mask_channel = use_mask_channel
+        self.psf_input_channel = psf_input_channel
+        self.psf_sigma_lateral = psf_sigma_lateral
+        self.psf_sigma_axial = psf_sigma_axial
+        self.wiener_init = wiener_init
+
+        if self.psf_input_channel:
+            self._psf_map_2d = self._build_psf_map_2d()
+
+        print(f"[CIDC25Volume3D] Loaded {gt_path.name}: "
+              f"shape={self.volume.shape}, sparse_mode={sparse_mode}, "
+              f"K_xy={sparsity_factor}, K_z={sparsity_factor_z}")
+
+    def _build_psf_map_2d(self) -> torch.Tensor:
+        """Normalized 2D PSF kernel map [1, H_p, W_p] encoding PSF scale."""
+        sigma = self.psf_sigma_lateral
+        r = max(1, int(3 * sigma + 0.5))
+        size = 2 * r + 1
+        x = torch.arange(size, dtype=torch.float32) - r
+        k2d = torch.exp(-0.5 * (x.unsqueeze(0) ** 2 + x.unsqueeze(1) ** 2) / (sigma ** 2))
+        k2d = k2d / k2d.max()
+        ps = self.patch_size
+        psf_map = torch.zeros(1, ps, ps)
+        cy, cx = ps // 2, ps // 2
+        y0 = max(0, cy - r)
+        y1 = min(ps, cy + r + 1)
+        x0 = max(0, cx - r)
+        x1 = min(ps, cx + r + 1)
+        ky0 = r - (cy - y0)
+        ky1 = ky0 + (y1 - y0)
+        kx0 = r - (cx - x0)
+        kx1 = kx0 + (x1 - x0)
+        psf_map[0, y0:y1, x0:x1] = k2d[ky0:ky1, kx0:kx1]
+        return psf_map
+
+    def __len__(self) -> int:
+        return self.patches_per_stack
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        T_p = min(self.volume_patch_t, self.F)
+        H_p = min(self.patch_size, self.H)
+        W_p = min(self.patch_size, self.W)
+
+        if self.mode == "train":
+            t0 = random.randint(0, max(0, self.F - T_p))
+            y0 = random.randint(0, max(0, self.H - H_p))
+            x0 = random.randint(0, max(0, self.W - W_p))
+        else:
+            t0 = (self.F - T_p) // 2
+            y0 = (self.H - H_p) // 2
+            x0 = (self.W - W_p) // 2
+
+        patch_np = self.volume[t0:t0+T_p, y0:y0+H_p, x0:x0+W_p].copy()
+
+        if self.norm_mode == "minmax":
+            vmin, vmax = patch_np.min(), patch_np.max()
+            denom = vmax - vmin + 1e-8
+            patch_np = ((patch_np - vmin) / denom).clip(0.0, 1.0).astype(np.float32)
+
+        gt = torch.from_numpy(patch_np).unsqueeze(0)  # [1, T_p, H_p, W_p]
+
+        mask = make_mask_3d(
+            T_p, H_p, W_p,
+            self.sparsity_factor, self.scan_pattern,
+            sparse_mode=self.sparse_mode,
+            sparsity_factor_z=self.sparsity_factor_z,
+        )  # [1, T_p, H_p, W_p]
+
+        sparse = gt * mask
+
+        if self.wiener_init:
+            interp = wiener_init_3d(
+                sparse.squeeze(0), self.psf_sigma_lateral,
+                self.psf_sigma_axial,
+            ).unsqueeze(0)
+        else:
+            fz = self.sparsity_factor_z if self.sparse_mode in ("z", "xyz") else 1
+            fxy = self.sparsity_factor if self.sparse_mode in ("xy", "xyz") else 1
+            interp = warm_start_3d(sparse, factor=fxy, factor_z=fz)
+
+        interp_m = to_model_range(interp, self.norm_mode)   # [1, T_p, H_p, W_p]
+        gt_m = to_model_range(gt, self.norm_mode)           # [1, T_p, H_p, W_p]
+
+        channels = [interp_m]
+        if self.use_mask_channel:
+            channels.append(mask)
+        if self.psf_input_channel:
+            psf_ch = self._psf_map_2d[:, :H_p, :W_p].unsqueeze(1).expand(1, T_p, H_p, W_p)
+            channels.append(psf_ch)
+        inp = torch.cat(channels, dim=0)  # [C_in, T_p, H_p, W_p]
+
+        if self.mode == "train":
+            cat = torch.cat([inp, gt_m], dim=0)
+            k = random.randint(0, 3)
+            flip = random.random() > 0.5
+            if flip:
+                cat = torch.flip(cat, dims=[-1])
+            if k > 0:
+                cat = torch.rot90(cat, k, dims=[-2, -1])
+            c_in = inp.shape[0]
+            inp = cat[:c_in]
+            gt_m = cat[c_in:c_in+1]
+
+        return inp, gt_m
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 7d. SparseStack3DDataset — prebuilt stack-pair training (MDC25_sparse)
+# ═════════════════════════════════════════════════════════════════════════════
+class SparseStack3DDataset(Dataset):
+    """
+    Train 3D model from pre-generated stack pairs:
+      <root>/<split>/stacks/*_gt.npy and *_sparse.npy
+    """
+
+    def __init__(
+        self,
+        root: str | Path,
+        split: str = "Training",
+        mode: Literal["train", "test"] = "train",
+        patch_size: int = 256,
+        volume_patch_t: int = 16,
+        patches_per_stack: int = 200,
+        norm_mode: NormMode = "minmax",
+        use_mask_channel: bool = True,
+        max_stacks: Optional[int] = None,
+    ):
+        super().__init__()
+        stack_dir = Path(root) / split / "stacks"
+        if not stack_dir.is_dir():
+            raise FileNotFoundError(f"Missing stack dir: {stack_dir}")
+        gt_map = {p.stem.replace("_gt", ""): p for p in sorted(stack_dir.glob("*_gt.npy"))}
+        sp_map = {p.stem.replace("_sparse", ""): p for p in sorted(stack_dir.glob("*_sparse.npy"))}
+        keys = sorted(set(gt_map) & set(sp_map))
+        if not keys:
+            raise ValueError(f"No *_gt.npy/*_sparse.npy pairs found in {stack_dir}")
+
+        if max_stacks is not None and max_stacks > 0:
+            keys = keys[:max_stacks]
+        self.samples = [(k, gt_map[k], sp_map[k]) for k in keys]
+        self.mode = mode
+        self.patch_size = patch_size
+        self.volume_patch_t = volume_patch_t
+        self.patches_per_stack = patches_per_stack if mode == "train" else 1
+        self.norm_mode = norm_mode
+        self.use_mask_channel = use_mask_channel
+
+    def __len__(self) -> int:
+        return len(self.samples) * self.patches_per_stack
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        sidx = idx // self.patches_per_stack
+        _, gt_p, sp_p = self.samples[sidx]
+        gt_vol = np.load(gt_p).astype(np.float32)
+        sp_vol = np.load(sp_p).astype(np.float32)
+        F, H, W = gt_vol.shape
+        T_p = min(self.volume_patch_t, F)
+        H_p = min(self.patch_size, H)
+        W_p = min(self.patch_size, W)
+        if self.mode == "train":
+            t0 = random.randint(0, max(0, F - T_p))
+            y0 = random.randint(0, max(0, H - H_p))
+            x0 = random.randint(0, max(0, W - W_p))
+        else:
+            t0 = (F - T_p) // 2
+            y0 = (H - H_p) // 2
+            x0 = (W - W_p) // 2
+
+        gt_np = gt_vol[t0:t0+T_p, y0:y0+H_p, x0:x0+W_p].copy()
+        sp_np = sp_vol[t0:t0+T_p, y0:y0+H_p, x0:x0+W_p].copy()
+        if H_p < self.patch_size or W_p < self.patch_size:
+            sy = self.patch_size / float(max(1, H_p))
+            sx = self.patch_size / float(max(1, W_p))
+            gt_np = zoom(gt_np, (1.0, sy, sx), order=1).astype(np.float32)
+            sp_np = zoom(sp_np, (1.0, sy, sx), order=1).astype(np.float32)
+        if self.norm_mode == "minmax":
+            vmin = min(float(gt_np.min()), float(sp_np.min()))
+            vmax = max(float(gt_np.max()), float(sp_np.max()))
+            denom = vmax - vmin + 1e-8
+            gt_np = ((gt_np - vmin) / denom).clip(0.0, 1.0).astype(np.float32)
+            sp_np = ((sp_np - vmin) / denom).clip(0.0, 1.0).astype(np.float32)
+
+        gt = torch.from_numpy(gt_np).unsqueeze(0)
+        interp = torch.from_numpy(sp_np).unsqueeze(0)
+        interp_m = to_model_range(interp, self.norm_mode)
+        gt_m = to_model_range(gt, self.norm_mode)
+        channels = [interp_m]
+        if self.use_mask_channel:
+            mask = (interp > 1e-6).float()
+            channels.append(mask)
+        inp = torch.cat(channels, dim=0)
+        return inp, gt_m
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1159,15 +1807,99 @@ def build_dataloaders(opts) -> Tuple[DataLoader, Optional[DataLoader]]:
         norm_mode         = getattr(opts, "norm_mode",   "minmax"),
         sparsity_factor   = opts.sparsity_factor,
         scan_pattern      = opts.scan_pattern,
+        sparse_mode       = getattr(opts, "sparse_mode", "xy"),
         sparse_source     = getattr(opts, "sparse_source", "low"),
         use_mask_channel  = use_mask_ch,
         apply_psf         = apply_psf,
+        wiener_init       = getattr(opts, "wiener_init", False),
         psf_sigma_lateral = opts.psf_sigma_lateral,
         stack_policy      = getattr(opts, "stack_policy", "error"),
         stack_frame_index = getattr(opts, "stack_frame_index", 0),
     )
 
-    if opts.task == "spatial_2p5d":
+    cidc25_root = getattr(opts, "cidc25_root", None)
+
+    if opts.task == "spatiotemporal_3d" and cidc25_root is not None:
+        train_ds = CIDC25Volume3DDataset(
+            cidc25_root=cidc25_root,
+            split=getattr(opts, "cidc25_split", "Training"),
+            gt_stem=getattr(opts, "cidc25_gt_stem", "A1"),
+            mode="train",
+            patch_size=opts.patch_size,
+            volume_patch_t=getattr(opts, "volume_patch_t", 16),
+            patches_per_stack=getattr(opts, "volume_patches_per_stack", 200),
+            norm_mode=getattr(opts, "norm_mode", "minmax"),
+            sparse_mode=getattr(opts, "sparse_mode", "xy"),
+            sparsity_factor=opts.sparsity_factor,
+            sparsity_factor_z=getattr(opts, "sparsity_factor_z", 4),
+            scan_pattern=opts.scan_pattern,
+            use_mask_channel=use_mask_ch,
+            psf_input_channel=getattr(opts, "psf_input_channel", False),
+            psf_sigma_lateral=opts.psf_sigma_lateral,
+            psf_sigma_axial=getattr(opts, "psf_sigma_axial", 3.0),
+            wiener_init=getattr(opts, "wiener_init", False),
+        )
+        train_info = (
+            f"{len(train_ds):>5,} samples  "
+            f"(3D vol, sparse_mode={getattr(opts, 'sparse_mode', 'xy')}, "
+            f"K_xy={opts.sparsity_factor}, K_z={getattr(opts, 'sparsity_factor_z', 4)})"
+        )
+    elif opts.task == "spatiotemporal_3d" and (Path(opts.data_root) / "Training" / "stacks").is_dir():
+        train_ds = SparseStack3DDataset(
+            root=opts.data_root,
+            split="Training",
+            mode="train",
+            patch_size=opts.patch_size,
+            volume_patch_t=getattr(opts, "volume_patch_t", 16),
+            patches_per_stack=getattr(opts, "volume_patches_per_stack", 200),
+            norm_mode=getattr(opts, "norm_mode", "minmax"),
+            use_mask_channel=use_mask_ch,
+            max_stacks=getattr(opts, "volume_max_stacks", None),
+        )
+        train_info = (
+            f"{len(train_ds):>5,} samples  "
+            f"(3D sparse stacks from {opts.data_root})"
+        )
+    elif opts.task == "spatial_2p5d" and cidc25_root is not None:
+        train_ds = CIDC25Volume2p5DDataset(
+            cidc25_root=cidc25_root,
+            split=getattr(opts, "cidc25_split", "Training"),
+            gt_stem=getattr(opts, "cidc25_gt_stem", "A1"),
+            mode="train",
+            patch_size=opts.patch_size,
+            temporal_window=getattr(opts, "temporal_window", 3),
+            patches_per_stack=getattr(opts, "volume_patches_per_stack", 200),
+            norm_mode=getattr(opts, "norm_mode", "minmax"),
+            sparse_mode=getattr(opts, "sparse_mode", "xy"),
+            sparsity_factor=opts.sparsity_factor,
+            sparsity_factor_z=getattr(opts, "sparsity_factor_z", 4),
+            scan_pattern=opts.scan_pattern,
+            use_mask_channel=use_mask_ch,
+            wiener_init=getattr(opts, "wiener_init", False),
+            psf_sigma_lateral=opts.psf_sigma_lateral,
+        )
+        train_info = (
+            f"{len(train_ds):>5,} samples  "
+            f"(2.5D vol, sparse_mode={getattr(opts, 'sparse_mode', 'xy')}, "
+            f"K_xy={opts.sparsity_factor}, K_z={getattr(opts, 'sparsity_factor_z', 4)}, "
+            f"T={getattr(opts, 'temporal_window', 3)})"
+        )
+    elif opts.task == "spatial_2p5d" and (Path(opts.data_root) / "Training" / "stacks").is_dir():
+        train_ds = SparseStack2p5DDataset(
+            root=opts.data_root,
+            split="Training",
+            mode="train",
+            patch_size=opts.patch_size,
+            temporal_window=getattr(opts, "temporal_window", 3),
+            patches_per_stack=getattr(opts, "volume_patches_per_stack", 200),
+            norm_mode=getattr(opts, "norm_mode", "minmax"),
+            use_mask_channel=use_mask_ch,
+            wiener_init=getattr(opts, "wiener_init", False),
+            psf_sigma_lateral=opts.psf_sigma_lateral,
+            max_stacks=getattr(opts, "volume_max_stacks", None),
+        )
+        train_info = f"{len(train_ds):>5,} samples  (2.5D sparse stacks from {opts.data_root})"
+    elif opts.task == "spatial_2p5d":
         train_ds = NucleiTemporal2p5DDataset(
             root=opts.data_root,
             split="train",
@@ -1254,12 +1986,43 @@ def build_dataloaders(opts) -> Tuple[DataLoader, Optional[DataLoader]]:
 
     # ② Split part of training data as validation
     elif split_val > 0:
+        if opts.task == "spatial_2p5d" and cidc25_root is not None:
+            train_idx = list(range(len(train_ds)))
+            rng = random.Random(seed)
+            rng.shuffle(train_idx)
+            n_val = max(1, int(len(train_idx) * split_val))
+            val_idx = train_idx[:n_val]
+            train_idx = train_idx[n_val:]
+            val_loader = DataLoader(
+                Subset(train_ds, val_idx),
+                batch_size        = 1,
+                shuffle           = False,
+                num_workers       = opts.num_workers,
+                pin_memory        = True,
+                persistent_workers= opts.num_workers > 0,
+            )
+            train_loader = DataLoader(
+                Subset(train_ds, train_idx),
+                batch_size        = opts.batch_size,
+                shuffle           = True,
+                num_workers       = opts.num_workers,
+                pin_memory        = True,
+                drop_last         = True,
+                persistent_workers= opts.num_workers > 0,
+            )
+            print(f"[dataset] Train : {train_info}  (holdout val {split_val:.2f})")
+            print(f"[dataset] Val   : {len(val_idx):>5,} samples (from volume patches)")
+            return train_loader, val_loader
         if train_data_root:
             n_pairs = len(train_ds.large_pairs) + len(train_ds.small_pairs)
             def _pair_id(i):
                 if i < train_ds._n_large_crops:
                     return i // train_ds.patches_per_image_large
                 return len(train_ds.large_pairs) + (i - train_ds._n_large_crops)
+        elif hasattr(train_ds, "samples") and hasattr(train_ds, "patches_per_stack"):
+            n_pairs = len(train_ds.samples)
+            def _pair_id(i):
+                return i // max(1, int(getattr(train_ds, "patches_per_stack", 1)))
         else:
             n_pairs = len(train_ds.pairs)
             def _pair_id(i):

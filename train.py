@@ -203,12 +203,15 @@ def run_epoch(
             log_freq = max(1, n // 5)
             if (batch_idx + 1) % log_freq == 0:
                 mode_str = "TRAIN" if is_train else "VAL  "
+                psf_str = ""
+                if "loss/psf" in metrics and metrics["loss/psf"] > 0:
+                    psf_str = f"  psf={metrics['loss/psf']:.4f}"
                 print(
                     f"  [{mode_str}] {batch_idx+1:4d}/{n}  "
                     f"loss={metrics['loss/total']:.4f}  "
                     f"mse={metrics['loss/mse']:.4f}  "
                     f"ssim={metrics['loss/ms_ssim']:.4f}  "
-                    f"dino={metrics['loss/dino']:.4f}  "
+                    f"dino={metrics['loss/dino']:.4f}{psf_str}  "
                     f"psnr={psnr:.2f} dB  "
                     f"[{time.time()-t0:.0f}s]"
                 )
@@ -353,6 +356,7 @@ def main() -> None:
     writer       = SummaryWriter(log_dir=str(opts.log_path))
     best_val     = float("inf")
     best_epoch   = 0
+    epochs_without_improvement = 0
     global_step  = start_epoch * len(train_loader)
     has_validation = val_loader is not None
 
@@ -403,25 +407,31 @@ def main() -> None:
 
         # ── Checkpointing ────────────────────────────────────────────────────
         if has_validation and val_m is not None:
-            val_loss = val_m["loss/total"]
-            if val_loss < best_val:
-                best_val   = val_loss
-                best_epoch = epoch
-                save_checkpoint(
-                    opts.log_path / "best.pth",
-                    model, optimizer, scheduler, epoch, val_m, opts,
-                )
             metrics_for_ckpt = val_m
+            monitored_loss = val_m["loss/total"]
+            monitored_name = "val/loss/total"
         else:
             metrics_for_ckpt = train_m
-            # No validation: save best by train loss (for convenience)
-            train_loss = train_m["loss/total"]
-            if train_loss < best_val:
-                best_val   = train_loss
-                best_epoch = epoch
-                save_checkpoint(
-                    opts.log_path / "best.pth",
-                    model, optimizer, scheduler, epoch, train_m, opts,
+            monitored_loss = train_m["loss/total"]
+            monitored_name = "train/loss/total"
+
+        improved = monitored_loss < (best_val - opts.early_stop_min_delta)
+        if improved:
+            best_val = monitored_loss
+            best_epoch = epoch
+            epochs_without_improvement = 0
+            save_checkpoint(
+                opts.log_path / "best.pth",
+                model, optimizer, scheduler, epoch, metrics_for_ckpt, opts,
+            )
+        else:
+            epochs_without_improvement += 1
+            if opts.early_stop_patience > 0:
+                print(
+                    f"  Early-stop monitor {monitored_name}: "
+                    f"no improvement for {epochs_without_improvement}/"
+                    f"{opts.early_stop_patience} epochs "
+                    f"(best={best_val:.6f} at epoch {best_epoch})"
                 )
 
         if epoch % opts.save_every == 0:
@@ -429,6 +439,14 @@ def main() -> None:
                 opts.log_path / f"epoch_{epoch:04d}.pth",
                 model, optimizer, scheduler, epoch, metrics_for_ckpt or train_m, opts,
             )
+
+        if opts.early_stop_patience > 0 and epochs_without_improvement >= opts.early_stop_patience:
+            print(
+                f"  Early stopping at epoch {epoch}: {monitored_name} "
+                f"did not improve by at least {opts.early_stop_min_delta:g} "
+                f"for {opts.early_stop_patience} consecutive epochs."
+            )
+            break
 
     writer.close()
     # Save last epoch as last.pth when no validation (so user can eval on test)

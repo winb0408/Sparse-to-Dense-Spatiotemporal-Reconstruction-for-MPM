@@ -1,3 +1,16 @@
+## 当前推荐阅读路径
+
+本项目已经按“数据维度先行”的实验主线重整。建议按以下顺序阅读：
+
+1. `docs/DATASET_PROTOCOL.md`：冻结 CIDC25、MDC25、pollen 的数据身份，以及 2D / 2.5D / 3D 合法组合。
+2. `docs/RESULT_TAXONOMY.md`：说明哪些结果属于正文主实验，哪些只能作为压力测试或迁移探索。
+3. `report/SUCCESS_PATH_2D_2P5D_3D.md`：短版主线说明。
+4. `report/reorganized_main.tex`：完整论文式 LaTeX 报告，覆盖实验目标、总体设计、具体方法、实验结果、分析、不足和后续工作；正文以文字和表格为主，文末附录集中放置关键图集。
+
+核心原则：不要把 CIDC25、MDC25、pollen 的结果混成一个总排名；主结论只来自数据协议一致的实验。
+
+---
+
 ## 项目概览：3PM 稀疏采样重建与可视化套件
 
 本项目实现了 3PM（Three-Photon Microscopy）图像从 **稀疏采样（noisy / sparse）到高质量重建（dense / GT-like）** 的完整评估与论文级可视化流水线，包含：
@@ -488,4 +501,375 @@ python scripts/visualize_cidc25_3d.py \
 - 在 `XY` 视图上滚动鼠标滚轮：快速切换 `z` 层
 - 拖动 `z/y/x` 滑条：同步更新三视图切片
 - 拖动 `thr` 滑条：实时调整 3D 点云阈值（高阈值更稀疏，低阈值更密）
+
+---
+
+## 8. CIDC25 三维稀疏重建 + PSF 物理先验
+
+### 8.1 新增能力总览
+
+| 功能 | 文件 | 说明 |
+|------|------|------|
+| 3D 稀疏数据生成 | `scripts/prepare_cidc25_sparse3d.py` | 从 CIDC25 原始栈生成 XY/Z/XYZ 三种稀疏模式 |
+| 3D Volume Dataset | `dataset.py` → `CIDC25Volume3DDataset` | 直接加载栈、3D patch 裁剪、在线稀疏化 |
+| Z 方向稀疏 warm-start | `dataset.py` → `warm_start_3d` | 支持独立 Z 轴 factor |
+| 3D 稀疏 mask | `dataset.py` → `make_mask_3d` | 支持 xy/z/xyz 三种 sparse_mode |
+| PSF 编码通道 | `dataset.py` + `models/__init__.py` | `--psf_input_channel` 在输入端加 PSF map |
+| PSF 一致性损失 | `loss.py` → `PSFConsistencyLoss` | `--lambda_psf 0.1` 启用物理约束 |
+| Wiener 预反卷积 | `dataset.py` → `wiener_init_2d/3d` | `--wiener_init` 替代 bilinear warm-start |
+| 3D 训练路径 | `build_dataloaders` | `--cidc25_root` 接入 VideoSwinUNet 训练 |
+
+### 8.2 3D 点云总览对比图（XY / Z / XYZ / GT）
+
+与 `200um-f10-z5_sparse/comparison_3d_overview_pointcloud.png` 同风格（复用 `visualize_cidc25_3d.py` 点云渲染：`inferno`、阈值采样、`elev=28/azim=40`）。每种稀疏率 K 一张图，四列分别为 XY / Z / XYZ 稀疏体与 GT。
+
+```bash
+python scripts/plot_cidc25_sparse3d_pointcloud_overview.py \
+  --sparse_root /data2/wjb/threePM/ThreePM_openDatasets/CIDC25_sparse3d \
+  --gt_stem A1 --split Training --ks 2 3 4
+```
+
+输出：`CIDC25_sparse3d/comparison_3d_overview_pointcloud_K{2,3,4}.png`
+
+### 8.3 3D 稀疏数据准备
+
+```bash
+python scripts/prepare_cidc25_sparse3d.py \
+  --cidc_root /data2/wjb/threePM/ThreePM_openDatasets/AI4Life-CIDC25 \
+  --output_root /data2/wjb/threePM/ThreePM_openDatasets/CIDC25_sparse3d \
+  --gt_stem A1 --split Training \
+  --sparsity_factors 2 4 8 --modes xy z xyz
+```
+
+### 8.4 3D VideoSwinUNet 训练（XY 稀疏）
+
+```bash
+python train.py --task spatiotemporal_3d --model video_swin_unet \
+  --cidc25_root /data2/wjb/threePM/ThreePM_openDatasets/AI4Life-CIDC25 \
+  --cidc25_gt_stem A1 \
+  --data_root /data2/wjb/threePM/ThreePM_openDatasets/CIDC25_sparse3d/K4_xy \
+  --sparse_mode xy --sparsity_factor 4 \
+  --volume_patch_t 16 --patch_size 256 --batch_size 2 \
+  --n_frames 16 --epochs 50 --no_dino \
+  --run_name sparse3d_3d_xy_K4
+```
+
+### 8.5 PSF 增强（物理先验）
+
+```bash
+# PSF 编码通道 + PSF 一致性损失
+python train.py --task spatiotemporal_3d --model video_swin_unet \
+  --cidc25_root /data2/wjb/threePM/ThreePM_openDatasets/AI4Life-CIDC25 \
+  --cidc25_gt_stem A1 \
+  --data_root /data2/wjb/threePM/ThreePM_openDatasets/CIDC25_sparse3d/K4_xy \
+  --sparse_mode xy --sparsity_factor 4 \
+  --psf_input_channel --lambda_psf 0.1 \
+  --psf_sigma_lateral 1.0 --psf_sigma_axial 3.0 \
+  --volume_patch_t 16 --patch_size 256 --batch_size 2 \
+  --n_frames 16 --epochs 50 --no_dino \
+  --run_name sparse3d_3d_xy_K4_psf_full
+```
+
+### 8.6 全量实验脚本
+
+```bash
+bash scripts/run_sparse3d_experiments.sh
+```
+
+包含 Phase 1（9 baseline runs）+ Phase 2（4 PSF 增强 runs）。
+
+### 8.7 K2 全图评估：按稀疏模式的总览伪彩对比图
+
+针对 `eval_sparse3d_k2_fullimg`，为 **xy / z / xyz** 各生成一张 2×5 总览图（全局 + ROI 放大），列顺序：
+
+`稀疏输入 | 2D 重建 | 2.5D 重建 | 3D 重建 | GT`
+
+重建列自动选用带 `--wiener_init`（及 2.5D 的 `mask_wiener`）的 checkpoint；配色与 `plot_pollen_structural_comparison.py` 一致（`magma` + 每列 `robust_range` 0.5–99.5% + colorbar）。
+
+```bash
+python scripts/plot_sparse3d_k2_overview_pseudocolor.py \
+  --cidc_root /data2/wjb/threePM/ThreePM_openDatasets/AI4Life-CIDC25 \
+  --sparse_root /data2/wjb/threePM/ThreePM_openDatasets/CIDC25_sparse3d \
+  --runs_dir runs \
+  --output_dir eval_sparse3d_k2_fullimg/qualitative \
+  --k 2 --frame 100 --modes xy z xyz
+```
+
+输出：
+
+- **magma 版**（与 pollen 结构伪彩一致）：`eval_sparse3d_k2_fullimg/qualitative/overview_{mode}_K2_f{frame}_pseudocolor.png/pdf`
+- **紫色版**（保留）：`eval_sparse3d_k2_fullimg/qualitative_purple/overview_{mode}_K2_f{frame}_pseudocolor_purple.png/pdf`
+
+**K=4 全图评估目录** `eval_sparse3d_k4_fullimg/`：
+
+```bash
+# 仅评估 K=4 的 checkpoint
+python scripts/eval_sparse3d_unified.py \
+  --cidc_root .../AI4Life-CIDC25 \
+  --sparse_root .../CIDC25_sparse3d \
+  --gt_stem F0 --split Validation \
+  --runs_dir runs --output_dir eval_sparse3d_k4_fullimg \
+  --sparsity_k 4 --max_frames 200
+
+# magma 对比图
+python scripts/plot_sparse3d_k2_overview_pseudocolor.py \
+  --k 4 --display-style magma \
+  --output_dir eval_sparse3d_k4_fullimg/qualitative
+
+# 紫色对比图
+python scripts/plot_sparse3d_k2_overview_pseudocolor.py \
+  --k 4 --display-style purple \
+  --output_dir eval_sparse3d_k4_fullimg/qualitative_purple
+```
+
+---
+
+## 9. 实验归档整理（2026-04-13）
+
+为避免“探索失败/中间态实验”干扰最终论文主线，新增分层归档：
+
+### 9.1 Stage2-3 未达预期实验归档
+
+归档目录：
+
+- `archive/failed_experiments_20260413/stage2_stage3_unsuccessful/`
+
+已归档内容（示例）：
+
+- `STAGE2_INTERIM_REPORT.md`
+- `STAGE2_EXTENDED_REPORT.md`
+- `STAGE3_REPORT.md`
+- `STAGE3_REVIEW_GLM5.md`
+- `stage2_pilot_data/`
+- `stage3_logs/`
+
+### 9.2 Stage4 PSF 未达预期变体归档
+
+归档目录：
+
+- `archive/failed_experiments_20260413/stage4_psf_unsuccessful/runs/`
+- `archive/failed_experiments_20260413/stage4_psf_unsuccessful/eval/`
+
+已归档变体：
+
+- `sparse3d_3d_xy_K4_psf_ch`
+- `sparse3d_3d_xy_K4_psf_loss`
+- `sparse3d_3d_xy_K4_psf_full`
+
+说明：
+
+- 上述变体在当前预算下未优于 3D baseline，先归档保留，不纳入当前主线。
+- `sparse3d_3d_xy_K4_wiener` 保留在主路径，作为有效物理先验方案。
+
+### 9.3 归档索引
+
+- `archive/failed_experiments_20260413/index/ARCHIVE_INDEX.md`
+
+---
+
+## 10. 成功探索主线文档（2D -> 2.5D -> 3D）
+
+新增文档：
+
+- `report/SUCCESS_PATH_2D_2P5D_3D.md`
+
+该文档仅保留“有效/成功探索”，包含：
+
+- 研究目标
+- 总体架构
+- 具体方法（含原理与公式）
+- 关键实验结果与解释
+- 主线收敛结论与后续建议
+
+---
+
+## 11. Phase 3A：K 值扫描与 XY 稀疏优化（2026-04-13）
+
+本阶段目标：
+
+1. 在 `K=2` 下补齐 `xy/z/xyz` 全模式实验（`run_sparse3d_k_sweep.sh` 已剔除 `K=3`，减少批量实验量）。
+2. 补齐 2.5D 的显式 mask 先验，并加入 Wiener 初始化通道级对照。
+3. 将 2D 路径扩展到 `--wiener_init`，统一与 3D 的预处理范式。
+
+### 11.1 新增/更新能力
+
+- `dataset.py`
+  - 新增 `CIDC25Volume2p5DDataset`（直接从 CIDC25 体数据构造 2.5D 输入）：
+    - 输入支持 `[T interp + T mask]`（默认）或仅 `[T interp]`
+    - 支持 `sparse_mode=xy/z/xyz`
+    - 支持 `wiener_init`
+  - `NucleiDenoisingDataset` 增加 `wiener_init` 分支（2D warm-start / Wiener 二选一）
+  - `build_dataloaders`：
+    - `task=spatial_2p5d` 且传入 `--cidc25_root` 时，自动走 `CIDC25Volume2p5DDataset`
+    - 保留原 `NucleiTemporal2p5DDataset` 路径以兼容旧数据组织
+- `models/__init__.py`
+  - `spatial_2p5d` 输入通道：
+    - 旧路径（配对帧 `NucleiTemporal2p5DDataset`）：`in_ch = temporal_window`
+    - 新路径（`--cidc25_root` + `CIDC25Volume2p5DDataset`）：默认 `in_ch = 2 * temporal_window`（interp + mask）
+- `scripts/run_sparse3d_k_sweep.sh`
+  - K 扫描脚本（当前策略）：
+    - **仅 K=2**，mode=xy/z/xyz
+    - **GPU 2 与 GPU 3 双 worker 并行**：对待跑任务按顺序轮询分配（2→3→2→3…），每个 GPU 上串行执行各自队列
+    - baseline runs：`2d / 2p5d / 3d / 3d_wiener`
+    - XY 增强 runs：`2d_wiener / 2p5d_mask / 2p5d_mask_wiener`
+    - 数据集已齐备时跳过 `prepare`；已有 `runs/<name>/best.pth` 时跳过训练
+- `scripts/eval_sparse3d_unified.py`
+  - 支持 `2d + wiener`
+  - 支持 `2p5d(mask/wiener)` 新路径评估
+  - baseline 统计扩展为自动扫描所有可用 `K*_mode` 目录
+- `scripts/plot_eval_results.py`
+  - 新增 `fig6_k_sweep_psnr`
+  - 新增 `fig7_optimization_gain`
+
+### 11.2 推荐执行顺序
+
+```bash
+# 1) 训练 K 扫描与增强实验
+bash scripts/run_sparse3d_k_sweep.sh
+
+# 2) 统一评估（建议先用 Validation/F0）
+python scripts/eval_sparse3d_unified.py \
+  --cidc_root /data2/wjb/threePM/ThreePM_openDatasets/AI4Life-CIDC25 \
+  --sparse_root /data2/wjb/threePM/ThreePM_openDatasets/CIDC25_sparse3d \
+  --gt_stem F0 --split Validation \
+  --runs_dir runs --output_dir eval_sparse3d --max_frames 200
+
+# 3) 绘图
+python scripts/plot_eval_results.py \
+  --eval_dir eval_sparse3d \
+  --output_dir eval_sparse3d/figures
+```
+
+---
+
+## 12. 花粉稀疏采样数据预处理（尺寸对齐 + Mask 生成）
+
+新增脚本：`scripts/preprocess_pollen_sparse_restore.py`
+
+用途：
+
+- 将 `pollen_test/Sparse` 中被“压缩导出”的稀疏采样帧还原回 GT 尺寸（与 dense 一致）。
+- 未扫描像素补 0。
+- 同步生成二值 `mask`（1=实际扫描到，0=未扫描）。
+
+支持的命名模式（从文件夹名自动解析）：
+
+- `2xX` / `4xX`：仅 X 方向稀疏
+- `2xY` / `4xY`：仅 Y 方向稀疏
+- `2xXY` / `4xXY`：X、Y 同时稀疏
+
+示例命令：
+
+```bash
+python scripts/preprocess_pollen_sparse_restore.py \
+  --data_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test \
+  --output_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/preprocessed
+```
+
+输出结构（每个稀疏采集目录）：
+
+- `{acq}/CellVideo1/CellVideo/CellVideo_restored.tif`：恢复到 GT 尺寸后的图像栈
+- `{acq}/CellVideo1/CellVideo/CellVideo_mask.tif`：对应 mask 栈
+
+说明：
+
+- 脚本会自动识别并跳过 `dense` 采集目录。
+- 若输出文件已存在，默认跳过；可加 `--overwrite` 强制覆盖。
+
+### 12.1 构建二维汇总数据集（100 帧均值）
+
+新增脚本：`scripts/build_pollen_sparse_2d_dataset.py`
+
+用途：
+
+- 将预处理后的每个采集栈（100 帧）沿时间维做均值，得到单张 2D 图像。
+- 文件名自动去掉时间戳（例如 `pollen-fov1-2xX-32.5mW_2026-04-17_17-25-47` -> `pollen-fov1-2xX-32.5mW`）。
+- 输出到 `Sparse_Datasets/`，并在 `Sparse_Datasets/mask/` 生成对应 2D mask。
+- 自动纳入 GT（dense）二维均值图，构成可直接使用的 2D 数据集。
+
+示例命令：
+
+```bash
+python scripts/build_pollen_sparse_2d_dataset.py \
+  --data_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test \
+  --preprocessed_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/preprocessed \
+  --output_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/Sparse_Datasets
+```
+
+输出结构：
+
+- `Sparse_Datasets/*.tif`：2D 稀疏/GT 图像
+- `Sparse_Datasets/mask/*_mask.tif`：对应 2D mask
+
+### 12.2 转换为标准测试结构（Test/low/high）
+
+新增脚本：`scripts/build_pollen_test_low_high.py`
+
+用途：
+
+- 将 `Sparse_Datasets` 转为常用评估目录：
+  - `Test/low`：稀疏 2D 图像
+  - `Test/high`：对应 GT 2D 图像（同名配对）
+- 额外输出：
+  - `Test/mask/*_mask.tif`：low 的采样 mask
+  - `Test/mask/*_gt_mask.tif`：对应 GT mask（全 1）
+
+示例命令：
+
+```bash
+python scripts/build_pollen_test_low_high.py \
+  --sparse_dataset_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/Sparse_Datasets \
+  --output_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/Sparse_Datasets_LowHigh
+```
+
+输出目录：
+
+- `Sparse_Datasets_LowHigh/Test/low/*.tif`
+- `Sparse_Datasets_LowHigh/Test/high/*.tif`
+- `Sparse_Datasets_LowHigh/Test/mask/*.tif`
+
+### 12.3 花粉结构感知评估协议（推荐用于显微结构可信度）
+
+旧版 `eval_pollen_sparse/summary_pollen.csv` 主要按全图 PSNR 排序，且 SSIM 为全图均值。对于显微图像，这容易被背景、亮度尺度和暗区域主导，可能出现“视觉结构恢复较好，但 SSIM 偏低”的冲突。
+
+新增结构感知评估脚本：`scripts/eval_pollen_structural.py`
+
+核心变化：
+
+- 自动从 GT 生成前景结构 mask，只在花粉/细胞结构区域计算关键指标。
+- 保留全图指标 `psnr_full` / `ssim_full` 作为参考。
+- 新增结构指标：
+  - `ssim_fg` / `ms_ssim_fg`
+  - `ncc_fg`
+  - `psnr_fg` / `mae_fg`
+  - `*_cal`：在前景区域做线性强度匹配后再计算，强调结构一致性而非整体亮度尺度。
+- 新增 `composite_score`：结构优先的综合分，用于选择 Best 2D / 2.5D / 3D。
+- `SSIM >= 0.85` 只建议用于修正后的 `ssim_fg_cal` 或 `ms_ssim_fg_cal`，不建议直接套用旧版全图 SSIM。
+
+运行结构评估：
+
+```bash
+python scripts/eval_pollen_structural.py \
+  --data_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/Sparse_Datasets \
+  --mask_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/Sparse_Datasets/mask \
+  --runs_dir /data2/wjb/threePM/runs \
+  --output_dir /data2/wjb/threePM/eval_pollen_sparse_structural
+```
+
+生成结构排序定性图：
+
+```bash
+python scripts/plot_pollen_structural_comparison.py \
+  --data_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/Sparse_Datasets \
+  --mask_root /data2/wjb/threePM/ThreePM_openDatasets/pollen_test/Sparse_Datasets/mask \
+  --eval_dir /data2/wjb/threePM/eval_pollen_sparse_structural
+```
+
+输出目录：
+
+- `eval_pollen_sparse_structural/summary_structural.csv`
+- `eval_pollen_sparse_structural/summary_structural.md`
+- `eval_pollen_sparse_structural/predictions/`
+- `eval_pollen_sparse_structural/qualitative_structural/`
+- `eval_pollen_sparse_structural/qualitative_structural_pseudocolor/`
 

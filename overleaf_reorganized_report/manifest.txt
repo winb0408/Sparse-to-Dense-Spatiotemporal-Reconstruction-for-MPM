@@ -1,0 +1,15 @@
+Overleaf package manifest
+=========================
+
+Main file: main.tex
+Compiler: XeLaTeX
+
+Copied figures:
+- figures/cidc25_k2k4_qual_xy.png <- eval_sparse3d_k2_fullimg/qualitative/qual_panel_xy.png
+- figures/cidc25_k2k4_qual_z.png <- eval_sparse3d_k2_fullimg/qualitative/qual_panel_z.png
+- figures/cidc25_k2k4_qual_xyz.png <- eval_sparse3d_k2_fullimg/qualitative/qual_panel_xyz.png
+- figures/cidc25_k2_oblique_xy.png <- eval_sparse3d_k2_fullimg/qualitative/oblique_panel_xy.png
+- figures/cidc25_k2_oblique_z.png <- eval_sparse3d_k2_fullimg/qualitative/oblique_panel_z.png
+- figures/cidc25_k2_oblique_xyz.png <- eval_sparse3d_k2_fullimg/qualitative/oblique_panel_xyz.png
+- figures/mdc25_k2_best5_modes.png <- eval_mdc25_sparse/qualitative/mdc25_k2_best5_modes.png
+- figures/pollen_fov1_4xXY_32p5mW_best5.png <- eval_pollen_sparse/qualitative_pseudocolor_v3/pollen-fov1-4xXY-32.5mW_best5.png

@@ -254,8 +254,89 @@ def _lpips_score(
 _METRIC_KEYS = [
     "psnr", "ssim", "ms_ssim", "mae", "ncc", "cnr",
     "s_snr", "fw_psnr", "lpips",
+    "psnr_fg", "ssim_fg", "ms_ssim_fg", "ncc_fg", "fg_fraction",
+    "bg_mean", "bg_std", "bg_residual_std", "bg_false_positive_rate",
+    "fwhm_profile", "profile_rmse", "profile_corr", "profile_peak_shift",
     "psnr_noisy", "ssim_noisy", "delta_psnr", "delta_ssim",
 ]
+
+
+def _foreground_mask(gt: np.ndarray, percentile: float = 75.0, dilate_iter: int = 2) -> np.ndarray:
+    thresh = float(np.percentile(gt, percentile))
+    mask = gt > thresh
+    if mask.sum() < 16:
+        thresh = float(np.percentile(gt, 90.0))
+        mask = gt > thresh
+    if mask.sum() > 0 and dilate_iter > 0:
+        mask = ndimage.binary_dilation(mask, iterations=dilate_iter)
+    return mask.astype(bool)
+
+
+def _safe_masked_metric(fn, pred: np.ndarray, gt: np.ndarray, mask: np.ndarray) -> float:
+    if int(mask.sum()) < 16:
+        return float("nan")
+    vals_p = pred[mask]
+    vals_g = gt[mask]
+    side = int(math.ceil(math.sqrt(vals_p.size)))
+    pad = side * side - vals_p.size
+    if pad > 0:
+        vals_p = np.pad(vals_p, (0, pad), mode="edge")
+        vals_g = np.pad(vals_g, (0, pad), mode="edge")
+    return fn(vals_p.reshape(side, side).astype(np.float32), vals_g.reshape(side, side).astype(np.float32))
+
+
+def _fwhm_from_profile(profile: np.ndarray) -> float:
+    if profile.size < 3:
+        return float("nan")
+    prof = profile.astype(np.float32)
+    prof = prof - float(prof.min())
+    peak = float(prof.max())
+    if peak <= 1e-8:
+        return float("nan")
+    half = 0.5 * peak
+    above = np.flatnonzero(prof >= half)
+    if above.size < 2:
+        return float("nan")
+    return float(above[-1] - above[0] + 1)
+
+
+def _profile_metrics(pred: np.ndarray, gt: np.ndarray, mask: np.ndarray) -> Dict[str, float]:
+    if int(mask.sum()) < 16:
+        return {
+            "fwhm_profile": float("nan"),
+            "profile_rmse": float("nan"),
+            "profile_corr": float("nan"),
+            "profile_peak_shift": float("nan"),
+        }
+    cy, cx = ndimage.center_of_mass(mask.astype(np.float32))
+    if not np.isfinite(cy) or not np.isfinite(cx):
+        return {
+            "fwhm_profile": float("nan"),
+            "profile_rmse": float("nan"),
+            "profile_corr": float("nan"),
+            "profile_peak_shift": float("nan"),
+        }
+    y = int(np.clip(round(cy), 0, gt.shape[0] - 1))
+    x = int(np.clip(round(cx), 0, gt.shape[1] - 1))
+    half = min(32, gt.shape[1] // 2, gt.shape[0] // 2)
+    px0, px1 = max(0, x - half), min(gt.shape[1], x + half + 1)
+    pred_prof = pred[y, px0:px1].astype(np.float32)
+    gt_prof = gt[y, px0:px1].astype(np.float32)
+    if pred_prof.size < 3 or gt_prof.size < 3:
+        return {
+            "fwhm_profile": float("nan"),
+            "profile_rmse": float("nan"),
+            "profile_corr": float("nan"),
+            "profile_peak_shift": float("nan"),
+        }
+    rmse = float(np.sqrt(np.mean((pred_prof - gt_prof) ** 2)))
+    corr = float(np.corrcoef(pred_prof, gt_prof)[0, 1]) if pred_prof.std() > 1e-8 and gt_prof.std() > 1e-8 else float("nan")
+    return {
+        "fwhm_profile": _fwhm_from_profile(pred_prof),
+        "profile_rmse": rmse,
+        "profile_corr": corr,
+        "profile_peak_shift": float(abs(int(np.argmax(pred_prof)) - int(np.argmax(gt_prof)))),
+    }
 
 
 def compute_all_metrics(
@@ -284,6 +365,35 @@ def compute_all_metrics(
         if (lpips_net is not None and _HAS_LPIPS)
         else float("nan")
     )
+
+    fg = _foreground_mask(gt)
+    bg = ~fg
+    m["fg_fraction"] = float(fg.mean())
+    m["psnr_fg"] = _safe_masked_metric(_psnr, pred, gt, fg)
+    m["ssim_fg"] = _safe_masked_metric(_ssim, pred, gt, fg)
+    m["ms_ssim_fg"] = _safe_masked_metric(_ms_ssim, pred, gt, fg)
+    if int(fg.sum()) >= 16:
+        pf = pred[fg] - float(pred[fg].mean())
+        gf = gt[fg] - float(gt[fg].mean())
+        m["ncc_fg"] = float(np.dot(pf, gf) / (np.linalg.norm(pf) * np.linalg.norm(gf) + 1e-10))
+    else:
+        m["ncc_fg"] = float("nan")
+
+    if int(bg.sum()) >= 16:
+        bg_pred = pred[bg]
+        bg_res = pred[bg] - gt[bg]
+        fg_ref = float(np.percentile(gt[fg], 50.0)) if int(fg.sum()) >= 16 else cnr_thresh
+        m["bg_mean"] = float(bg_pred.mean())
+        m["bg_std"] = float(bg_pred.std())
+        m["bg_residual_std"] = float(bg_res.std())
+        m["bg_false_positive_rate"] = float((bg_pred > fg_ref).mean())
+    else:
+        m["bg_mean"] = float("nan")
+        m["bg_std"] = float("nan")
+        m["bg_residual_std"] = float("nan")
+        m["bg_false_positive_rate"] = float("nan")
+
+    m.update(_profile_metrics(pred, gt, fg))
     if noisy is not None:
         m["psnr_noisy"] = _psnr(noisy, gt)
         m["ssim_noisy"] = _ssim(noisy, gt)

@@ -17,6 +17,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .prior_fusion import build_prior_fusion_2d
+
 
 # ─────────────────────────────────────────────
 # Windowing helpers
@@ -325,10 +327,20 @@ class SwinUNet2D(nn.Module):
         depths:       List[int] = [2, 2, 6, 2],
         num_heads:    List[int] = [3, 6, 12, 24],
         window_size:  int   = 8,
+        prior_fusion: str   = "none",
+        prior_image_channels: Optional[int] = None,
+        prior_mask_channels: Optional[int] = None,
     ):
         super().__init__()
         self.n_stages  = len(depths)
         dims           = [embed_dim * (2 ** i) for i in range(self.n_stages)]
+
+        # ── Prior-aware input fusion ─────────────────────────────────────────
+        self.prior_fusion = build_prior_fusion_2d(
+            prior_fusion,
+            prior_image_channels,
+            prior_mask_channels,
+        )
 
         # ── Patch embedding ──────────────────────────────────────────────────
         # [B, in_ch, H, W] → [B, embed_dim, H/ps, W/ps]
@@ -399,6 +411,9 @@ class SwinUNet2D(nn.Module):
           head     → [B,  1, 256, 256]
         """
         B, C, H, W = x.shape
+
+        # Prior-aware fusion keeps the channel count unchanged.
+        x = self.prior_fusion(x)
 
         # Patch embed
         x = self.patch_embed(x)                    # [B, embed_dim, H/ps, W/ps]

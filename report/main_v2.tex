@@ -1,0 +1,251 @@
+%% =========================================================
+%% Three-Photon Microscopy - 3D Sparse Reconstruction
+%% Research Report v2: K=2 + K=4 Joint Analysis
+%% =========================================================
+% !TeX program = xelatex
+\documentclass[UTF8, scheme=plain, 11pt, a4paper]{ctexart}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true, linkcolor=blue!70!black,
+  citecolor=green!50!black, urlcolor=blue!70!black,
+  unicode=true
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small 3PM Sparse Reconstruction --- Report v2}
+\lhead{\small \leftmark}
+\rfoot{\thepage}
+
+\titleformat{\section}{\large\bfseries}{}{0em}{\thesection\quad}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{\thesubsection\quad}
+
+\newcommand{\psnr}{\text{PSNR}}
+\newcommand{\ssim}{\text{SSIM}}
+
+% Keep original report figures, and add full-image evaluation/qualitative paths.
+\graphicspath{{figures/}{../eval_sparse3d_k2_fullimg/figures/}{../eval_sparse3d_k2_fullimg/qualitative/}}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\LARGE\bfseries 三光子显微镜稀疏重建研究报告（v2）\\[0.5em]
+   K=2 与 K=4 联合横向/纵向分析\par}
+  \vspace{1em}
+  {\large Three-Photon Microscopy Sparse Reconstruction Report (v2)\\
+   Joint Cross-Sectional and Longitudinal Analysis on K=2 and K=4\par}
+  \vspace{2em}
+  {\normalsize
+   \textbf{版本关系：} 本文件为 \texttt{main.tex} 的增量分析版，不覆盖原稿\\[0.5em]
+   \textbf{新增内容：} K=2 新实验结果 + 与 K=4 联合比较\\[0.5em]
+   \textbf{数据与评估：} Validation/F0.tif，统一协议，200 帧\par}
+  \vspace{1.5em}
+  {\small \today}
+  \vfill
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{版本说明（v2 相对 v1）}
+
+\begin{itemize}
+  \item v1（\texttt{main.tex}）聚焦 K=4 阶段性结果（Phase1/Phase2）。
+  \item v2 在保留 v1 结论框架基础上，新增 K=2 完整评估，并进行 K=2 与 K=4 联合分析。
+  \item v2 使用结果目录：\texttt{eval\_sparse3d\_k2\_fullimg/summary\_all.csv} 和 \texttt{summary\_all.md}。
+  \item 与上一版差异：2D/2.5D 推理由分块硬拼接改为\textbf{整图推理（含自动 padding + 裁剪）}，消除明显分块伪影。
+\end{itemize}
+
+\section{新增实验设置（K=2）}
+
+\subsection{实验目的}
+
+在 K=4 基线基础上，降低稀疏因子到 K=2，验证：
+\begin{enumerate}[leftmargin=*]
+  \item 更高采样率是否系统性提升重建质量；
+  \item 2.5D 显式 mask 先验在 XY 场景下的增益；
+  \item Wiener 初始化在不同算法/稀疏模式下是否稳定有效。
+\end{enumerate}
+
+\subsection{运行与评估清单}
+
+\begin{itemize}
+  \item 训练：\texttt{scripts/run\_sparse3d\_k\_sweep.sh}（已裁剪为 K=2）
+  \item 评估：\texttt{scripts/eval\_sparse3d\_unified.py}
+  \item 绘图：\texttt{scripts/plot\_eval\_results.py}
+\end{itemize}
+
+\section{K=2 与 K=4 联合对比（全图推理版）}
+
+\subsection{横向对比（同一 K，不同方法）}
+
+\begin{table}[H]
+  \centering
+  \caption{K=2 下核心方法横向对比（Validation/F0，全图推理）}
+  \begin{tabular}{lccc}
+    \toprule
+    场景 & 方法 & PSNR (dB) & SSIM \\
+    \midrule
+    XY & 3D & 40.64 & 0.946 \\
+    XY & 3D + Wiener & 40.61 & 0.953 \\
+    XY & 2.5D + mask & 37.80 & 0.915 \\
+    XY & 2.5D（旧） & 27.96 & 0.827 \\
+    XY & 2D & 27.90 & 0.818 \\
+    \midrule
+    Z & 3D & 44.43 & 0.976 \\
+    Z & 2.5D & 51.72 & 0.994 \\
+    Z & 2D & 42.59 & 0.962 \\
+    \midrule
+    XYZ & 3D + Wiener & 39.06 & 0.925 \\
+    XYZ & 3D & 36.18 & 0.878 \\
+    XYZ & 2.5D & 30.30 & 0.857 \\
+    XYZ & 2D & 30.72 & 0.846 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{分析}
+在 K=2 条件下，3D 在 XY/Z/XYZ 三种场景均保持领先，尤其 Z 场景达到 44.43 dB。2.5D+mask 在 XY 场景达到 37.80 dB，相比旧 2.5D（27.96 dB）提升显著，说明显式 mask 先验的确有效。值得注意的是，2D 在全图推理后由原先低分大幅回升（例如 XY: 16.85 $\rightarrow$ 27.90 dB），证明先前的分块拼接伪影会系统性低估 2D/2.5D。
+
+\subsection{纵向对比（同一方法，K=4 $\rightarrow$ K=2）}
+
+\begin{table}[H]
+  \centering
+  \caption{K=4 到 K=2 的 PSNR 变化（$\Delta = \psnr_{K2} - \psnr_{K4}$，全图推理）}
+  \begin{tabular}{lcc}
+    \toprule
+    方法/场景 & $\Delta$PSNR (dB) & 解释 \\
+    \midrule
+    3D\_xy & +19.45 & 采样率提升后 3D 潜力显著释放 \\
+    3D\_z & +23.25 & Z 场景下时空模型收益最大 \\
+    3D\_xyz & +15.00 & 复合稀疏下仍显著提升 \\
+    2.5D\_xy（旧） & +1.64 & 采样率提升后仍受益 \\
+    2.5D\_z & +1.64 & 高性能场景继续小幅提升 \\
+    2.5D\_xyz & -0.99 & K=4 略优，提示模式依赖性 \\
+    2D\_z & +18.29 & Z 场景受益极大 \\
+    2D\_xy & +5.72 & 从低采样恢复到高采样显著改善 \\
+    2D\_xyz & +8.54 & 复合场景明显改善 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{结论}
+\begin{itemize}
+  \item K 从 4 降到 2 后，3D 路线在三种模式均显著提升，尤其 Z 模式提升最大（+23.25 dB）。
+  \item 2D/2.5D 在全图推理下不再出现系统性反常下降，说明此前异常主要来自分块拼接伪影而非模型本体失效。
+  \item Wiener 仍是场景相关组件：在 3D-XYZ 与 3D-XY(K4) 上贡献明显，在 3D-XY(K2) 上近似持平。
+\end{itemize}
+
+\section{图表与可视化分析（v2）}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{fig6_k_sweep_psnr.png}
+  \caption{K 值扫描曲线：不同算法在不同稀疏模式下的 PSNR 对比。}
+\end{figure}
+\paragraph{图分析}
+图中可见 K=2 相比 K=4 在多数方法/模式下整体上移；3D 曲线整体高于 2D/2.5D。2.5D+mask（在 XY 下）明显拉高了 2.5D 家族的曲线水平，支持“mask 先验补齐”策略。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{fig7_optimization_gain.png}
+  \caption{优化增益排序：相对同算法/同模式/同 K baseline 的 PSNR 增益。}
+\end{figure}
+\paragraph{图分析}
+增益图显示，最大的稳定增益来自“3D + 更低稀疏（K2）”与“2.5D + mask”。Wiener 的增益呈现明显模式依赖：在部分场景收益高，在另一些场景接近零。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{fig4_summary_heatmap.png}
+  \caption{联合结果热力图（含 K=2 与 K=4）。}
+\end{figure}
+\paragraph{图分析}
+热力图排序后可见，前列主要由 3D（特别是 Z/XYZ）与 2.5D-Z 组成；2D 在全图推理版中显著上移，证明评估流程修正对公平比较至关重要。
+
+\subsection{代表帧对比图（全图推理，6行$\times$5列）}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{qual_panel_xy.png}
+  \caption{XY 稀疏代表帧对比（6行5列）：前3行为 K=2，后3行为 K=4；每列依次为 GT、Sparse 输入、2D、2.5D、3D。}
+\end{figure}
+\paragraph{图分析}
+在 XY 场景下，K=2 的 2D/2.5D/3D 均优于 K=4；2.5D+mask 与 3D 在细胞边界与低对比纹理恢复上明显优于旧 2.5D。此前“四块对比度不一致”伪影在全图推理后消失。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{qual_panel_z.png}
+  \caption{Z 稀疏代表帧对比（6行5列）：前3行为 K=2，后3行为 K=4。}
+\end{figure}
+\paragraph{图分析}
+Z 场景整体最易重建，2.5D 与 3D 都接近 GT；K=2 在细微结构与背景平滑性上略优于 K=4。该观察与高 PSNR/SSIM 的定量结果一致。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{qual_panel_xyz.png}
+  \caption{XYZ 复合稀疏代表帧对比（6行5列）：前3行为 K=2，后3行为 K=4。}
+\end{figure}
+\paragraph{图分析}
+XYZ 是难度最高场景。K=2 组在结构连贯性和亮暗过渡上明显优于 K=4；3D 保持最稳定的纹理恢复能力，2.5D 次之，2D 在复杂区域仍有细节丢失。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{oblique_panel_xy.png}
+  \caption{3D 斜视角对比（XY）：GT 斜视投影、3D-K2、3D-K4。}
+\end{figure}
+\paragraph{图分析}
+斜视角下可见 K=2 的 3D 重建在空间连续性上更接近 GT；K=4 在斜视投影中仍能观察到更明显的结构稀疏化效应。
+
+\section{最终结论（v2，全图推理修正版）}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{主线收敛：} 3D（Video Swin）在 XY/Z/XYZ 三类场景均保持最稳健高性能，仍是当前最佳主线。
+  \item \textbf{评估修正结论：} 2D/2.5D 的分块硬拼接会显著低估指标；改为整图推理后，2D 平均提升 +5.49 dB、2.5D 平均提升 +7.80 dB。
+  \item \textbf{有效改进：} 2.5D 增加 mask 通道在 XY 场景效果显著（27.96 $\rightarrow$ 37.80 dB），验证了“显式可观测先验”策略。
+  \item \textbf{Wiener定位：} 仍是场景相关增强组件，不宜无差别全局默认，应按稀疏模式与模型类型选择。
+\end{enumerate}
+
+\section*{附录：v2 复现实验命令}
+\begin{verbatim}
+# K=2 扫描（已并行调度 GPU2/GPU3）
+bash scripts/run_sparse3d_k_sweep.sh
+
+# 统一评估
+python scripts/eval_sparse3d_unified.py \
+  --cidc_root .../AI4Life-CIDC25 \
+  --sparse_root .../CIDC25_sparse3d \
+  --gt_stem F0 --split Validation \
+  --runs_dir runs --output_dir eval_sparse3d_k2_fullimg --max_frames 200
+
+# 绘图
+python scripts/plot_eval_results.py \
+  --eval_dir eval_sparse3d_k2_fullimg \
+  --output_dir eval_sparse3d_k2_fullimg/figures
+
+# 代表帧可视化（6x5）
+python scripts/plot_sparse_recon_case_studies.py \
+  --cidc_root .../AI4Life-CIDC25 \
+  --sparse_root .../CIDC25_sparse3d \
+  --runs_dir runs \
+  --output_dir eval_sparse3d_k2_fullimg/qualitative \
+  --frames 40 100 160 --modes xy z xyz --gt_stem F0
+\end{verbatim}
+
+\end{document}

@@ -1,0 +1,94 @@
+{
+  "dataset_version": "v2.0",
+  "session": {
+    "session_id": "SESSION_2026-04-16_A",
+    "acquisition_date": "2026-04-16",
+    "operator": "operator_name",
+    "lab": "lab_name",
+    "notes": "Two-photon pilot acquisition for pollen and beads."
+  },
+  "microscope": {
+    "type": "Two-photon",
+    "manufacturer": "Olympus",
+    "model": "model_name",
+    "objective": "25x/1.05 NA water",
+    "laser_type": "Ti:Sapphire",
+    "laser_wavelength_nm": 920,
+    "detector": "PMT",
+    "pmt_gain": 750
+  },
+  "sample": {
+    "sample_type": "pollen",
+    "sample_id": "P003",
+    "species": "Lilium longiflorum",
+    "preparation": "autofluorescence",
+    "mounting_medium": "glycerol",
+    "batch_id": "BATCH_01"
+  },
+  "fov": {
+    "fov_id": "F012",
+    "position_xyz_um": [0.0, 0.0, 0.0],
+    "pixel_size_um": 0.103,
+    "resolution": [512, 512],
+    "bit_depth": 16,
+    "frame_averaging": 3,
+    "dwell_time_us": 10
+  },
+  "calibration_refs": {
+    "psf_file": "../../1_Calibration/PSF/beads_100nm_zstack.tif",
+    "noise_file": "../../1_Calibration/Noise/darkfield_gain750.tif",
+    "scan_pattern_dir": "../../1_Calibration/ScanPattern/"
+  },
+  "acquisition_sequence": [
+    {
+      "step": 1,
+      "name": "dense_high_pre",
+      "scan_mode": "dense",
+      "sparsity_factor": 1,
+      "pattern": "none",
+      "laser_power_mw": 15,
+      "dwell_time_us": 10,
+      "file": "pollen_P003_F012_dense_power15mw_pre.tif"
+    },
+    {
+      "step": 2,
+      "name": "sparse_2x_checkerboard",
+      "scan_mode": "sparse",
+      "sparsity_factor": 2,
+      "pattern": "checkerboard",
+      "mask_file": "../../1_Calibration/ScanPattern/pattern_2x_checkerboard.npy",
+      "laser_power_mw": 8,
+      "dwell_time_us": 10,
+      "file": "pollen_P003_F012_sparse2x_checkerboard_power8mw_r01.tif"
+    },
+    {
+      "step": 3,
+      "name": "dense_high_post",
+      "scan_mode": "dense",
+      "sparsity_factor": 1,
+      "pattern": "none",
+      "laser_power_mw": 15,
+      "dwell_time_us": 10,
+      "file": "pollen_P003_F012_dense_power15mw_post.tif"
+    }
+  ],
+  "quality_control": {
+    "registration_shift_px": 0.6,
+    "registration_shift_um": 0.062,
+    "photobleaching_rate": 0.07,
+    "temporal_stability": "good",
+    "qc_grade": "A",
+    "qc_pass": true,
+    "qc_notes": "Within threshold."
+  },
+  "split_assignment": {
+    "dataset_group": "2_SparseReconstruction",
+    "subset": "Training",
+    "split_locked": true
+  },
+  "provenance": {
+    "sop_version": "v1.0-final",
+    "planner_file": "report/realdata_acquisition_planner.html",
+    "exported_config": "threepm_config_YYYY-MM-DDTHH-mm-ss-sssZ.json"
+  }
+}

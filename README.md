@@ -4,6 +4,24 @@
 
 ---
 
+## 当前推荐阅读路径
+
+本项目已经按“数据维度先行”的实验主线重整。建议按以下顺序阅读：
+
+1. `docs/DATASET_PROTOCOL.md`：冻结数据集身份、模型维度和合法实验组合。
+2. `docs/PRIOR_FUSION_EXPERIMENT_PROTOCOL.md`：当前新增主线，定义 mask 通道先验 + Wiener 初始化 + prior-aware fusion 的实验协议、指标分层和消融矩阵。
+3. `docs/RESULT_TAXONOMY.md`：说明哪些结果可作为正文主实验，哪些只能作为压力测试或迁移探索。
+4. `report/SUCCESS_PATH_2D_2P5D_3D.md`：短版主线说明。
+5. `report/reorganized_main.tex`：完整论文式 LaTeX 报告，包含实验目标、总体设计、方法、结果、分析、不足和后续工作；正文以文字和表格为主，文末附录集中放置关键图集。
+
+核心原则：不要把 CIDC25、MDC25、pollen 的结果混成一个总排名；主结论只来自数据协议一致的实验。
+
+当前创新主线：优先验证 `mask` 通道先验 + Wiener 初始化，再用 `--prior_fusion gated` 做轻量结构化融合消融。推荐用 `scripts/generate_prior_fusion_experiments.py` 生成 2D/2.5D/3D 三条实验线的命令清单。
+
+NaN 诊断结论：`experiments/prior_fusion_mask_wiener_v1/scripts/train_nan_probe.py` 已定位到 2D A1/A4 发散主要来自 AMP `GradScaler` 连续 overflow 后 scale 衰减到 `0.0`，随后非有限梯度污染参数；同配置关闭 `--use_amp` 的 6 epoch nanprobe 已通过。核心矩阵已统一关闭 AMP、以 150 epoch 上限和早停策略完成 15/15 重跑与统一评估，结果位于 `experiments/prior_fusion_mask_wiener_v1/eval/core_best/`。当前主结论：Wiener 初始化是跨 2D/2.5D/3D 最稳定收益来源；mask 通道在 2D/3D 中小幅增益，但在 2.5D z-sparse 原始拼接中产生负迁移；gated fusion 能缓解 2.5D mask 伤害，但尚未成为全局最优结构。
+
+---
+
 ## Directory Structure
 
 ```
@@ -32,11 +50,21 @@ pip install tifffile pillow tensorboard
 
 ## Task Modes
 
-| `--task`             | Input shape        | Model               | Description                        |
-|----------------------|--------------------|---------------------|------------------------------------|
-| `baseline`           | `[B, 1, H, W]`     | `swin_unet_2d`      | Dense noisy → dense clean          |
-| `spatial_2d`         | `[B, 2, H, W]`     | `swin_unet_2d`      | 2D sparse scan reconstruction      |
-| `spatiotemporal_3d`  | `[B, 2, T, H, W]`  | `video_swin_unet`   | 3D spatiotemporal reconstruction   |
+模型维度必须跟数据协议匹配。详细规则见 `docs/DATASET_PROTOCOL.md`。
+
+| `--task`             | Input shape          | Model               | Main-experiment meaning |
+|----------------------|----------------------|---------------------|-------------------------|
+| `baseline`           | `[B, 1, H, W]`       | `swin_unet_2d`      | 2D dense noisy → dense clean |
+| `spatial_2d`         | `[B, 1/2, H, W]`     | `swin_unet_2d`      | 2D reconstruction, or slice-wise baseline for 3D stacks |
+| `spatial_2p5d`       | `[B, C×Wz, H, W]`    | `swin_unet_2d`      | Neighbor-slice input → center-slice reconstruction |
+| `spatiotemporal_3d`  | `[B, C, Z, H, W]`    | `video_swin_unet`   | Volumetric sparse reconstruction |
+
+Protocol guard:
+
+- `CIDC25` is treated as a 3D stack dataset.
+- `MDC25` is split into `MDC25-2D Nuclei` and `MDC25-3D Tribolium`.
+- `pollen` is currently a 2D real sparse external sample because preprocessing uses mean projection.
+- Cross-dimensional tests require explicit opt-in flags and should be reported as transfer probes, not main benchmark results.
 
 ---
 

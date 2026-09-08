@@ -48,3 +48,27 @@ pretrained_weights/
 *.log
 *.zip
 
+# Large experiment archives and raw result data (too large for git)
+archive/
+experiments/
+eval_mdc25_sparse/**
+eval_newsample_mdc25_preds/**
+eval_pollen_sparse/**
+eval_pollen_sparse_structural/**
+eval_sparse3d/**
+eval_sparse3d_k2/**
+eval_sparse3d_k2_fullimg/**
+eval_sparse3d_k4_fullimg/**
+# ... but keep the small text summary tables as result documentation
+!eval_*/summary_*.md
+!eval_*/summary_*.csv
+!eval_mdc25_sparse/RUN_CONFIG.md
+
+# Report figures (result images); keep markdown / LaTeX sources only
+report/figures/
+overleaf_reorganized_report/figures/
+
+# Local tooling / workspace files
+.agent/
+{models,outputs}/
+

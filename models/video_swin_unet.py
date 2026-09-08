@@ -25,6 +25,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .prior_fusion import build_prior_fusion_3d
+
 
 # ─────────────────────────────────────────────
 # 3-D Windowing helpers
@@ -310,7 +312,10 @@ class VideoDecoderStage(nn.Module):
         super().__init__()
         wt, wh, ww = window_size
         self.upsample  = PatchExpanding3D(dim)
-        self.skip_proj = nn.Linear(dim, dim // 2, bias=False)
+        # Encoder skip is stored *before* PatchMerging, so its channel dim is
+        # dim//2 — the same as PatchExpanding3D(dim) output.  (Using Linear(dim, dim//2)
+        # here was a bug and breaks residual fusion, e.g. 768 vs 384 mismatch.)
+        self.skip_proj = nn.Linear(dim // 2, dim // 2, bias=False)
         self.blocks    = nn.ModuleList([
             VideoSwinBlock(
                 dim // 2, num_heads, window_size,
@@ -372,10 +377,20 @@ class VideoSwinUNet(nn.Module):
         depths:       List[int]            = [2, 2, 6, 2],
         num_heads:    List[int]            = [3, 6, 12, 24],
         window_size:  Tuple[int, int, int] = (2, 8, 8),
+        prior_fusion: str = "none",
+        prior_image_channels: Optional[int] = None,
+        prior_mask_channels: Optional[int] = None,
     ):
         super().__init__()
         self.n_stages = len(depths)
         dims          = [embed_dim * (2 ** i) for i in range(self.n_stages)]
+
+        # ── Prior-aware input fusion ─────────────────────────────────────────
+        self.prior_fusion = build_prior_fusion_3d(
+            prior_fusion,
+            prior_image_channels,
+            prior_mask_channels,
+        )
 
         # ── Spatial patch embedding (applied independently to each frame) ─────
         # [B, in_ch, T, H, W] → [B, embed_dim, T, H/ps, W/ps]
@@ -434,6 +449,9 @@ class VideoSwinUNet(nn.Module):
         x : [B, in_ch, T, H, W]
         """
         B, C, T, H, W = x.shape
+
+        # ── Prior-aware fusion ──
+        x = self.prior_fusion(x)
 
         # ── Patch embed ──
         # [B, in_ch, T, H, W] → [B, embed_dim, T, H/ps, W/ps]
