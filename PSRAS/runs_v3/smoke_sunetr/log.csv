@@ -1,0 +1,2 @@
+step,loss,l1,ms_ssim,dc,lr,elapsed_s
+0,1.72483,1.30144,0.15322,,1.00e-04,5

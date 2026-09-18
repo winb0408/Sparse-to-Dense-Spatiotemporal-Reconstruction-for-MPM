@@ -1,0 +1,17 @@
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 500: loss=0.3463 val PSNR=24.96 SSIM=0.8524
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 1000: loss=0.2451 val PSNR=25.61 SSIM=0.8642
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 1500: loss=0.2734 val PSNR=25.56 SSIM=0.8681
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 2000: loss=0.2426 val PSNR=25.00 SSIM=0.8670
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 2500: loss=0.3060 val PSNR=25.48 SSIM=0.8675
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 3000: loss=0.2922 val PSNR=25.60 SSIM=0.8676
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 3500: loss=0.2653 val PSNR=25.63 SSIM=0.8660
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 4000: loss=0.2777 val PSNR=25.52 SSIM=0.8705
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 4500: loss=0.2753 val PSNR=25.40 SSIM=0.8638
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 5000: loss=0.2197 val PSNR=25.34 SSIM=0.8699
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 5500: loss=0.3166 val PSNR=25.48 SSIM=0.8698
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 6000: loss=0.3189 val PSNR=25.68 SSIM=0.8699
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 6500: loss=0.3039 val PSNR=25.63 SSIM=0.8695
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 7000: loss=0.2408 val PSNR=25.61 SSIM=0.8693
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 7500: loss=0.1574 val PSNR=25.60 SSIM=0.8691
+[b3_2p5d_z_K8_T3_p8k_lam3e6] step 8000: loss=0.2632 val PSNR=25.60 SSIM=0.8691
+[b3_2p5d_z_K8_T3_p8k_lam3e6] done. best val PSNR=25.68, final={'psnr': 25.60137367248535, 'ssim': 0.8691001534461975}

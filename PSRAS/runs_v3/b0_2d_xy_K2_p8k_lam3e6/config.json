@@ -1,0 +1,42 @@
+{
+  "preset": "b0",
+  "regime": "2d",
+  "mode": "xy",
+  "K": 2,
+  "psf": {
+    "sigma_xy_px": 1.0,
+    "sigma_z_px": 0.0
+  },
+  "noise": {
+    "poisson_photons": 0.0,
+    "gaussian_sigma": 0.0,
+    "note": "CIDC25 stacks carry their own simulated noise; extra noise is off by default (see PROJECT_LOG DEC-008)"
+  },
+  "lam_wiener": 3e-06,
+  "warm_start": "bilinear",
+  "fusion": false,
+  "residual": false,
+  "dc_weight": 0.0,
+  "features": [
+    "y"
+  ],
+  "t": 1,
+  "model": {
+    "base": 48,
+    "window": 8,
+    "kind": "swin2d",
+    "axial_at": "all",
+    "output": "all"
+  },
+  "optim": {
+    "steps": 8000,
+    "batch": 8,
+    "lr": 0.0002,
+    "accum": 1,
+    "warmup_steps": 0
+  },
+  "patch": 256,
+  "seed": 0,
+  "data_dir": "/data2/wjb/threePM/PSRAS/runs_v3/data/cidc25_v3",
+  "protocol": "v3"
+}

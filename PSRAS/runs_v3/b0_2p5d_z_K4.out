@@ -1,0 +1,9 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:227: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn(
+[b0_2p5d_z_K4] step 500: loss=0.2381 val PSNR=32.10 SSIM=0.9182
+[b0_2p5d_z_K4] step 1000: loss=0.1978 val PSNR=35.61 SSIM=0.9662
+[b0_2p5d_z_K4] step 1500: loss=0.1636 val PSNR=36.49 SSIM=0.9681
+[b0_2p5d_z_K4] step 2000: loss=0.1899 val PSNR=37.76 SSIM=0.9476
+[b0_2p5d_z_K4] step 2500: loss=0.1527 val PSNR=39.58 SSIM=0.9803
+[b0_2p5d_z_K4] step 3000: loss=0.1589 val PSNR=39.67 SSIM=0.9808
+[b0_2p5d_z_K4] done. best val PSNR=39.67, final={'psnr': 39.66717529296875, 'ssim': 0.9807843863964081}

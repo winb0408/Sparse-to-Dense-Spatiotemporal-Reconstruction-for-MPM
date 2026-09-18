@@ -1,0 +1,92 @@
+"""Re-evaluate a trained run under its own acquisition protocol.
+
+Motivation: train.py used to build the val dataset without mode/K, so runs
+trained outside xy-grid-K4 were validated under the wrong protocol. This
+script loads a run's config.json + checkpoint and recomputes val metrics
+under the protocol the run was actually trained on.
+
+Usage:
+    python scripts/reval.py runs_v3/b0_2d_y_K8 [--ckpt best|last]
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import torch
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from data.datasets import make_val_dataset            # noqa: E402
+from metrics.image_metrics import psnr, split_errors, ssim  # noqa: E402
+from physics.psf import PSFConfig                     # noqa: E402
+from scripts.train import PRESETS, build_model        # noqa: E402
+
+
+def main() -> None:
+    p = argparse.ArgumentParser()
+    p.add_argument("run_dir", type=Path)
+    p.add_argument("--ckpt", choices=["best", "last"], default="last")
+    p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu",
+                   help="rvrt's CUDA-only deformable attention needs gpu")
+    p.add_argument("--data_dir", type=Path,
+                   default=Path(__file__).parents[1] / "runs_v3/data/cidc25_v3")
+    args = p.parse_args()
+
+    cfg = json.loads((args.run_dir / "config.json").read_text())
+    psf = PSFConfig(sigma_xy_um=cfg["psf"]["sigma_xy_px"],
+                    sigma_z_um=cfg["psf"]["sigma_z_px"],
+                    voxel_xy_um=1.0, voxel_z_um=1.0)
+    t, feats = cfg["t"], tuple(cfg["features"])
+    preset = PRESETS[cfg["preset"]]
+
+    val_ds = make_val_dataset(args.data_dir, "val", cfg["regime"],
+                              mode=cfg["mode"], K=cfg["K"], psf=psf,
+                              patch_hw=(cfg["patch"], cfg["patch"]),
+                              warm_start_kind=cfg["warm_start"],
+                              lam=cfg["lam_wiener"], features=feats,
+                              t_override=cfg["t"])
+
+    ckpt = torch.load(args.run_dir / f"{args.ckpt}.pt", map_location="cpu",
+                      weights_only=False)
+    model = build_model(preset, t, cfg["model"]["base"], cfg["model"]["window"],
+                        cfg["model"].get("kind", "swin2d"),
+                        axial_at=cfg["model"].get("axial_at", "all"),
+                        output=cfg["model"].get("output", "all"))
+    model.load_state_dict(ckpt["model"])
+    model = model.to(args.device).eval()
+
+    psnrs, ssims = [], []
+    e_meas, e_miss = [], []
+    with torch.no_grad():
+        for it in val_ds.fixed_items:
+            x, target = it["inputs"], it["target"]
+            x = x.to(args.device)
+            pred = model(x[None]).float().view(t, *x.shape[-2:])
+            if preset["residual"]:
+                # DEC-013: inputs are feature-major [F*t, H, W]; X0 is the
+                # 3rd feature (y, mask, x0, ...) -- same convention as train.py.
+                x0 = x.view(len(feats), t, *x.shape[-2:])[2]
+                pred = x0 + pred
+            q = it["query"].bool()
+            pred_sel, tgt_sel = pred[q], target.view(t, *x.shape[-2:]).to(pred.device)[q]
+            psnrs.append(psnr(pred_sel, tgt_sel).item())
+            ssims.append(ssim(pred_sel[:, None], tgt_sel[:, None]).item())
+            em, es = split_errors(pred_sel, tgt_sel,
+                                  x.view(len(feats), t, *x.shape[-2:])[0][q] != 0)
+            e_meas.append(em)
+            e_miss.append(es)
+
+    out = {"psnr": sum(psnrs) / len(psnrs), "ssim": sum(ssims) / len(ssims),
+           "err_measured": sum(e_meas) / len(e_meas),
+           "err_missing": sum(e_miss) / len(e_miss),
+           "n_items": len(psnrs), "ckpt": args.ckpt,
+           "protocol": {"mode": cfg["mode"], "K": cfg["K"]}}
+    (args.run_dir / "val_metrics_corrected.json").write_text(json.dumps(out, indent=2))
+    print(json.dumps(out, indent=2))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,10 @@
+arch,arm,run,reval_psnr,reval_ssim,note
+Ours swin2d,b1,b1_2d_xy_K8_p8k,31.9794,0.899479,
+Ours swin2d,b3,b3_2d_xy_K8_p8k_lam3e6,31.6890,0.874848,
+Ours swin2d,b4,b4_2d_xy_K8_p8k_lam3e6,31.9983,0.887966,
+Video Swin (official),b1,b1_2d_xy_K8_p8k_vswin,30.9437,0.863850,
+Video Swin (official),b3,b3_2d_xy_K8_p8k_vswin,31.4288,0.879694,
+SwinUNETR (official),b1,b1_2d_xy_K8_p8k_sunetr,30.9295,0.850536,
+SwinUNETR (official),b3,b3_2d_xy_K8_p8k_sunetr,30.8301,0.842724,
+RVRT (official),b1,b1_2d_xy_K8_p8k_rvrt,31.3267,0.875410,
+RVRT (official),b3,b3_2d_xy_K8_p8k_rvrt,6.2981,0.119499,training collapse

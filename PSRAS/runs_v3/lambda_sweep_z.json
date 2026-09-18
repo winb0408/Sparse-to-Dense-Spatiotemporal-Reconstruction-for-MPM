@@ -1,0 +1,29 @@
+{
+  "protocol": {
+    "regime": "2.5d",
+    "mode": "z",
+    "K": 2,
+    "n_items": 8,
+    "t": 3,
+    "note": "K16 row appended manually after accidental overwrite (2026-09-10)"
+  },
+  "rows": [
+    {
+      "lam": 3e-06,
+      "psnr": 61.39501428604126,
+      "ssim": 0.9997954219579697
+    }
+  ],
+  "extra_protocols": [
+    {
+      "regime": "2.5d",
+      "mode": "z",
+      "K": 16,
+      "n_items": 8,
+      "t": 31,
+      "lam": 3e-06,
+      "psnr": 47.73741149902344,
+      "ssim": 0.9990226328372955
+    }
+  ]
+}

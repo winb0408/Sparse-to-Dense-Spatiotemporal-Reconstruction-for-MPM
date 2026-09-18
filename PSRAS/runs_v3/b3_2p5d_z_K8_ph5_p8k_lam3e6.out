@@ -1,0 +1,38 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:227: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn(
+Traceback (most recent call last):
+  File "/data2/wjb/threePM/PSRAS/scripts/train.py", line 308, in <module>
+    main()
+  File "/data2/wjb/threePM/PSRAS/scripts/train.py", line 251, in main
+    pred = model(x).float().view(-1, t, *x.shape[-2:])
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/data2/wjb/threePM/PSRAS/models/swin_unet_2d.py", line 121, in forward
+    x = self.decoders[i](x)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/data2/wjb/threePM/PSRAS/models/swin_unet_2d.py", line 55, in forward
+    x = blk(x)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/data2/wjb/threePM/PSRAS/models/swin_unet_2d.py", line 38, in forward
+    h = self.attn(x)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/data2/wjb/threePM/PSRAS/models/attention.py", line 182, in forward
+    out = self.attn(wins, bias)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/data2/wjb/threePM/PSRAS/models/attention.py", line 150, in forward
+    out = (attn + attn_bias).softmax(dim=-1) @ v      # [B, h, N, d]
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 512.00 MiB. GPU 0 has a total capacity of 47.52 GiB of which 498.75 MiB is free. Process 246301 has 5.47 GiB memory in use. Process 3306683 has 14.21 GiB memory in use. Process 3353201 has 14.21 GiB memory in use. Including non-PyTorch memory, this process has 12.85 GiB memory in use. Of the allocated memory 11.97 GiB is allocated by PyTorch, and 554.03 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

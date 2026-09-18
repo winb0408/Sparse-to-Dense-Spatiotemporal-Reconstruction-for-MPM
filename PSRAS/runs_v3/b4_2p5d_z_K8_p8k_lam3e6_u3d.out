@@ -1,0 +1,27 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:227: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn(
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 500: loss=0.8673 val PSNR=2.60 SSIM=0.0417
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 1000: loss=0.3217 val PSNR=17.93 SSIM=0.2250
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 1500: loss=0.2547 val PSNR=18.07 SSIM=0.2475
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 2000: loss=0.2891 val PSNR=24.14 SSIM=0.4763
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 2500: loss=0.3003 val PSNR=24.45 SSIM=0.5398
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 3000: loss=0.2524 val PSNR=31.06 SSIM=0.8945
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 3500: loss=0.2942 val PSNR=28.54 SSIM=0.8192
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 4000: loss=0.2799 val PSNR=32.67 SSIM=0.9321
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 4500: loss=0.1252 val PSNR=36.33 SSIM=0.9667
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 5000: loss=0.2430 val PSNR=33.81 SSIM=0.8506
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 5500: loss=0.2068 val PSNR=33.55 SSIM=0.9469
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 6000: loss=0.2285 val PSNR=22.81 SSIM=0.3477
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 6500: loss=0.2232 val PSNR=35.03 SSIM=0.9247
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 7000: loss=0.1749 val PSNR=38.47 SSIM=0.9667
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 7500: loss=0.1740 val PSNR=39.25 SSIM=0.9742
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 8000: loss=0.1673 val PSNR=39.03 SSIM=0.9690
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 8500: loss=0.1459 val PSNR=36.69 SSIM=0.9695
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 9000: loss=0.1584 val PSNR=38.83 SSIM=0.9835
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 9500: loss=0.2240 val PSNR=39.72 SSIM=0.9849
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 10000: loss=0.1216 val PSNR=42.62 SSIM=0.9872
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 10500: loss=0.2419 val PSNR=43.33 SSIM=0.9884
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 11000: loss=0.1726 val PSNR=43.52 SSIM=0.9888
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 11500: loss=0.2140 val PSNR=43.73 SSIM=0.9893
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] step 12000: loss=0.2297 val PSNR=43.73 SSIM=0.9893
+[b4_2p5d_z_K8_p8k_lam3e6_u3d] done. best val PSNR=43.73, final={'psnr': 43.73220634460449, 'ssim': 0.9892674386501312}

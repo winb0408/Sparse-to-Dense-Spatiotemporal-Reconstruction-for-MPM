@@ -1,0 +1,10 @@
+arch,arm,run,reval_psnr,reval_ssim,note
+Ours swin2d,b1,b1_2p5d_z_K8_p8k,38.9058,0.976357,
+Ours swin2d,b3,b3_2p5d_z_K8_p8k_lam3e6,44.2382,0.988123,
+Ours swin2d,b4,b4_2p5d_z_K8_p8k_lam3e6,46.2847,0.992907,
+Video Swin (official),b1,b1_2p5d_z_K8_p8k_vswin,29.2772,0.823065,
+Video Swin (official),b3,b3_2p5d_z_K8_p8k_lam3e6_vswin,34.6961,0.916300,
+SwinUNETR (official),b1,b1_2p5d_z_K8_p8k_sunetr,34.1259,0.966637,
+SwinUNETR (official),b3,b3_2p5d_z_K8_p8k_lam3e6_sunetr,40.5153,0.987871,
+RVRT (official),b1,b1_2p5d_z_K8_p8k_rvrt,34.0767,0.923273,
+RVRT (official),b3,b3_2p5d_z_K8_p8k_lam3e6_rvrt,41.3581,0.984766,

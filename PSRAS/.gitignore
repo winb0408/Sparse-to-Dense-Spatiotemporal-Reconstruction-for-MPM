@@ -1,0 +1,33 @@
+# ---- PSRAS 项目：只提交论文支撑产物（代码/文档/图表/指标），排除大数据与权重 ----
+
+# 训练权重与 checkpoint（单个最大 ~489M）
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# 数据集与生成数据（runs_v3/data 3.4G：CIDC25 patch 缓存等）
+runs_v3/data/
+data/cache/
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.zarr
+*.tif
+*.tiff
+
+# 第三方外部基线源码（公开仓库，论文中引用即可，不入库）
+third_party/
+
+# Python 产物
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 会话/巡检草稿（非论文产物）
+patrol*.txt
+tmp*.txt
+cleanlog.txt
+rv.txt
+name.txt

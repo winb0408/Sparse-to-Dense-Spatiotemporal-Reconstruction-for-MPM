@@ -1,0 +1,12 @@
+{
+  "psnr": 42.020795822143555,
+  "ssim": 0.9881273657083511,
+  "err_measured": 0.0,
+  "err_missing": 0.004565669689327478,
+  "n_items": 8,
+  "ckpt": "last",
+  "protocol": {
+    "mode": "z",
+    "K": 4
+  }
+}
