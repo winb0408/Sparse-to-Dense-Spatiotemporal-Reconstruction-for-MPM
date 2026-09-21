@@ -1,0 +1,2 @@
+[Y_K4_B1] step 500: loss=0.1697 val PSNR=32.10 SSIM=0.8664
+[Y_K4_B1] step 1000: loss=0.1300 val PSNR=30.13 SSIM=0.7142

@@ -29,6 +29,8 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("run_dir", type=Path)
     p.add_argument("--ckpt", choices=["best", "last"], default="last")
+    p.add_argument("--split", default="val",
+                   help="split key in split.json: val | test | test_temporal ...")
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu",
                    help="rvrt's CUDA-only deformable attention needs gpu")
     p.add_argument("--data_dir", type=Path,
@@ -42,7 +44,7 @@ def main() -> None:
     t, feats = cfg["t"], tuple(cfg["features"])
     preset = PRESETS[cfg["preset"]]
 
-    val_ds = make_val_dataset(args.data_dir, "val", cfg["regime"],
+    val_ds = make_val_dataset(args.data_dir, args.split, cfg["regime"],
                               mode=cfg["mode"], K=cfg["K"], psf=psf,
                               patch_hw=(cfg["patch"], cfg["patch"]),
                               warm_start_kind=cfg["warm_start"],
@@ -74,17 +76,27 @@ def main() -> None:
             pred_sel, tgt_sel = pred[q], target.view(t, *x.shape[-2:]).to(pred.device)[q]
             psnrs.append(psnr(pred_sel, tgt_sel).item())
             ssims.append(ssim(pred_sel[:, None], tgt_sel[:, None]).item())
-            em, es = split_errors(pred_sel, tgt_sel,
-                                  x.view(len(feats), t, *x.shape[-2:])[0][q] != 0)
+            # DEC-025 (protocol v4): split-region errors must use the real
+            # measurement mask feature, never Y != 0 (a measured position can
+            # legitimately hold a zero value).  Runs without a mask feature
+            # (e.g. b0 = y only) record NaN split errors.
+            fmaps = x.view(len(feats), t, *x.shape[-2:])
+            if "mask" in feats:
+                em, es = split_errors(pred_sel, tgt_sel, fmaps[feats.index("mask")][q])
+            else:
+                em, es = float("nan"), float("nan")
             e_meas.append(em)
             e_miss.append(es)
 
     out = {"psnr": sum(psnrs) / len(psnrs), "ssim": sum(ssims) / len(ssims),
            "err_measured": sum(e_meas) / len(e_meas),
            "err_missing": sum(e_miss) / len(e_miss),
-           "n_items": len(psnrs), "ckpt": args.ckpt,
+           "n_items": len(psnrs), "ckpt": args.ckpt, "split": args.split,
+           "metrics_version": "v4: 2D gaussian SSIM window; split errors from M",
            "protocol": {"mode": cfg["mode"], "K": cfg["K"]}}
-    (args.run_dir / "val_metrics_corrected.json").write_text(json.dumps(out, indent=2))
+    out_name = "val_metrics_corrected.json" if args.split == "val" else \
+        f"metrics_{args.split}.json"
+    (args.run_dir / out_name).write_text(json.dumps(out, indent=2))
     print(json.dumps(out, indent=2))
 
 

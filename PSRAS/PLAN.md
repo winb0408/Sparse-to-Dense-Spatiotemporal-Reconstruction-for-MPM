@@ -1,6 +1,14 @@
-# PSRAS 修改计划（Protocol v3）
+# PSRAS 修改计划（Protocol v3 → v4 重置）
 
-> PSRAS = **P**hysics-**S**ampling-**R**esidual **A**ware **S**ynthesis
+> **v4 状态（2026-09-22，DEC-025）**：基于外部审查（ChatGPT 三轮对话 + 《20260921PSRAS_NextStage_Project_Revision_Plan.md》v4.0-draft），
+> 7 项 P0 断言全部核验属实并已修复（SSIM 二维窗 / reval 显式 mask / split v2 诚实语义 / z-warm-start 命名勘误 / Protocol A 未落地声明）。
+> v4 修正后主线：**Y / YZ / XYZ / XYT 为 acquisition regime 一级分类**（2D/2.5D/3D 降为网络上下文描述）；
+> 核心创新押注 fixed-budget Y/Z allocation + sampling-conditioned physics prior + unified（shared spatial backbone + axis adapter）。
+> 详见 PROJECT_LOG.md DEC-025（含对 GPT 方案的 5 项修正：本地无独立测试栈 / 重评估代替全量重训 / repo 不重构 / XYT 数据依赖 / 矩阵分级）。
+> 当前阶段：Phase 1（EXP-022 Y-sparse 修正基线，36 run 三链并行）。
+> 以下 v3 原文保留作历史依据；其中与 v4 冲突处以 DEC-025 勘误为准（尤其 §5 数据划分与"真 3D Wiener"表述）。
+
+> PSRAS = **P**hysics-**S**ampling-**R**esidual **A**ware **S**ynthesis（v4 起缩写语义待终定，Residual 分支已淘汰，见 v4-draft §15）
 > 基于对 threePM（`dev` 分支）的 ChatGPT 审阅结论 + 独立代码核实 + 经验修正整理而成。
 > 本文是执行依据；实验过程与结论记录见 [PROJECT_LOG.md](PROJECT_LOG.md)。
 >

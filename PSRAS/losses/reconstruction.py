@@ -17,9 +17,17 @@ _MSSSIM_WEIGHTS = (0.0448, 0.2856, 0.3001, 0.2363, 0.1333)
 
 
 def _gaussian_window(k: int, sigma: float, device) -> torch.Tensor:
+    """Standard 2D SSIM Gaussian window G(x,y)=Gx(x)Gy(y) as [1,1,k,k].
+
+    DEC-025 (protocol v4): the pre-v4 implementation returned a 1D
+    [1,1,1,k] kernel, so conv2d smoothed along W only -- non-standard,
+    anisotropic SSIM/MS-SSIM.  Fixed to the separable 2D outer product;
+    all v4 quantitative numbers must be recomputed with this window.
+    """
     ax = torch.arange(k, dtype=torch.float32, device=device) - (k - 1) / 2.0
     g = torch.exp(-(ax**2) / (2 * sigma**2))
-    return (g / g.sum()).view(1, 1, 1, -1)
+    win = g[:, None] * g[None, :]
+    return (win / win.sum()).view(1, 1, k, k)
 
 
 def _ssim_components(x: torch.Tensor, y: torch.Tensor, window: torch.Tensor):

@@ -1102,6 +1102,25 @@
 
 **矩阵 22/22 全部完成并 reval**：外部 18 ✅ + 我方 xyz 3 ✅ + 补跑 b1_z ✅。三链均 exit 0 收尾。
 
+### EXP-022（预注册）：Phase 1 Y-sparse 修正基线——Direct vs Bilinear-prior vs Wiener-prior（DEC-025 协议 v4）
+
+**目的**：在修正协议（v4 SSIM、显式 mask、split v2）下重新回答 GPT 方案 Main Experiment 1 的三个分离问题：
+- Question A（先验本身）：Q(X_W) vs Q(X_B)——Wiener-only vs Bilinear-only（无网络，x0 直接评估，事后计算不训练）；
+- Question B（先验 vs 直接网络）：Q(f(Y,X_W)) vs Q(f(Y))——b3 vs b1；
+- Question C（先验种类）：Q(f(Y,X_W)) vs Q(f(Y,X_B))——b3 vs b2。
+
+**设计**：Regime A（Y-sparse，mode="y"，2d，T=1）；K∈{2,4,8,16}；arm∈{b1（DIRECT：y+mask）, b2（Bilinear prior）, b3（侧向 Wiener prior，λ=3e-6 冻结，来源 EXP-004 遗产 train/val 调优）}；seed∈{0,1,2}；共 3×4×3=36 run，8000 步、batch 8、patch 256、PSF σxy=1.0/σz=0、无额外噪声（DEC-008 主线口径）。命名 `Y_K{K}_B{1|2|3}_s{seed}`。GPU1/2/3 三链并行。
+
+**读表规则（预注册）**：
+1. 主报告：val（F0[0:750]，模型选择口径）与 test（F0[750:1500]）双口径 PSNR/SSIM，3 种子 mean±std（v4 指标）；
+2. Question A/B/C 分别作表，不得合并叙事；每问给出 3 种子配对差（per-item paired）；
+3. 判据：Question B 增益>0 且 3/3 种子同号才可主张"先验有用"；Question C 增益>0 且 3/3 种子同号才可主张"Wiener 优于 Bilinear"（旧 xy 情境 −0.29 不外推，本实验独立重答）；
+4. e_measured/e_missing（显式 M）一并报告；
+5. K16 若出现 b2/b3 反转（旧 xy-K16 有 −2.70 前科），如实报告并限定适用 K 范围；
+6. λ 仅用 train/val 选择（冻结 3e-6），test 阶段不得回调。
+
+**启动状态**：2026-09-22 预注册后即启动（三链队列 + 巡检）。Phase 2（genuine YZ physics prior：KY/KZ 独立化 + 真 3D 反演先验实现）在本实验 gate 通过后另行预注册。
+
 ### EXP-021（预注册）：M1 no-PSF 消融（用户指示）+ 我方 2D b1 补跑
 
 **动机**（用户指示"再启动 no-PSF 消融（M1）"）：量化"真 3D 各向异性 PSF 先验"本身的贡献。若无 PSF（H=I），Wiener 退卷积退化为平凡操作（x0≈y 的插值填充），EXP-020 中 z 情境 +5.4~+7.3 的跨架构 Wiener 增益若消失，则该增益可归因于各向异性 PSF 的可逆模糊结构，而非"多一路输入通道"。
@@ -1185,6 +1204,45 @@
 **诚实边界**：单 seed；M1 只覆盖 z 情境（与主线 z-K8 对齐）；b2/b3 构造等价使"Wiener x0 vs bilinear x0"在 no-PSF 下不可分离（本就不应可分离——这正是 M1 的实验逻辑）。
 
 **EXP-021 关闭。** M1 链两条队列均 DONE（exit 0），GPU1/GPU2 已空闲。
+
+### DEC-025：协议 v4 重置采纳——外部审查方案的核验、修正与 Phase 0 落地（用户提出，2026-09-22）
+
+**背景**：用户提供与 ChatGPT 的三轮审查对话（ChatGPT-Sparse-to-Dense-Spatiotemporal-Reconstruction-for-MPM-20260921-2219.md）及由此生成的《20260921PSRAS_NextStage_Project_Revision_Plan.md》（v4.0-draft）。按用户指令逐项核验其技术断言后采纳，并修正其不可靠部分。
+
+**P0 断言核验（7/7 属实，全部已修）**：
+1. F0 同栈 val/test（split.json：val=F0[0:750], test=F0[750:1500]）——属实；
+2. reval.py 用 Y≠0 推断 measured support（实际取 feature 0 = y，而真实 mask 是 feature 1）——属实，已改为显式 mask 特征（无 mask 特征的 run 记 NaN），reval 输出按 split 分文件落盘；
+3. SSIM 一维高斯窗（`view(1,1,1,-1)` 只沿 W 平滑）——属实，已改标准二维可分离窗 `[1,1,K,K]`（losses/reconstruction.py::_gaussian_window，训练损失与评估共用同一修复点）；45 项测试全过；
+4. z 主线 B3 warm-start 实为"侧向 2D Wiener（实测平面）+ 轴向线性插值"，非 full 3D Wiener（wiener.py 头注释自证；3D Wiener 仅用于 xyz 模式）——属实，命名勘误见下；
+5. Protocol A（R 算子）仅存在于 docstring——属实；
+6. 训练栈内建噪声/F0 干净（DEC-008 已有意识处理，非未察觉问题）——属实，语义已重述；
+7. Small Methods 2026 竞品文献（DOI 10.1002/smtd.202501513, PubMed 41546413）——经 PubMed E-utilities 核实真实存在，"XYZ+Transformer 不可作主创新"的定位论断成立。
+
+**【结果1 勘误】"真 3D Wiener"表述全面撤销**：本日志及既往分析中"z 主线 = 真 3D 各向异性 Wiener 退卷积先验"的表述错误。正确表述：**z 主线 X0 = 实测平面侧向 2D Wiener + 轴向插值**。EXP-020 的 z 情境增益、EXP-021 M1（no-PSF 增益坍缩至 +0.81 dB）结论本身不受影响，但机理归因改为"**侧向 PSF 退卷积物理**"而非"3D 退卷积"。真正的 3D physics prior 将在 YZ 主线重新实现与验证（Phase 2）。
+
+**【结果2】修正协议下主结论存活核验（v4 SSIM + 显式 mask，val 与 test 双口径）**：
+| run | val PSNR/SSIM | test(F0[750:1500]) PSNR/SSIM |
+|---|---|---|
+| b1 z-K8 | 38.91/0.9751 | 38.39/0.9729 |
+| b2 z-K8 | 39.85/0.9765 | 39.73/0.9768 |
+| b3 z-K8 | 44.24/0.9878 | 43.80/0.9875 |
+| b4 z-K8 | 46.29/0.9922 | 45.72/0.9918 |
+| b1 2d-K8 | 31.98/0.8821 | 31.77/0.8791 |
+| b2 2d-K8 | 32.20/0.8867 | 31.96/0.8838 |
+| b3 2d-K8 | 31.69/0.8567 | 31.43/0.8531 |
+z 线 B3>B2、B4>B3 与 2D 线 B2>B1>B3 在修正指标下均保持；旧绝对数值与 v4 数值不混合统计。**训练损失中的 MS-SSIM 同样受一维窗影响（GPT 未发现）**——所有 arm 同等受影响故相对结论有效；Phase 1 起新 run 使用修正损失训练，legacy run 不重训（相对结论已核验存活）。
+
+**【结果3】F1/F2/F3 数据身份澄清（推翻 GPT 方案与初版执行的共同假设）**：CIDC25 readme + 实测（frames 100-103）证实 **F1/F2/F3 = F0 同内容不同噪声版本**（corr 0.71/0.36/0.18，残差 std 0.072/0.180/0.309），**不是独立栈**。初版执行曾将 F1-F3 设为 test 并观察到 16-17 dB 崩溃——那是"干净重建 vs 噪声 GT"的语义错配，非泛化失败。已改回：test = F0[750:1500]（诚实语义：内容独立于训练栈，但模型选择接触过 F0，如实声明）；F1/F2/F3 另设 noise_stress split（须配对干净 F0 帧 GT，需 paired-input 数据模式，另行预注册）。**本地数据只支撑一个干净未见栈（F0）；完全选择独立的多栈 test 需外部数据（MDC25/真实采集）**。
+
+**对 GPT v4.0-draft 方案的修正（其余采纳）**：
+- 采纳：P0 清单、五条原则（两问分离/acquisition regime 一级分类/XYZ≠XYT/独立 test/命名冻结）、fixed-budget Y/Z allocation 核心创新、unified vs specialist 实证设计、T-scaling 重定位为 context sufficiency、阶段 gate 结构、新 run 命名约定（Y_K{K}_B{arm}_s{seed} 等）。
+- 修正1（重大）："需要建立独立 stack test"→ 本地不可得（见【结果3】），降级为"F0 test 声明选择接触 + 外部数据 zero-shot（Phase 5）"；
+- 修正2："SSIM 冻结后重跑所有定量实验"→ 改为"修正指标下重评估（reval，已完成）+ 主结论存活核验（已完成）"，仅 Phase 1+ 新 run 用修正损失训练，避免全量重训；
+- 修正3：repo 大重构（CORRECTED_PROTOCOL/ 目录树等）拒绝——破坏已推送 GitHub 的路径连续性，以"新增模块 + 现有结构"方式演进；
+- 修正4：XYT 分支标注数据依赖（CIDC25 为 z-stack 无时序；XYT 需外部时序数据），延后至数据可得后预注册；
+- 修正5：实验矩阵分级执行（Phase 1 最小充分矩阵先行，gate 通过再扩展），避免一次性 60+ run。
+
+**Phase 0 落地清单（本 DEC 内完成）**：SSIM 二维窗 ✅ / reval 显式 mask + --split ✅ / split v2 诚实语义 ✅（scripts/prepare_split_v2.py，F1-F3 已转换入库 noise_stress）/ 45 测试全过 ✅ / Protocol A/B 语义与 A 未落地状态在 PLAN.md v4 记录 ✅ / 归一化（训练栈标定，冻结）与 PSF（σxy=1.0/σz=1.5 px）冻结声明 ✅。
 
 ### DEC-024：b4 门控融合可解释性交付——gate 图 + 物理不确定度场可视化（用户提出②）
 
