@@ -1,0 +1,19 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:227: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn(
+[Y_K16_B3_s1] step 500: loss=0.2516 val PSNR=27.38 SSIM=0.7432
+[Y_K16_B3_s1] step 1000: loss=0.2673 val PSNR=27.88 SSIM=0.7662
+[Y_K16_B3_s1] step 1500: loss=0.2635 val PSNR=27.92 SSIM=0.7685
+[Y_K16_B3_s1] step 2000: loss=0.2381 val PSNR=27.78 SSIM=0.7632
+[Y_K16_B3_s1] step 2500: loss=0.2768 val PSNR=27.84 SSIM=0.7615
+[Y_K16_B3_s1] step 3000: loss=0.3164 val PSNR=27.74 SSIM=0.7565
+[Y_K16_B3_s1] step 3500: loss=0.2454 val PSNR=27.47 SSIM=0.7466
+[Y_K16_B3_s1] step 4000: loss=0.2051 val PSNR=27.47 SSIM=0.7444
+[Y_K16_B3_s1] step 4500: loss=0.2186 val PSNR=27.30 SSIM=0.7391
+[Y_K16_B3_s1] step 5000: loss=0.2442 val PSNR=27.36 SSIM=0.7392
+[Y_K16_B3_s1] step 5500: loss=0.2496 val PSNR=27.08 SSIM=0.7297
+[Y_K16_B3_s1] step 6000: loss=0.2320 val PSNR=27.02 SSIM=0.7300
+[Y_K16_B3_s1] step 6500: loss=0.2441 val PSNR=26.90 SSIM=0.7274
+[Y_K16_B3_s1] step 7000: loss=0.2165 val PSNR=26.89 SSIM=0.7258
+[Y_K16_B3_s1] step 7500: loss=0.2589 val PSNR=26.85 SSIM=0.7256
+[Y_K16_B3_s1] step 8000: loss=0.2134 val PSNR=26.83 SSIM=0.7250
+[Y_K16_B3_s1] done. best val PSNR=27.92, final={'psnr': 26.82756805419922, 'ssim': 0.724990725517273}

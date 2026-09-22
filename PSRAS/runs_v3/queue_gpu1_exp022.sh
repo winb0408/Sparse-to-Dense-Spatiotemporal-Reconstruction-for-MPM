@@ -29,4 +29,10 @@ run Y_K16_B3_s0 --preset b3 --regime 2d --mode y --K 16 --steps 8000 --lam_wiene
 run Y_K16_B1_s0 --preset b1 --regime 2d --mode y --K 16 --steps 8000 --seed 0
 run Y_K16_B2_s0 --preset b2 --regime 2d --mode y --K 16 --steps 8000 --lam_wiener 3e-6 --seed 0
 run Y_K16_B3_s0 --preset b3 --regime 2d --mode y --K 16 --steps 8000 --lam_wiener 3e-6 --seed 0
-log "GPU1 EXP-022 chain DONE"
+run Y_K2_B1_s1 --preset b1 --regime 2d --mode y --K 2 --steps 8000 --seed 1
+run Y_K2_B2_s1 --preset b2 --regime 2d --mode y --K 2 --steps 8000 --lam_wiener 3e-6 --seed 1
+run Y_K2_B3_s1 --preset b3 --regime 2d --mode y --K 2 --steps 8000 --lam_wiener 3e-6 --seed 1
+run Y_K2_B1_s2 --preset b1 --regime 2d --mode y --K 2 --steps 8000 --seed 2
+run Y_K2_B2_s2 --preset b2 --regime 2d --mode y --K 2 --steps 8000 --lam_wiener 3e-6 --seed 2
+run Y_K2_B3_s2 --preset b3 --regime 2d --mode y --K 2 --steps 8000 --lam_wiener 3e-6 --seed 2
+log "GPU1 EXP-022 chain DONE (full matrix)"
