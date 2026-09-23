@@ -57,6 +57,12 @@ PRESETS: dict[str, dict] = {
            "warm": "wiener", "fusion": True, "residual": True, "dc": 0.0},
     "b6": {"features": ("y", "mask", "x0", "confidence", "uncertainty"),
            "warm": "wiener", "fusion": True, "residual": True, "dc": 0.05},
+    # EXP-024 (Phase 2 YZ mainline): physics prior variants selected by
+    # EXP-023 -- b4i = iterative DC inversion x0, b4f = fill-first Wiener x0.
+    "b4i": {"features": ("y", "mask", "x0", "confidence", "uncertainty"),
+            "warm": "iterdc:1e-3:5", "fusion": True, "residual": False, "dc": 0.0},
+    "b4f": {"features": ("y", "mask", "x0", "confidence", "uncertainty"),
+            "warm": "wiener_fill_first", "fusion": True, "residual": False, "dc": 0.0},
 }
 
 
@@ -122,10 +128,12 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--preset", choices=sorted(PRESETS), required=True)
     p.add_argument("--regime", choices=["2d", "2.5d"], default="2d")
-    p.add_argument("--mode", choices=["xy", "y", "z", "yz", "xyz"], default=None,
+    p.add_argument("--mode", choices=["xy", "y", "z", "yz", "xyz", "yz2"], default=None,
                    help="default: xy for 2d, z for 2.5d. y/yz = line skipping "
                         "(physically time-saving); xy grid = line lattice")
     p.add_argument("--K", type=int, default=4)
+    p.add_argument("--kz", type=int, default=0,
+                   help="yz2 mode: independent plane spacing kz (K stays ky)")
     p.add_argument("--t", type=int, default=None,
                    help="override window depth (odd; default window_T(regime,"
                         " mode, K)); EXP-017 context scaling")
@@ -172,7 +180,12 @@ def main() -> None:
 
     mode = args.mode or ("xy" if args.regime == "2d" else "z")
     preset = PRESETS[args.preset]
-    t = args.t or window_T(args.regime, mode, args.K)
+    if mode == "yz2":
+        # EXP-024: T follows plane spacing kz; K means ky.
+        kz = args.kz or args.K
+        t = args.t or (1 if kz == 1 else 2 * kz - 1)
+    else:
+        t = args.t or window_T(args.regime, mode, args.K)
     assert t % 2 == 1, f"window depth must be odd, got {t}"
     psf = make_psf(args.psf_xy, args.psf_z, args.regime)
     name = args.name or f"{args.preset}_{args.regime}_{mode}_K{args.K}"
@@ -181,6 +194,7 @@ def main() -> None:
 
     config = {
         "preset": args.preset, "regime": args.regime, "mode": mode, "K": args.K,
+        "kz": args.kz,
         "psf": {"sigma_xy_px": args.psf_xy, "sigma_z_px": args.psf_z if args.regime != "2d" else 0.0},
         "noise": {"poisson_photons": args.poisson_photons, "gaussian_sigma": 0.0,
                   "note": "CIDC25 stacks carry their own simulated noise; extra "
@@ -206,13 +220,13 @@ def main() -> None:
         args.data_dir, "train", args.regime, mode=mode, K=args.K, psf=psf,
         patch_hw=(args.patch, args.patch), seed=args.seed,
         warm_start_kind=args.warm or preset["warm"], lam=args.lam_wiener,
-        features=preset["features"], t_override=args.t,
+        features=preset["features"], t_override=args.t, K2=args.kz,
         noise=NoiseConfig(args.poisson_photons, 0.0))
     val_ds = make_val_dataset(
         args.data_dir, "val", args.regime, mode=mode, K=args.K, psf=psf,
         patch_hw=(args.patch, args.patch),
         warm_start_kind=args.warm or preset["warm"], lam=args.lam_wiener,
-        features=preset["features"], t_override=args.t,
+        features=preset["features"], t_override=args.t, K2=args.kz,
         noise=NoiseConfig(args.poisson_photons, 0.0))
     train_loader = DataLoader(train_ds, batch_size=args.batch, shuffle=True,
                               num_workers=4, pin_memory=True, drop_last=True)

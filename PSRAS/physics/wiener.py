@@ -143,6 +143,79 @@ def _lateral_interp(vol: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     return torch.where(mask.to(torch.bool), vol, out)
 
 
+def _adaptive_lambda(y: torch.Tensor, mask: torch.Tensor, lam0: float) -> torch.Tensor:
+    """Per-slice noise-adaptive Wiener lambda (EXP-023 / DEC-026).
+
+    lam_eff = lam0 * (1 - rho_t) with rho_t = measured fraction of slice t.
+    Densely measured slices get near-frozen deconvolution (rho -> 1) while
+    mostly missing slices get heavy regularization -- the EXP-022 lesson
+    (frozen z-tuned lambda collapsed to Gibbs ringing on zero-filled
+    lateral holes) made quantitative: holes have rho = 0, so lam_eff = lam0.
+    """
+    rho = mask.float().mean(dim=(-2, -1))              # [T]
+    return lam0 * (1.0 - rho)
+
+
+def iterative_dc_inverse(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,
+                         lam: float = 0.01, steps: int = 5,
+                         step_size: float | None = None) -> torch.Tensor:
+    """Iterative data-consistent inversion prior (EXP-023 P4).
+
+    Gradient descent on 0.5*|| M.(H*X - Y) ||^2 + 0.5*lam*||X||^2 with the
+    analytic Gaussian OTF (H*X and H^T*X both = FFT convolution since the
+    Gaussian PSF is symmetric).  Initialization: bilinear warm-start, so
+    missing regions carry interpolated structure before the first step.
+
+    Parameters
+    ----------
+    y    : [T, H, W] zero-filled observation.
+    mask : [T, H, W] bool measurement support.
+    psf  : optical model (identity => gradient steps still apply data
+           consistency on the mask, deconvolution term becomes identity).
+    steps: number of gradient steps.
+    """
+    squeeze = y.ndim == 3
+    if squeeze:
+        y = y[None]
+    B, T, H, W = y.shape
+    m = mask[None].float() if mask.ndim == 3 else mask.float()
+    dev = y.device
+    otf = gaussian_otf_3d((T, H, W), psf, device=dev, dtype=torch.float32)[None]
+    Hs = otf
+    x = _axial_interp(y if squeeze else y, mask.amax(dim=(-2, -1)) > 0.5) if False else None
+    # init: bilinear warm start (fills both axial gaps and lateral holes)
+    init = torch.zeros_like(y.float())
+    for b in range(B):
+        mb = mask if mask.ndim == 3 else mask[b]
+        init[b] = warm_start(y[b], mb, psf, lam, mode="bilinear")
+    x = init
+    # Lipschitz bound of M.H^T.H.M + lam*I: at most ||H||^2 + lam = 1 + lam.
+    L = 1.0 + lam
+    eta = step_size if step_size is not None else 1.0 / L
+    for _ in range(steps):
+        # grad = H^T M (M H x - M y) + lam x ; H^T = conj(OTF) mult, H = OTF mult
+        Xf = torch.fft.fftn(x.float(), dim=(-3, -2, -1))
+        hx = torch.fft.ifftn(Hs * Xf, dim=(-3, -2, -1)).real
+        r = m * (hx - y.float())
+        Rf = torch.fft.fftn(r, dim=(-3, -2, -1))
+        grad = torch.fft.ifftn(torch.conj(Hs) * Rf, dim=(-3, -2, -1)).real + lam * x
+        x = x - eta * grad
+    return x[0] if squeeze else x
+
+
+def _adaptive_wiener(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,
+                     lam0: float) -> torch.Tensor:
+    """Fill-first Wiener with per-slice adaptive lambda (EXP-023 P3)."""
+    filled = _lateral_interp(y, mask)
+    lat_psf = PSFConfig(psf.sigma_xy_um, 0.0, psf.voxel_xy_um, psf.voxel_z_um)
+    lam_eff = _adaptive_lambda(filled, mask, lam0)      # [T]
+    out = filled.clone()
+    for t in range(y.shape[0]):
+        if lam_eff[t] < lam0:                            # measured content exists
+            out[t] = wiener_deconv_3d(filled[t][None], lat_psf, float(max(lam_eff[t], 1e-8)))[0]
+    return out
+
+
 def warm_start(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,
                lam: float = 0.01, mode: str = "wiener") -> torch.Tensor:
     """Physics warm-start X0 = W(Y; H, M) with per-mode axial handling.
@@ -166,6 +239,19 @@ def warm_start(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,
         if lateral_holes:
             out = _lateral_interp(out, mask)
         return out
+
+    if mode.startswith("adaptive:"):
+        # EXP-023 P3: noise-adaptive lambda, lam0 parsed from the mode string
+        # ("adaptive:1e-2"). Fill lateral holes FIRST (EXP-022 lesson), then
+        # per-slice deconvolution with lam_eff = lam0*(1-rho).
+        lam0 = float(mode.split(":")[1])
+        return _adaptive_wiener(y, mask, psf, lam0)
+
+    if mode.startswith("iterdc:"):
+        # EXP-023 P4: iterative data-consistent inversion. "iterdc:lam:steps"
+        lam_i, steps_i = mode.split(":")[1:]
+        return iterative_dc_inverse(y, mask, psf, lam=float(lam_i),
+                                    steps=int(steps_i))
 
     if mode == "wiener_fill_first":
         # DEC-015 (EXP-011(三)): for laterally-gapped protocols (xy grid / y),

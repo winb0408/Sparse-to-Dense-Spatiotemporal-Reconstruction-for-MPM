@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import torch
 
-__all__ = ["make_mask"]
+__all__ = ["make_mask", "make_mask_yz2"]
 
 
 def _xy_mask_2d(H: int, W: int, K: int, pattern: str,
@@ -86,3 +86,19 @@ def make_mask(mode: str, K: int, T: int, H: int, W: int,
         return planes.view(T, 1, 1) & base[None]
 
     raise ValueError(f"unknown sampling mode: {mode}")
+
+
+def make_mask_yz2(ky: int, kz: int, T: int, H: int, W: int,
+                  seed: int = 0, phase_t: int = 0, phase_y: int = 0) -> torch.Tensor:
+    """YZ mask with INDEPENDENT sparsity along Y and Z (DEC-026, EXP-023).
+
+    Rows: every ky-th line; planes: every kz-th slice.  Acquisition time
+    scales ~ ky*kz (row skipping x plane skipping) for point-scanning 3PM.
+    X stays dense within a measured row (in-line pixels nearly free).
+    Returns [T, H, W] bool, True = measured.
+    """
+    if ky < 1 or kz < 1:
+        raise ValueError(f"ky/kz must be >= 1, got {ky}/{kz}")
+    rows = ((torch.arange(H) + phase_y) % ky == 0).view(1, H, 1)
+    planes = ((torch.arange(T) + phase_t) % kz == 0).view(T, 1, 1)
+    return (rows & planes).expand(T, H, W)

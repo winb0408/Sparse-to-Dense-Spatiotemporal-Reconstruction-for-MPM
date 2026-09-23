@@ -66,12 +66,16 @@ class CIDC25SparseDataset(Dataset):
                  patches_per_epoch: int = 1000, seed: int = 0,
                  warm_start_kind: str = "wiener", lam: float = 0.01,
                  features: tuple[str, ...] = FEATURES,
-                 t_override: int | None = None):
+                 t_override: int | None = None, K2: int = 0):
         self.dir = Path(data_dir)
         split_info = json.loads((self.dir / "split.json").read_text())
         self.split = split_info["split"][split]
         self.regime = regime
         self.T = window_T(regime, mode, K)
+        # yz2 (EXP-024): T follows the PLANE spacing kz (K2), not ky.
+        if mode == "yz2":
+            kz = K2 if K2 else K
+            self.T = 1 if kz == 1 else 2 * kz - 1
         # EXP-017 context-scaling: explicit window-depth override (must be
         # odd; query stays the center slice). T < 2K-1 may leave knotless
         # windows (DEC-012 ill-posedness) -- x0 then degrades to 0 by
@@ -82,8 +86,9 @@ class CIDC25SparseDataset(Dataset):
         half = self.T // 2
         self.query = ([1] * self.T if self.T == 1
                       else [0] * half + [1] + [0] * (self.T - half - 1))
+        self.K2 = K2
         self.acq = AcquisitionConfig(
-            mode=mode, K=K, pattern=pattern,
+            mode=mode, K=K, K2=K2, pattern=pattern,
             psf=psf if psf is not None else PSFConfig(),
             noise=noise if noise is not None else NoiseConfig(),
         )
@@ -115,7 +120,11 @@ class CIDC25SparseDataset(Dataset):
         seeds = (_derive_seed(self.seed, index, 1000), _derive_seed(self.seed, index, 2000))
         # Stack-frame lattice phase (DEC-012): keeps the sampled pattern
         # aligned with the stack, not re-anchored to each window.
-        phases = (t0 % self.acq.K, y0 % self.acq.K, x0 % self.acq.K)
+        if self.acq.mode == "yz2":
+            kz = self.K2 if self.K2 else self.acq.K
+            phases = (t0 % kz, y0 % self.acq.K, x0 % self.acq.K)
+        else:
+            phases = (t0 % self.acq.K, y0 % self.acq.K, x0 % self.acq.K)
         return gt, seeds, phases
 
     def __getitem__(self, index: int):
@@ -125,8 +134,8 @@ class CIDC25SparseDataset(Dataset):
         gt_t = torch.from_numpy(gt)
         # Per-sample deterministic seeds for the mask and noise.
         acq = AcquisitionConfig(
-            mode=self.acq.mode, K=self.acq.K, pattern=self.acq.pattern,
-            psf=self.acq.psf,
+            mode=self.acq.mode, K=self.acq.K, K2=self.acq.K2,
+            pattern=self.acq.pattern, psf=self.acq.psf,
             noise=NoiseConfig(self.acq.noise.poisson_photons,
                               self.acq.noise.gaussian_sigma, noise_seed),
             mask_seed=mask_seed, phase_t=phases[0], phase_y=phases[1],
@@ -159,12 +168,14 @@ def make_val_dataset(data_dir: str | Path, split: str, regime: str, n_per_stack:
             gt = np.asarray(stack[t0:t0 + th, y0:y0 + patch_hw[0], x0:x0 + patch_hw[1]],
                             dtype=np.float32)
             acq = AcquisitionConfig(
-                mode=ds.acq.mode, K=ds.acq.K, pattern=ds.acq.pattern, psf=ds.acq.psf,
+                mode=ds.acq.mode, K=ds.acq.K, K2=ds.acq.K2,
+                pattern=ds.acq.pattern, psf=ds.acq.psf,
                 noise=NoiseConfig(ds.acq.noise.poisson_photons,
                                   ds.acq.noise.gaussian_sigma,
                                   _derive_seed(ds.seed, 7777, si, int(t0))),
                 mask_seed=_derive_seed(ds.seed, 8888, si, int(t0)),
-                phase_t=t0 % ds.acq.K, phase_y=y0 % ds.acq.K, phase_x=x0 % ds.acq.K,
+                phase_t=t0 % (ds.K2 if ds.acq.mode == "yz2" and ds.K2 else ds.acq.K),
+                phase_y=y0 % ds.acq.K, phase_x=x0 % ds.acq.K,
             )
             obs = simulate_acquisition(torch.from_numpy(gt), acq)
             mi = build_observation(obs, psf=ds.acq.psf, lam=ds.lam,

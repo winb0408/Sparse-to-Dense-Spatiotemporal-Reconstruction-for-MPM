@@ -61,8 +61,10 @@ class NoiseConfig:
 
 @dataclass(frozen=True)
 class AcquisitionConfig:
-    mode: str = "xy"               # xy | y | z | yz | xyz
+    mode: str = "xy"               # xy | y | z | yz | xyz | yz2
     K: int = 2
+    K2: int = 0                    # yz2: independent sparsity along the 2nd
+                                   # axis (ky=K rows, kz=K2 planes); 0 = unused
     pattern: str = "grid"
     psf: PSFConfig = field(default_factory=PSFConfig)
     noise: NoiseConfig = field(default_factory=NoiseConfig)
@@ -75,7 +77,8 @@ class AcquisitionConfig:
     phase_x: int = 0
 
     def to_dict(self) -> dict:
-        return {"mode": self.mode, "K": self.K, "pattern": self.pattern,
+        return {"mode": self.mode, "K": self.K, "K2": self.K2,
+                "pattern": self.pattern,
                 "psf": self.psf.to_dict(), "noise": self.noise.to_dict(),
                 "mask_seed": self.mask_seed,
                 "phase": [self.phase_t, self.phase_y, self.phase_x]}
@@ -125,8 +128,15 @@ def simulate_acquisition(x: torch.Tensor, cfg: AcquisitionConfig) -> Observation
     hx = blur_3d_fft(x, cfg.psf)
 
     # 2. sampling support
-    mask = make_mask(cfg.mode, cfg.K, T, H, W, cfg.pattern, cfg.mask_seed,
-                     phase_t=cfg.phase_t, phase_y=cfg.phase_y, phase_x=cfg.phase_x)
+    if cfg.mode == "yz2":
+        from .sampling import make_mask_yz2
+        mask = make_mask_yz2(cfg.K, cfg.K2 or cfg.K, T, H, W,
+                             seed=cfg.mask_seed, phase_t=cfg.phase_t,
+                             phase_y=cfg.phase_y)
+    else:
+        mask = make_mask(cfg.mode, cfg.K, T, H, W, cfg.pattern, cfg.mask_seed,
+                         phase_t=cfg.phase_t, phase_y=cfg.phase_y,
+                         phase_x=cfg.phase_x)
 
     # 3. noise on measured positions
     y = _add_noise(hx, mask, cfg.noise)

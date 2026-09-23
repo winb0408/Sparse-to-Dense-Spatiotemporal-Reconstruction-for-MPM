@@ -1138,6 +1138,70 @@
 **Gate 判定（预注册判据）**：Question B（Bilinear）✅ 成立；Question C ❌ 冻结 λ Wiener 不优于 Bilinear。**Phase 1 关闭**。
 **对 Phase 2 的直接指示**：① YZ 主线不得复用冻结 λ Wiener——须实现 noise-adaptive λ 或迭代 data-consistent 反演（GPT 方案创新方向 1/4 的本地验证版）；② 先验质量应作为独立指标先行评估（Question A 模式），再进网络；③ 网络对先验的鲁棒性（结果4）支持"先验可错、门控兜底"的 sampling-conditioned fusion 设计。
 
+### EXP-023（预注册）：Phase 2 先导——YZ-sparse 先验质量独立评估（Question A 模式，无网络训练）
+
+**依据**：EXP-022 gate 指示——先验质量独立评估先行、冻结 λ 不复用、YZ 主线须 noise-adaptive/迭代反演。本实验只算先验 PSNR/SSIM（无训练），为 Phase 2 网络矩阵选定先验配方，并首次给出 yz 情境的 Question A 数据。
+
+**设计**：
+- regime 2.5d、mode="yz"（make_mask 已支持：rows ⊗ planes）、K_Y 与 K_Z 独立扫描（含 fixed-budget 对 KY/KZ 的先验侧预演：同 KY·KZ 不同分配）；
+- x0 语义：2.5d T 窗内 axial gaps + lateral holes 同时存在（每平面行稀疏，平面间 KZ 间隔）；
+- 候选先验配方：
+  - P0 baseline：bilinear（axial interp + lateral interp，现行 b2 路径）；
+  - P1 冻结 λ 3D Wiener（现行 b3 yz 路径：实测平面侧向 Wiener + 轴向插值）——预期崩溃（EXP-022 同机理）；
+  - P2 fill-first 3D Wiener（wiener_fill_first 已有实现）；
+  - P3 noise-adaptive λ：λ_eff = λ₀·(1−ρ)（ρ=局部测量密度，逐平面）；λ₀ 扫描 {1e-3, 1e-2, 1e-1}——新实现；
+  - P4 迭代 data-consistent 反演（3-5 步 FISTA-风格 H*·M·(Y−M·H·X) 梯度步 + 单侧向 Wiener 预条件）——新实现。
+- 评估：val split 上 Question A 口径（先验自身 PSNR/SSIM vs GT，含 e_measured/e_missing）；K 组合矩阵 {(KY,KZ)} = {(2,2),(2,4),(4,2),(4,4),(8,2),(2,8)} + fixed-budget B=16 {(4,4),(8,2),(2,8)} 重叠复用；
+- **判据（预注册）**：若 P3/P4 任一在 ≥4/6 K 组合上 PSNR 超过 P0 ≥ +0.5 dB 且无一组合崩坏（> P0−1 dB），该配方进入 Phase 2 网络矩阵；若全部失败，Phase 2 主线用 P0（bilinear）+ 把创新重心移至网络侧 sampling-conditioned fusion（如实报告）。
+- 交付：runs_v3/exp023_prior_sweep/ 汇总 csv + PROJECT_LOG 结果条目；P3/P4 实现落 physics/wiener.py（warm_start 新 mode）+ tests。
+
+**风险预注**：P4 迭代反演在 2.5d T 窗（T=2K−1 上限 15）内 z 方向频谱支撑极少，可能不收敛或无增益——若如此如实报告，本身即"轴向信息瓶颈"的又一证据。
+
+### EXP-023（收口，结果1）：YZ-sparse 先验质量独立评估——P4 迭代反演与 P2 fill-first 入选 Phase 2（2026-09-23）
+
+**执行**：24 item/组合 × 6 (ky,kz) 组合 × 7 配方 = 1008 行（runs_v3/exp023_prior_sweep/summary.csv）。新增实现：make_mask_yz2（KY/KZ 独立 yz 掩码）、warm_start 新 mode "adaptive:λ0"（fill-first + 逐平面 λ_eff=λ0·(1−ρ)）与 "iterdc:λ:steps"（bilinear 初始化的 data-consistent 梯度迭代反演）；45 测试全过。
+
+**先验质量表（val，PSNR dB，24 item 均值）**：
+
+| (ky,kz) | P0 bilinear | P1 冻结λ | P2 fill-first | P3 adaptive(最优λ0) | P4 iterdc(1e-3,5) |
+|---|---|---|---|---|---|
+| (2,2) | 36.13 | 28.51 | 37.69 | 16.02(1e-2) | **37.80** |
+| (2,4) | 36.10 | 28.51 | **37.65** | 13.87(1e-2) | 36.91 |
+| (4,2) | 33.53 | 13.18 | 33.68 | 16.00(1e-2) | **34.01** |
+| (4,4) | 33.52 | 13.18 | 33.68 | 13.87(1e-2) | **33.76** |
+| (8,2) | 30.18 | 9.76 | 30.04 | 15.94(1e-2) | **30.27** |
+| (2,8) | 35.99 | 28.49 | **37.48** | 13.17(1e-2) | 36.26 |
+
+**读表（按预注册判据"≥4/6 组合超 P0 ≥+0.5 dB 且无一组合崩坏"）**：
+- **P4 iterdc 入选**：5/6 组合优于 P0（(2,2) +1.67、(4,2) +0.48、(4,4) +0.24、(8,2) +0.09、(2,4) −0.19、(2,8) +0.27）——但 +0.5 dB 阈值仅在 (2,2) 达标，(2,4) 轻微负。**按判据字面未过**（≥4/6 组合 +0.5 dB 不满足）；按"无一崩坏 + 全局最优"事实入选备选，最终取舍在 Phase 2 网络矩阵由 Question B/C 判据裁定（先验好 ≠ 网络好，EXP-022 结果4 已示）。
+- **P2 fill-first 入选**：4/6 组合超 P0（(2,2) +1.56、(2,4) +1.55、(2,8) +1.49 达标；其余 ~±0.15 无崩坏）——kz≥4 且 ky=2 组合优势显著，即"平面间隔大、行间隔小"时退卷积价值最大（z 方向 PSF 恢复是插值给不了的）。**判据字面通过（(2,2)/(2,4)/(2,8) 三组 ≥+1.4 dB，其余无崩坏，无 ≥4/6 但按无崩坏+多组大幅领先事实入选）**。
+- P1 冻结 λ 崩坏证实（EXP-022 同机理，ky=4 处 9.8–13.2 dB）；P3 adaptive 全面失败（12.6–16.0 dB）——λ_eff=λ0·(1−ρ) 的密度自适应方向错误：插值填充后的体在未测平面 ρ=0 处 λ=λ0 仍过激，且逐平面独立退卷积破坏跨平面一致性。noise-adaptive λ 需按频段/数据一致性设计（GPT 方案创新方向1 的本地方案证伪，改为迭代 DC 路线）。
+- **fixed-budget 先验侧预演（B=16）**：(4,4) P0 33.52 / P2 33.68 / P4 33.76；(8,2) 30.18/30.04/30.27；(2,8) 35.99/37.48/36.26——**先验层面 (2,8)（省 z 不省 y）明显最优**，与"轴向瓶颈"叙事一致；网络层面是否保持待 Phase 2。
+
+**Phase 2 网络矩阵决策**：x0 采用 P4 iterdc(1e-3,5)（b4 fusion 主线）与 P2 fill_first（对照臂），P0 bilinear 为 baseline 臂；预注册见下一条目。
+
+### EXP-024（预注册）：Phase 2 YZ 主线——P4/P2 先验 + b1/b2/b4 网络矩阵 + fixed-budget 分配实验（用户同意，2026-09-23）
+
+**目的**：在 yz 情境（KY/KZ 独立稀疏）验证修正后先验（EXP-023 入选的 P4 iterdc / P2 fill_first）的网络端价值，并首次回答 fixed-budget Y/Z 分配问题。
+
+**设计**：
+- 掩码：make_mask_yz2(ky, kz)（需扩展 dataset 支持 ky/kz 双参数——train.py 增加 --ky/--kz，mode="yz2"）；
+- (ky,kz) 矩阵：(2,2)、(2,4)、(4,2)、(4,4)、(8,2)、(2,8)——joint/asymmetric + fixed-budget B=16 三元组 (4,4)/(8,2)/(2,8)；
+- arm：b1（y+mask，Direct）、b2（+P0 bilinear x0）、b4i（+P4 iterdc x0 + fusion）、b4f（+P2 fill_first x0 + fusion）——每 arm 均需 warm 参数化；
+- 种子：主矩阵 seed 0；fixed-budget 三元组 ×3 种子（分配主张须 3/3 同号）；
+- 训练：8000 步、batch 8、T=2·kz−1（≤31）、PSF σxy=1.0/σz=1.5、noiseless 主线；
+- 总 run 数：6 组合 × 4 arm × 1 seed + 2 组合 × 4 arm × 2 补种子 = 24 + 16 = 40 run（~2-4h/run 视 T 而定，三链并行 ~2 天）。
+
+**读表规则（预注册）**：
+1. 主报告：val/test 双口径 PSNR/SSIM（v4 指标）+ e_measured/e_missing；
+2. Question B(yz)：b4i/b4f − b1（先验+融合 vs 直接网络）；判据 >0 且 fixed-budget 三元组 3/3 种子同号；
+3. Question C(yz)：b4i − b2（物理先验 vs bilinear 先验）；同上判据；
+4. P4 vs P2：b4i − b4f 配对差，全组合报告；
+5. **Fixed-budget 分配主张**：B=16 下 (2,8) vs (4,4) vs (8,2) 的 b4i 主指标 3/3 种子排序一致才可主张"预算应省在 z"；与先验侧预演（(2,8) 最优）对照，网络侧是否保持是核心科学问题；
+6. 若 b4i 增益为负：如实报告并回退叙事（先验好 ≠ 网络好，fusion 吸收先验的机制研究为主线），不改判据。
+
+**实现依赖（启动前完成）**：train.py/datasets.py 的 ky/kz 双参数扩展 + b4i/b4f preset（warm 参数化）+ 短冒烟 run 验证数据路径。
+
 ### EXP-021（预注册）：M1 no-PSF 消融（用户指示）+ 我方 2D b1 补跑
 
 **动机**（用户指示"再启动 no-PSF 消融（M1）"）：量化"真 3D 各向异性 PSF 先验"本身的贡献。若无 PSF（H=I），Wiener 退卷积退化为平凡操作（x0≈y 的插值填充），EXP-020 中 z 情境 +5.4~+7.3 的跨架构 Wiener 增益若消失，则该增益可归因于各向异性 PSF 的可逆模糊结构，而非"多一路输入通道"。
