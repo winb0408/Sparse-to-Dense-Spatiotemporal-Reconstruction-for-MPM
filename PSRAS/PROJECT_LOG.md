@@ -1146,11 +1146,11 @@
 - regime 2.5d、mode="yz"（make_mask 已支持：rows ⊗ planes）、K_Y 与 K_Z 独立扫描（含 fixed-budget 对 KY/KZ 的先验侧预演：同 KY·KZ 不同分配）；
 - x0 语义：2.5d T 窗内 axial gaps + lateral holes 同时存在（每平面行稀疏，平面间 KZ 间隔）；
 - 候选先验配方：
-  - P0 baseline：bilinear（axial interp + lateral interp，现行 b2 路径）；
-  - P1 冻结 λ 3D Wiener（现行 b3 yz 路径：实测平面侧向 Wiener + 轴向插值）——预期崩溃（EXP-022 同机理）；
-  - P2 fill-first 3D Wiener（wiener_fill_first 已有实现）；
-  - P3 noise-adaptive λ：λ_eff = λ₀·(1−ρ)（ρ=局部测量密度，逐平面）；λ₀ 扫描 {1e-3, 1e-2, 1e-1}——新实现；
-  - P4 迭代 data-consistent 反演（3-5 步 FISTA-风格 H*·M·(Y−M·H·X) 梯度步 + 单侧向 Wiener 预条件）——新实现。
+  - P0 baseline = Bilinear-prior（轴向线性插值 + 横向线性插值，纯几何无 PSF；= 网络矩阵 b2 的 x0）；
+  - P1 冻结 λ Wiener（对零填充观测直接近逆滤波 + 轴向插值，旧 b3 排序）——预期崩溃（EXP-022 同机理），仅作反面对照，不进网络矩阵；
+  - P2 FillFirst-Wiener（先横向插值填洞 → 实测平面侧向 Wiener 退卷积 λ=0.01 → 轴向插值；**Wiener 家族**；= 网络矩阵 b4f 的 x0）；
+  - P3 密度自适应 λ：λ_eff = λ₀·(1−ρ)（ρ=逐平面测量密度），fill-first 后逐平面退卷积；λ₀ 扫描 {1e-3,1e-2,1e-1}——新实现，对照臂；
+  - P4 迭代 data-consistent 反演（bilinear 初始化 + 5 步梯度迭代 min ½‖M(H·X−Y)‖²+½λ‖X‖²，每步含 OTF 退卷积；**Wiener 家族（迭代式）**；= 网络矩阵 b4i 的 x0，λ=1e-3）。
 - 评估：val split 上 Question A 口径（先验自身 PSNR/SSIM vs GT，含 e_measured/e_missing）；K 组合矩阵 {(KY,KZ)} = {(2,2),(2,4),(4,2),(4,4),(8,2),(2,8)} + fixed-budget B=16 {(4,4),(8,2),(2,8)} 重叠复用；
 - **判据（预注册）**：若 P3/P4 任一在 ≥4/6 K 组合上 PSNR 超过 P0 ≥ +0.5 dB 且无一组合崩坏（> P0−1 dB），该配方进入 Phase 2 网络矩阵；若全部失败，Phase 2 主线用 P0（bilinear）+ 把创新重心移至网络侧 sampling-conditioned fusion（如实报告）。
 - 交付：runs_v3/exp023_prior_sweep/ 汇总 csv + PROJECT_LOG 结果条目；P3/P4 实现落 physics/wiener.py（warm_start 新 mode）+ tests。
@@ -1201,6 +1201,16 @@
 6. 若 b4i 增益为负：如实报告并回退叙事（先验好 ≠ 网络好，fusion 吸收先验的机制研究为主线），不改判据。
 
 **实现依赖（启动前完成）**：train.py/datasets.py 的 ky/kz 双参数扩展 + b4i/b4f preset（warm 参数化）+ 短冒烟 run 验证数据路径。
+
+**Arm 配置全称（用户要求，所有后续记录统一使用"全称+缩写"双写法）**：
+| 缩写 | 全称 | 输入特征 | x0 先验公式 | λ/参数 |
+|---|---|---|---|---|
+| b1 | Direct（无先验直接重建） | y, mask | 无 x0 | — |
+| b2 | Bilinear-prior（双线性插值先验） | y, mask, x0 | X0 = 轴向线性插值 + 横向线性插值（`_axial_interp`/`_lateral_interp`，纯几何，无 PSF） | — |
+| b4i | IterDC-prior fusion（迭代数据一致反演先验 + 门控融合） | y, mask, x0, C_s, U_p | X0 = bilinear 初始化后 5 步梯度迭代 min ½‖M(H·X−Y)‖²+½λ‖X‖²（每步含 OTF 退卷积项，**Wiener 家族**） | λ=1e-3, 5 步 |
+| b4f | FillFirst-Wiener fusion（先填洞后 Wiener 退卷积先验 + 门控融合） | y, mask, x0, C_s, U_p | X0 = 横向插值填洞 → 实测平面侧向 Wiener 退卷积 → 轴向插值（`wiener_fill_first`，**Wiener 家族**） | λ=0.01 |
+
+注：b4i/b4f 均为 Wiener 家族物理先验（含 PSF 退卷积）；与旧 b3 的区别仅在"冻结 λ 直接对零填充观测近逆滤波"的排序被 EXP-022/023 淘汰（Gibbs 振铃），退卷积物理本身保留。ky=1 时 b4f 的 x0 与旧 b3/b4 主线构造等价（fill_first 无横向洞时退化为 legacy 路径）。纯 z 控制组 (1,4)/(1,8) 经用户决策不加（2026-09-24 记录）。
 
 ### EXP-021（预注册）：M1 no-PSF 消融（用户指示）+ 我方 2D b1 补跑
 
