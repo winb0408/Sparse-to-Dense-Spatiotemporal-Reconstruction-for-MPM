@@ -1,0 +1,17 @@
+[YZ_4x2_b4i] step 500: loss=0.2720 val PSNR=31.31 SSIM=0.8936
+[YZ_4x2_b4i] step 1000: loss=0.2088 val PSNR=30.40 SSIM=0.7675
+[YZ_4x2_b4i] step 1500: loss=0.1667 val PSNR=33.32 SSIM=0.9113
+[YZ_4x2_b4i] step 2000: loss=0.2470 val PSNR=33.01 SSIM=0.8975
+[YZ_4x2_b4i] step 2500: loss=0.2048 val PSNR=33.57 SSIM=0.9200
+[YZ_4x2_b4i] step 3000: loss=0.2556 val PSNR=34.22 SSIM=0.9228
+[YZ_4x2_b4i] step 3500: loss=0.2194 val PSNR=34.60 SSIM=0.9232
+[YZ_4x2_b4i] step 4000: loss=0.1849 val PSNR=34.73 SSIM=0.9248
+[YZ_4x2_b4i] step 4500: loss=0.2600 val PSNR=34.69 SSIM=0.9250
+[YZ_4x2_b4i] step 5000: loss=0.2406 val PSNR=34.67 SSIM=0.9243
+[YZ_4x2_b4i] step 5500: loss=0.2025 val PSNR=34.59 SSIM=0.9237
+[YZ_4x2_b4i] step 6000: loss=0.1594 val PSNR=34.69 SSIM=0.9243
+[YZ_4x2_b4i] step 6500: loss=0.2176 val PSNR=34.71 SSIM=0.9246
+[YZ_4x2_b4i] step 7000: loss=0.1986 val PSNR=34.75 SSIM=0.9248
+[YZ_4x2_b4i] step 7500: loss=0.2345 val PSNR=34.73 SSIM=0.9247
+[YZ_4x2_b4i] step 8000: loss=0.2149 val PSNR=34.75 SSIM=0.9248
+[YZ_4x2_b4i] done. best val PSNR=34.75, final={'psnr': 34.74981498718262, 'ssim': 0.9248343706130981}

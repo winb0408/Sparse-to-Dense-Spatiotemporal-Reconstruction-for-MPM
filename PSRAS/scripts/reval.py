@@ -44,8 +44,10 @@ def main() -> None:
     t, feats = cfg["t"], tuple(cfg["features"])
     preset = PRESETS[cfg["preset"]]
 
+    # yz2 runs carry kz in config.json; pass through as K2 so the mask matches training
+    k2 = cfg.get("kz", 0) or 0
     val_ds = make_val_dataset(args.data_dir, args.split, cfg["regime"],
-                              mode=cfg["mode"], K=cfg["K"], psf=psf,
+                              mode=cfg["mode"], K=cfg["K"], K2=k2, psf=psf,
                               patch_hw=(cfg["patch"], cfg["patch"]),
                               warm_start_kind=cfg["warm_start"],
                               lam=cfg["lam_wiener"], features=feats,
@@ -93,7 +95,7 @@ def main() -> None:
            "err_missing": sum(e_miss) / len(e_miss),
            "n_items": len(psnrs), "ckpt": args.ckpt, "split": args.split,
            "metrics_version": "v4: 2D gaussian SSIM window; split errors from M",
-           "protocol": {"mode": cfg["mode"], "K": cfg["K"]}}
+           "protocol": {"mode": cfg["mode"], "K": cfg["K"], "K2": k2}}
     out_name = "val_metrics_corrected.json" if args.split == "val" else \
         f"metrics_{args.split}.json"
     (args.run_dir / out_name).write_text(json.dumps(out, indent=2))
