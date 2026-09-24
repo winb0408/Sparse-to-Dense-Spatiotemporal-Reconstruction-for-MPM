@@ -1282,6 +1282,38 @@ b4i−b4f 配对差（test PSNR）：(2,2) −0.15；(2,4) −1.41；(2,8) −1.
 
 **EXP-024 总收口**：(1) Question B(yz) 确认——Wiener 家族物理先验+门控融合在 yz2 双轴稀疏全组合带来稳定网络增益（+0.5~+3.4 dB），Phase 2 核心假设成立；(2) 最优先验配方为 **FillFirst-Wiener（b4f）**，其 x0 应作为 Phase 3 统一 3D 网络的默认 warm-start/融合输入；(3) 分配律主张成立，为采样协议设计（ROI 行内密采、轴向疏采）提供依据。Phase 3 建议：unified axial-3D 网络（models/unified_3d.py）以 b4f 先验为默认输入、T∈{1,3,5,9,16} query mask Q 机制、主验证 (2,8) 采样点（预算最优）并对照 (4,4)。
 
+### EXP-025（预注册）：Phase 4 Unified Framework——specialist vs unified 对比 + A_Z 轴向适配器消融（用户同意，2026-09-24）
+
+**目的**（v4 方案 §7-8）：回答 "sampling-conditioned unified reconstruction model 能否在不牺牲 specialist 性能的前提下跨 acquisition regime"。两问：① 混合 Y+YZ 训练的统一网络 vs 单 regime specialist（同架构同预算）；② 学习式轴向交互（A_Z）相对纯物理先验通道有无增量（v3 期全层 3D 已被 EXP-012/013/014 证伪，本实验将轴向交互压缩为单个零初始化适配器再测）。
+
+**架构（UnifiedV4，models/unified_v4.py，T 无关）**：
+- 输入 [B, T*5, H, W]（feature-major，与现主线一致）；
+- 逐 slice 共享融合 stem（_PerSliceFusionStem：每 slice y/m/x0/c_s/u_p → f_y + g·f_w，gate 零初始化，权重跨 slice 共享——满足 v4 方案 §7.2 "不用 Conv2d(5T→C)"）；
+- **A_Z**：零初始化残差深度可分离 Conv3d(k=(3,1,1)) 沿 T，构造上初始恒等（state_dict 转移验证 torch.allclose=True）；T=1（Y regime）自动跳过；
+- 逐 slice 共享 SwinUNet2D(base→1)；UNet 主体训练态梯度检查点（逐 slice 处理使激活 ∝ B·T，(2,8) 处 B=8×T=15 需检查点适配 48GB）；
+- `--no_az` 关闭 A_Z（消融臂）。
+
+**Arm（全称+缩写双写法；均 preset=b4f=FillFirst-Wiener prior fusion、model=univ4、7950 步、batch 8、base 48、seed 三重复）**：
+| 缩写 | 全称 | 训练数据 |
+|---|---|---|
+| SY | Specialist-Y | 混合 y-K{2,4,8}（mode=y，T=1） |
+| SYZ | Specialist-YZ | 混合 yz2-{(2,2),(2,4),(2,8),(4,2),(4,4),(8,2)} |
+| U | Unified | 上两者全部 9 点（regime 均匀+severity 均匀批次交替） |
+| U-noAZ | Unified without axial adapter | 同 U，--no_az |
+| SYZ-noAZ | Specialist-YZ without axial adapter | 同 SYZ，--no_az |
+
+共 5 arm × 3 seed = 15 run。批次流：每步均匀随机选 regime 点 → 该点 DataLoader 取 batch（T 随批变化，loss/model T 无关）。评估：每 run 在全部 9 点（y-K{2,4,8} + yz2-6 组合）× 双口径 reval（reval.py 新增 --eval_mode/--eval_K/--eval_kz 点覆盖，输出 metrics_<split>_<mode>_K<k>[x<kz>].json）；specialist 跨 regime 迁移（SY 上 YZ 套件、SYZ 上 Y 套件）为描述性报告。
+
+**判读规则（预注册）**：
+1. **Unified gate**：U 在 Y 套件（3 点均值）与 YZ 套件（6 点均值）上均 ≥ 对应 specialist − 0.5 dB，且逐 seed 配对差 ≥2/3 同号；两套件同时达标才可主张 unified 不牺牲 specialist；
+2. **A_Z 增量**：U − U-noAZ 与 SYZ − SYZ-noAZ 的配对差，3/3 seed 同号为成立；否则如实报告（含"A_Z 无增量、轴向耦合由物理先验通道（x0 轴向插值 + T 窗口输入）承载即可"的回退叙事——该结论与 v3 "信息瓶颈在轴向" 互补，同样可写论文）；
+3. 架构健全性参照（非 gate）：SYZ vs EXP-024 单点 specialist（swin2d b4f，单点训练）不做同表对比（数据分布不同：混合 vs 单点），仅作定性 sanity；
+4. 若 U 显著劣于 specialist（>1 dB）：报告并归因（批次交替稀释 / T 变化批统计），回退方案为 regime-conditioned batch norm 或两阶段训练，不改判据。
+
+**实现依赖（启动前完成，2026-09-24 已验证）**：models/unified_v4.py（形状/零初始化恒等/检查点冒烟 40 步通过）；train.py --regime_mix/--no_az（混合批次流 + per-regime val 冒烟通过，per_regime 指标正确分点记录）；reval.py --eval_mode/--eval_K/--eval_kz（混合 run 点覆盖评估冒烟通过，protocol 字段记录评估点）。
+
+**执行记录（启动，2026-09-24 13:31）**：15 run 三链启动后巡检发现 GPU2 被他人 24GB 进程占用（SM 争抢使 SYZ run ~15h/run），当日重排：GPU1 = SY_s0-2 → SYZ_s1/s2 → SYZ_noAZ_s0/s2（7 run）；GPU2 = SYZ_s0（已在跑，争抢下完成）→ SYZ_noAZ_s1（2 run）；GPU3 = U_s0-2 + U_noAZ_s0-2（6 run）。预计 ~30h（他人进程结束则更快）。首个 run 冒烟读数正常（SY_s0 step 500 val PSNR 32.81）。
+
 ### EXP-021（预注册）：M1 no-PSF 消融（用户指示）+ 我方 2D b1 补跑
 
 **动机**（用户指示"再启动 no-PSF 消融（M1）"）：量化"真 3D 各向异性 PSF 先验"本身的贡献。若无 PSF（H=I），Wiener 退卷积退化为平凡操作（x0≈y 的插值填充），EXP-020 中 z 情境 +5.4~+7.3 的跨架构 Wiener 增益若消失，则该增益可归因于各向异性 PSF 的可逆模糊结构，而非"多一路输入通道"。

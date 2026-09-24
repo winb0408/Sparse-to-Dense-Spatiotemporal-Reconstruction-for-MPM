@@ -35,6 +35,12 @@ def main() -> None:
                    help="rvrt's CUDA-only deformable attention needs gpu")
     p.add_argument("--data_dir", type=Path,
                    default=Path(__file__).parents[1] / "runs_v3/data/cidc25_v3")
+    # EXP-025: evaluate a (mixed-regime) run at a specific acquisition point
+    # that may differ from the training config (unified/specialist runs are
+    # scored on the full Y + YZ suite).  Overrides the protocol below.
+    p.add_argument("--eval_mode", choices=["y", "yz2"], default=None)
+    p.add_argument("--eval_K", type=int, default=0)
+    p.add_argument("--eval_kz", type=int, default=0)
     args = p.parse_args()
 
     cfg = json.loads((args.run_dir / "config.json").read_text())
@@ -46,19 +52,37 @@ def main() -> None:
 
     # yz2 runs carry kz in config.json; pass through as K2 so the mask matches training
     k2 = cfg.get("kz", 0) or 0
-    val_ds = make_val_dataset(args.data_dir, args.split, cfg["regime"],
-                              mode=cfg["mode"], K=cfg["K"], K2=k2, psf=psf,
+    eval_tag = ""
+    if args.eval_mode is not None:
+        # EXP-025 point override: rebuild the protocol for one acquisition
+        # point (y: regime 2d, T=1 / yz2: regime 2.5d, T=2*kz-1).
+        from scripts.train import point_params
+        from physics.psf import PSFConfig as _P
+        ev_regime, ev_K, ev_kz, ev_t = point_params(
+            args.eval_mode, args.eval_K if args.eval_mode == "y"
+            else (args.eval_K, args.eval_kz), "2d", "2.5d")
+        psf = _P(sigma_xy_um=cfg["psf"]["sigma_xy_px"],
+                 sigma_z_um=cfg["psf"]["sigma_z_px"] if ev_regime != "2d" else 0.0,
+                 voxel_xy_um=1.0, voxel_z_um=1.0)
+        regime, mode, K, k2, t = ev_regime, args.eval_mode, ev_K, ev_kz, ev_t
+        t_override = None
+        eval_tag = f"_{mode}_K{K}x{k2}" if mode == "yz2" else f"_{mode}_K{K}"
+    else:
+        regime, mode, K, t_override = cfg["regime"], cfg["mode"], cfg["K"], cfg["t"]
+    val_ds = make_val_dataset(args.data_dir, args.split, regime,
+                              mode=mode, K=K, K2=k2, psf=psf,
                               patch_hw=(cfg["patch"], cfg["patch"]),
                               warm_start_kind=cfg["warm_start"],
                               lam=cfg["lam_wiener"], features=feats,
-                              t_override=cfg["t"])
+                              t_override=t_override)
 
     ckpt = torch.load(args.run_dir / f"{args.ckpt}.pt", map_location="cpu",
                       weights_only=False)
     model = build_model(preset, t, cfg["model"]["base"], cfg["model"]["window"],
                         cfg["model"].get("kind", "swin2d"),
                         axial_at=cfg["model"].get("axial_at", "all"),
-                        output=cfg["model"].get("output", "all"))
+                        output=cfg["model"].get("output", "all"),
+                        use_az=cfg["model"].get("use_az", True))
     model.load_state_dict(ckpt["model"])
     model = model.to(args.device).eval()
 
@@ -95,9 +119,11 @@ def main() -> None:
            "err_missing": sum(e_miss) / len(e_miss),
            "n_items": len(psnrs), "ckpt": args.ckpt, "split": args.split,
            "metrics_version": "v4: 2D gaussian SSIM window; split errors from M",
-           "protocol": {"mode": cfg["mode"], "K": cfg["K"], "K2": k2}}
+           "protocol": {"mode": mode, "K": K, "K2": k2}}
     out_name = "val_metrics_corrected.json" if args.split == "val" else \
         f"metrics_{args.split}.json"
+    if eval_tag:
+        out_name = out_name.replace(".json", f"{eval_tag}.json")
     (args.run_dir / out_name).write_text(json.dumps(out, indent=2))
     print(json.dumps(out, indent=2))
 

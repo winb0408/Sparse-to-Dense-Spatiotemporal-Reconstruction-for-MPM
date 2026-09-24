@@ -23,7 +23,7 @@
 | P1 | Corrected Y baseline（EXP-022，36 run） | ✅ 2026-09-23 | EXP-022 结果1-4 | Bilinear>Direct 全 K 3/3 同号；冻结λ Wiener 先验崩坏（负增益）但网络鲁棒 ✅ |
 | P2 | Genuine YZ physics prior（EXP-023，1008 行先验扫描） | ✅ 2026-09-23 | EXP-023 结果1 | P4 IterDC 5/6 最优、P2 FillFirst-Wiener kz 大时领先；P1/P3 淘汰；先验侧 (2,8) 最优 ✅ |
 | P3 | YZ Mainline（EXP-024，40 run 双口径） | ✅ 2026-09-24 | EXP-024 结果1-4 | **(2,8)>(4,4) 3/3 种子 (+2.0~+4.2 dB)、(8,2) 垫底——"预算省在 z"成立**；b4f ≥ b4i 全 6 组合；先验+融合 vs Direct 全组合 +0.5~+3.4 dB ✅ |
-| P4 | Unified Framework（shared encoder + fusion + Z adapter + specialist 对比） | ⬜ | — | 待预注册 |
+| P4 | Unified Framework（shared encoder + fusion + Z adapter + specialist 对比） | 🔵 进行中 | EXP-025 预注册（2026-09-24） | 15 run 三链（GPU2 与他人进程共享已重排）；判读：U vs specialist gate + A_Z 增量 3/3 seed |
 | P5 | XYZ / XYT Extension + noise_stress | ⬜ | — | XYT 数据依赖待确认 |
 | P6 | Protocol A / Real Acquisition | ⬜ | — | 未落地，不做主张 |
 
@@ -55,7 +55,7 @@
 
 ## 4. 下一步（待用户批准后预注册）
 
-1. **Phase 4 Unified Framework**（主推荐）：shared 2D spatial encoder + b4f（FillFirst-Wiener）先验默认输入 + Z adapter；specialist vs unified matched-budget 对比；主验证 (2,8) 对照 (4,4)。
+1. 🔵 **Phase 4 Unified Framework 已启动（EXP-025，2026-09-24）**：UnifiedV4 架构（逐 slice 共享 stem/UNet + 零初始化 A_Z 深度可分离轴向适配器 + 梯度检查点）；5 arm × 3 seed = 15 run（Specialist-Y / Specialist-YZ / Unified / 两个 noAZ 消融），9 评估点双口径；预计 ~30h。
 2. 候选并行：Phase 5 noise_stress（F1/F2/F3 配对 GT）、稳健性扫描（λ 敏感性 / PSF mismatch）。
 3. 远期：Phase 5 XYZ/XYT、Phase 6 Protocol A（pollen 真实采集）。
 

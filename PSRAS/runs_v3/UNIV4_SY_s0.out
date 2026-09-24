@@ -1,0 +1,8 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:745: UserWarning: torch.utils.checkpoint: the use_reentrant parameter should be passed explicitly. In version 2.5 we will raise an exception if use_reentrant is not passed. use_reentrant=False is recommended, but if you need to preserve the current default behavior, you can pass use_reentrant=True. Refer to docs for more details on the differences between the two variants.
+  return fn(*args, **kwargs)
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:227: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn(
+[UNIV4_SY_s0] step 500: loss=0.1516 val PSNR=32.81 SSIM=0.8787
+[UNIV4_SY_s0] step 1000: loss=0.1249 val PSNR=32.03 SSIM=0.8889
+[UNIV4_SY_s0] step 1500: loss=0.2209 val PSNR=32.42 SSIM=0.8911
+[UNIV4_SY_s0] step 2000: loss=0.1884 val PSNR=32.56 SSIM=0.8797
