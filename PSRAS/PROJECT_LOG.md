@@ -11,7 +11,34 @@
 
 ---
 
-## 1. 项目定位
+## 1. 项目定位（v4 修订，2026-09-24；v3 原文见下方历史注记）
+
+**PSRAS** 是 threePM 项目的 protocol-level 重构（缩写语义 v4 起待终定，Residual 分支已证伪淘汰）。
+科学问题（v4，DEC-025）：
+
+> **Physics-guided sparse reconstruction under anisotropic sampling** ——
+> 在统一 forward model `Y = M ⊙ (H*X + n)` 下，acquisition regime 一级分类为 **Y / YZ / XYZ / XYT**
+> （2D/2.5D/3D 降为网络上下文描述），核心创新押注：
+> ① fixed-budget Y/Z allocation（同样采样预算下 Y 与 Z 如何分配最有效）；
+> ② sampling-conditioned physics prior（FillFirst-Wiener 等物理先验家族 + 门控融合）；
+> ③ unified 框架（shared spatial backbone + axis adapter，Phase 4）。
+
+执行计划见 [PLAN.md](PLAN.md)（v4，2026-09-24 重写）；v3 计划归档于 [Historical_Plan/](Historical_Plan/)。
+
+**v4 阶段 ↔ 实验索引**（阶段编号按 v4 方案；2026-09-22~24 日志中 EXP-023/024 曾按旧叫法称 "Phase 2 先导/Phase 2 YZ 主线"）：
+
+| v4 阶段 | 状态 | 关闭证据 |
+|---|---|---|
+| Phase 0 Protocol Cleanup | ✅ 2026-09-22 | DEC-025（7/7 P0 修复 + 主结论存活核验） |
+| Phase 1 Corrected Y baseline | ✅ 2026-09-23 | EXP-022（结果1-4，36/36 run） |
+| Phase 2 Genuine YZ physics prior | ✅ 2026-09-23 | EXP-023（结果1，1008 行先验扫描） |
+| Phase 3 YZ Mainline | ✅ 2026-09-24 | EXP-024（结果1-4，40/40 run） |
+| Phase 4 Unified Framework | ⬜ 待预注册 | — |
+| Phase 5 XYZ/XYT + noise_stress | ⬜ | — |
+| Phase 6 Protocol A 真实采集 | ⬜ | — |
+
+<details>
+<summary>历史注记：v3 定位原文（2026-09-09，已被 v4 修订取代）</summary>
 
 **PSRAS (Physics-Sampling-Residual Aware Synthesis)** 是 threePM 项目的 protocol-level 重构。
 科学问题从 "Swin-UNet sparse-to-dense 重建" 重新定义为：
@@ -22,6 +49,9 @@
 > + residual 重建 `X̂ = X₀ + ΔX` + measurement-domain data consistency。
 
 最终形态是一个统一 3D 条件重建网络，以 T ∈ {1,3,5,9,16} 与 query mask Q 同时覆盖 2D / 2.5D / 3D regime。
+（注：residual 重建与统一 3D 网络两条已在 v3 期分别被 EXP-015 系与 DEC-019 证伪/关闭；v4 主线见上文。）
+
+</details>
 
 ## 2. 设计原则（不可违反）
 
@@ -1631,3 +1661,20 @@ z 线 B3>B2、B4>B3 与 2D 线 B2>B1>B3 在修正指标下均保持；旧绝对�
   checkpointing，12k 步，标杆 B4 2D 架构 46.28，预注册目标 ≥47.3）。
 - 遗留到 Phase 3：兑现率瓶颈（K8 仅 30%）、统一 3D 网络、时间节省映射
   （T ∝ N_y·N_z 下 K_y=K_z=8 → 64× 省时的重建质量论证）。
+
+### DEC-026：文档体系重构——v4 计划对齐 + 历史归档（用户指示，2026-09-24）
+
+**背景**：用户指出 PLAN.md 依据新方案修改后凌乱，PROJECT_LOG.md 与 Project_progress_status.md 未按 v4 方案组织，指示归档旧文档并重新梳理（"看看当前已完成哪些阶段，还差什么"）。
+
+**改动**：
+1. 新建 `Historical_Plan/`：归档 v3 计划（PLAN_v3_20260909.md）与 v3 进度表（Project_progress_status_v3_20260924.md），原样保留；
+2. **PLAN.md 全文重写为 v4**：阶段结构对齐《20260921PSRAS_NextStage_Project_Revision_Plan.md》§17 的 Phase 0–6（Protocol Cleanup → Y baseline → YZ physics prior → YZ Mainline → Unified → XYZ/XYT → Protocol A），每阶段附状态/Gate/关闭证据；含已冻结协议约定表（split v2 / 指标 v4 / arm 命名双写法）与论文主图规划；
+3. **Project_progress_status.md 全文重写**：v4 阶段验收表、已确立论文级主张清单（含强度标注与不可主张清单）、EXP-024 主矩阵读数存档、下一步待批准项；
+4. **PROJECT_LOG.md 保持 append-only 不归档**：仅更新 §1 项目定位为 v4（v3 原文收入折叠历史注记），并新增"v4 阶段 ↔ 实验索引"表；全部 DEC/EXP 历史条目原样保留，证据树连续性不断。
+
+**阶段编号勘误说明**：2026-09-22~24 日志中 EXP-023/024 曾按旧叫法称 "Phase 2 先导/Phase 2 YZ 主线"；按 v4 方案编号实为 Phase 2（Genuine YZ physics prior）与 Phase 3（YZ Mainline）。新文档已统一为 v4 编号并在索引中注明对应关系，旧条目原文不改（append-only 原则）。
+
+**当前状态结论（Phase 0–3 全关，下一步 Phase 4 待预注册）**：
+- Phase 0 ✅ DEC-025；Phase 1 ✅ EXP-022；Phase 2 ✅ EXP-023；Phase 3 ✅ EXP-024；
+- 核心问题"Y/Z 稀疏如何分配最有效"已回答：预算省在 z（(2,8) 最优，3/3 种子）；
+- 最优先验配方 FillFirst-Wiener (b4f)；下一步 Phase 4 Unified Framework（shared 2D encoder + b4f 默认输入 + Z adapter + specialist 对比，主验证 (2,8) vs (4,4)）。

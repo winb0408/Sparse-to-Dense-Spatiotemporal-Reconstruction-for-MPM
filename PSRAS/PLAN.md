@@ -1,235 +1,112 @@
-# PSRAS 修改计划（Protocol v3 → v4 重置）
+# PSRAS 项目计划（Protocol v4）
 
-> **v4 状态（2026-09-22，DEC-025）**：基于外部审查（ChatGPT 三轮对话 + 《20260921PSRAS_NextStage_Project_Revision_Plan.md》v4.0-draft），
-> 7 项 P0 断言全部核验属实并已修复（SSIM 二维窗 / reval 显式 mask / split v2 诚实语义 / z-warm-start 命名勘误 / Protocol A 未落地声明）。
-> v4 修正后主线：**Y / YZ / XYZ / XYT 为 acquisition regime 一级分类**（2D/2.5D/3D 降为网络上下文描述）；
-> 核心创新押注 fixed-budget Y/Z allocation + sampling-conditioned physics prior + unified（shared spatial backbone + axis adapter）。
-> 详见 PROJECT_LOG.md DEC-025（含对 GPT 方案的 5 项修正：本地无独立测试栈 / 重评估代替全量重训 / repo 不重构 / XYT 数据依赖 / 矩阵分级）。
-> 当前阶段：Phase 1（EXP-022 Y-sparse 修正基线，36 run 三链并行）。
-> 以下 v3 原文保留作历史依据；其中与 v4 冲突处以 DEC-025 勘误为准（尤其 §5 数据划分与"真 3D Wiener"表述）。
-
-> PSRAS = **P**hysics-**S**ampling-**R**esidual **A**ware **S**ynthesis（v4 起缩写语义待终定，Residual 分支已淘汰，见 v4-draft §15）
-> 基于对 threePM（`dev` 分支）的 ChatGPT 审阅结论 + 独立代码核实 + 经验修正整理而成。
-> 本文是执行依据；实验过程与结论记录见 [PROJECT_LOG.md](PROJECT_LOG.md)。
->
-> 原则：**不修改 threePM 根目录任何旧代码**。所有新代码、新实验、新结果均在 `PSRAS/` 下；
-> 旧结果一律视为 `legacy / exploratory`，不进入新论文正文。
+> 版本：v4（2026-09-24 重写）。依据《20260921PSRAS_NextStage_Project_Revision_Plan.md》（外部审查 v4.0-draft）
+> + DEC-025 的 5 项本地修正（本地无独立测试栈 / 重评估代替全量重训 / repo 不重构 / XYT 数据依赖 / 矩阵分级）。
+> v3 计划全文归档于 [Historical_Plan/PLAN_v3_20260909.md](Historical_Plan/PLAN_v3_20260909.md)；
+> v3 阶段进度表归档于 [Historical_Plan/Project_progress_status_v3_20260924.md](Historical_Plan/Project_progress_status_v3_20260924.md)。
+> 实验证据树：[PROJECT_LOG.md](PROJECT_LOG.md)（append-only，DEC/EXP 编号持续）。
+> 当前状态速览：[Project_progress_status.md](Project_progress_status.md)。
 
 ---
 
-## 1. 审阅结论核实（2026-09-09，针对 dev 分支源码）
+## 0. 项目一句话定位
 
-| # | 论断 | 证据位置 | 核实结果 |
-|---|---|---|---|
-| C1 | DINOv2 perceptual loss 无梯度反传 | `loss.py:198` `_extract` 整体 `@torch.no_grad()`，pred/target 特征都在 no_grad 下提取 | **属实**，loss 数值只是记录，从未优化重建网络 |
-| C2 | `wiener_init_3d` 是逐帧 2D Wiener | `dataset.py:453-465`，`psf_sigma_axial` 参数被忽略 | **属实** |
-| C3 | 2D/3D Swin 均无 shifted-window attention mask | `models/swin_unet_2d.py:174`、`models/video_swin_unet.py:210`，只有 `roll` 无区域 mask | **属实**，非标准 SW-MSA |
-| C4 | normalization 依赖 GT 统计量 | `dataset.py:1485,1638,1759`（GT/patch min-max 决定输入尺度） | **属实**，属 target-dependent preprocessing |
-| C5 | 预插值数据被当作 raw sparse | `scripts/prepare_cidc25_sparse3d.py`：Z 模式保存 `zoom` 插值后体数据；XY/XYZ 保存 warm-start 后结果 | **属实**，三个 regime 的 inverse problem 定义不一致 |
-| C6 | `baseline_input_z_K4` 74 dB / SSIM 1.0 可疑 | 来自 legacy eval 输出 | **不重查旧账**，直接在新 protocol 下重建 baseline，该问题自然消失 |
+三光子显微镜（3PM）稀疏采样→稠密重建：在统一 forward model `Y = M⊙(H*X + n)` 下，
+**acquisition regime 一级分类 = Y / YZ / XYZ / XYT**（2D/2.5D/3D 降为网络上下文描述），
+核心创新押注：
+1. **Fixed-budget Y/Z allocation**——同样采样预算下 Y 与 Z 如何分配最有效；
+2. **Sampling-conditioned physics prior**——先填洞后 Wiener 退卷积（FillFirst-Wiener）等物理先验家族 + 门控融合；
+3. **Unified 框架**（shared spatial backbone + axis adapter）。
 
-C1–C5 全部独立核实为真，构成 P0 修复项的事实基础。
+PSRAS 缩写语义 v4 起待终定（Residual 分支已在 v3 期证伪淘汰，见 Historical_Plan 归档）。
 
----
+**一句话项目规则**：先预注册再跑；结论必须附数据支撑；推翻旧结论不删除旧记录，追加 `supersedes`；
+legacy（threePM 旧分支）结果只引用不作证据；实验记录统一"全称+缩写"双写法说明每个 arm 配置。
 
-## 2. 对 GPT 方案的经验修正与补充
+## 1. 已冻结的协议约定（Phase 0 产物，DEC-025）
 
-GPT 的总体方向（物理一致 forward model → anisotropic 3D Wiener → sampling-aware prior → residual 重建 → 统一 3D 网络）正确，以下是需要修正/收紧的点：
+| 项 | 约定 |
+|---|---|
+| Split v2 | train={A1,B1,C2,D2}，val=F0[0:750]，test=F0[750:1500]（内容独立、选择接触声明）；F1/F2/F3 为 F0 同内容噪声变体（corr .71/.36/.18）→ noise_stress，不作独立栈；calibration 只用训练栈 |
+| 指标（v4 口径） | SSIM 用标准 2D 可分离高斯窗（训练损失与评估共用）；e_measured/e_missing 由显式 mask M 计算；val/test 双口径；多种子 mean±std |
+| 采样 | make_mask_yz2(ky,kz)：行稀疏 ⊗ 平面稀疏，K=ky、K2=kz、T=2·kz−1；z 主线"Wiener"= 侧向 2D Wiener + 轴向插值（命名勘误 DEC-025） |
+| 归一化/PSF | 固定标定常数（训练集统计），无 GT 依赖；PSF σxy=1.0 px / σz=1.5 px；noiseless 主线 |
+| Protocol A | 未落地（真实采集 pollen 线），Phase 6 前不做主张 |
+| Arm 命名 | 全称+缩写双写法：b1=Direct、b2=Bilinear-prior、b4i=IterDC-prior fusion、b4f=FillFirst-Wiener fusion（公式与 λ 见 EXP-024 预注册配置表） |
 
-### M1. Wiener 与 "无 PSF 的纯 masking" 不匹配 —— 必须先定死 forward model
-GPT 的 Protocol B 写作 `Y = M ⊙ (H*X + n)`（含 PSF），但 CIDC25 历史 sparse 只是纯遮蔽（无 blur）。
-**纯遮蔽下做 Wiener 反卷积在物理上是错配的**——缺失像素不是光学模糊造成的。
-决定：
-- **新协议的 acquisition simulation 必须包含 PSF（H）与噪声（n）**，即统一使用 `Y = M ⊙ (H*X + n)`。这既更接近 3PM 真实成像，也让 Wiener 有明确物理角色。
-- 同时保留一条 **no-PSF 消融线**（`H = δ`，即纯 inpainting），作为 ablation 而非主线。
-- 若 `H = δ`，warm-start 退化为 zero-fill + 插值，此时不得声称 "deconvolution"。
+## 2. 分阶段计划与当前状态（v4 阶段编号）
 
-### M2. Z-sparse 下 3D Wiener 的作用要讲清楚
-轴向缺失切片是纯 inpainting 问题，OTF 沿 z 的反卷积**不解决**缺层；
-3D anisotropic Wiener 的收益主要体现在 **XY / XYZ sparse**（横向去模糊 + 利用轴向邻域）。
-- Z 模式的 warm-start：对 measured slices 做横向 Wiener，缺失切片用轴向插值（在 Wiener 之后插值，而非之前）。
-- 论文叙事中不要声称 "3D Wiener 解决 Z sparse"，而是 "anisotropic inversion for lateral degradation + interpolation for axial gaps"。
+> 注：2026-09-22~24 的日志中 EXP-023/024 曾按旧叫法称 "Phase 2 先导/Phase 2 YZ 主线"，
+> 按 v4 方案编号对应关系为：EXP-023=Phase 2，EXP-024=Phase 3。
 
-### M3. Data Consistency loss 的适用范围
-`L_DC = ‖M ⊙ (H*X̂ − Y)‖` 在**含 PSF 的 forward model**下才有意义（去模糊后重新解释观测）。
-纯 masking 且 `H = δ` 时，measured 像素上的 DC 退化为恒等约束，几乎无信息。
-→ DC loss 只在含 PSF / Protocol A 数据上启用；λ_DC 从 {0, 0.01, 0.05, 0.1} 消融。
+### Phase 0 — Protocol Cleanup ✅ 2026-09-22 关闭（DEC-025）
+- [x] stack-level split 修正（split v2 诚实语义）
+- [x] reval 显式 mask + --split 分文件
+- [x] SSIM 标准 2D 高斯窗
+- [x] 归一化 / PSF / 种子冻结
+- [x] Protocol A/B 语义文档化；legacy 定量结果全部归档
+- Gate：无未解决 P0 协议 bug ✅（7/7 断言核验修复；修正指标下主结论存活核验通过）
 
-### M4. normalization 的具体方案（比 GPT 更可执行）
-固定标定常数，而不是逐样本统计：
-- uint16 物理量程 → `float32 [0,1]`（除以 65535）；
-- 若各 stack 增益差异大，用 **训练集全局标定常数**（如训练集 99.9 分位数），存入 metadata，train/val/test/inference 共用同一常数；
-- 任何阶段禁止读取当前样本 GT 的 min/max。
+### Phase 1 — Corrected Y baseline ✅ 2026-09-23 关闭（EXP-022）
+- [x] Y K∈{2,4,8,16}，Direct / Bilinear / 冻结λ Wiener，3 种子 × 双口径 = 36 run
+- Gate：区分 "Wiener vs Bilinear" 与 "Wiener prior vs Direct Network" ✅
+  - Question B（Bilinear-prior vs Direct）：全 K 3/3 同号正（K2 +1.5 → K16 +0.16）
+  - Question C（冻结 λ=3e-6 Wiener）：全 K 3/3 同号**负**——先验自身 Gibbs 崩坏（−23~−11 dB），网络鲁棒（b3≈b1/b2）
+  - 指示：主线先验必须 noise-adaptive / 迭代反演，不复用冻结 λ
 
-### M5. residual 学习的适用性判断
-z-K2 场景 X0 已达 ~51 dB（legacy 证据），residual 信号极小，网络可能学成恒等——这是**预期行为**而非失败；
-XY/K8 等重度退化下 residual 项才是主要贡献。按 sampling severity 分层报告 residual 幅度 ‖ΔX‖/‖X0‖，本身就是一个分析维度。
+### Phase 2 — Genuine YZ physics prior ✅ 2026-09-23 关闭（EXP-023）
+- [x] 先验配方独立评估（无网络，Question A 口径）：P0 bilinear / P1 冻结λ / P2 fill-first / P3 密度自适应λ / P4 迭代 DC 反演，6 (ky,kz) 组合 × 1008 行扫描
+- Gate：prior 本身经独立验证，不由下游网络定义 ✅
+  - P4（IterDC）5/6 组合最优；P2（FillFirst-Wiener）在 kz≥4/ky=2 大幅领先；P1 崩坏证实、P3 证伪
+  - fixed-budget B=16 先验侧预演：(2,8) 最优（"预算省在 z"）
 
-### M6. 统一 3D 网络采用轴向分离注意力（GPT 方案 A），分阶段引入
-- Phase 1–2 先用**修复后的 2D Swin-UNet** 打通 protocol（它是 B0–B6 消融的载体）；
-- Phase 3 再实现 unified axial-3D net（spatial window attention + axial/z attention，T∈{1,3,5,9,16}，query mask Q 控制输出目标）；
-- T=1 时 axial attention 自然退化为无操作，不需要特判。
-- 保留 spatial-only downsampling（不对 z 做 /2），包装为 anisotropy-aware 设计。
+### Phase 3 — YZ Mainline ✅ 2026-09-24 关闭（EXP-024）
+- [x] KY×KZ 全矩阵（(2,2)/(2,4)/(2,8)/(4,2)/(4,4)/(8,2)）× 4 arm，40 run 双口径 reval
+- [x] asymmetric sparsity + fixed-budget allocation（B=16 三元组 3 种子）
+- [x] acquisition-efficiency 分析（4 arm 排序一致性）
+- Gate：回答"Y/Z 稀疏如何分配最有效" ✅
+  - Question B(yz)：先验+融合对 Direct 全 6 组合 +0.5~+3.4 dB，三元组 3/3 同号
+  - 分配律：**(2,8) > (4,4) 3/3 种子（+2.0~+4.2 dB）、(8,2) 垫底（单种子）——"预算应省在 z"（行密采+轴疏采）成立**
+  - 最优先验配方：**FillFirst-Wiener (b4f)** ≥ IterDC (b4i) 全 6 组合（先验好 ≠ 网络好：融合偏好"有结构偏差但可学习"的先验）
+  - Question C(yz)：IterDC vs Bilinear 增益不均匀（部分否证，如实报告）
 
-### M7. stack-level split 提前到 Phase 1
-GPT 放在 P1，但这直接决定所有数字的可信度且改造成本低，**提前**：
-CIDC25 按 stack 划分 train/val/test，禁止同一 stack 的 patch 跨集合。
+### Phase 4 — Unified Framework ⬜（下一步，待预注册）
+- [ ] shared spatial encoder（2D 主干，v3 期已证 axial 3D 网络三变体不过线，DEC-019）
+- [ ] sampling-conditioned fusion（b4f 先验为默认输入：填洞→侧向 Wiener→轴向插值 + C_s/U_p 门控）
+- [ ] Z adapter（axial 交互的轻量位置）
+- [ ] specialist vs unified 对比（matched parameter / training budget）
+- [ ] 主验证采样点：(2,8)（预算最优）对照 (4,4)
+- Gate：unified 不显著牺牲 specialist 性能
+- 参考：T∈{1,3,5,9,16} query mask Q 机制（v3 期 T 缩放曲线 EXP-017：平台→陡升→饱和，临界上下文~3 帧）
 
-### M8. 评估
-- 采纳 measured/missing split（`E_measured`、`E_missing`）为核心新增指标，成本极低且直击方法故事；
-- paired 统计按 sample_id merge 后再 Wilcoxon；
-- 删除 FwPSNR；MS-SSIM 换用验证过的标准实现；
-- foreground 定义改用 GT 形态学阈值（Otsu on GT, train 集固定参数），不用逐样本 75 分位。
+### Phase 5 — XYZ / XYT Extension ⬜
+- [ ] XYZ：full spatial undersampling 鲁棒性
+- [ ] XYT：temporal generalization + temporal metrics（数据依赖待确认，DEC-025 修正项）
+- [ ] noise_stress（F1/F2/F3 配对干净 GT）——需预注册
 
----
+### Phase 6 — Protocol A / Real Acquisition ⬜
+- [ ] hardware-realistic sparse acquisition（pollen 等）
+- [ ] measured acquisition time / exposure / dose proxy
+- [ ] quality–speed trade-off 曲线
+- Final gate：算法指标 + 实际 acquisition efficiency 完整闭环
 
-## 3. PSRAS 目录结构（目标态）
+### 计划内稳健性补充（并入 Phase 4/5 执行，v4 方案 §11-13）
+- [ ] noise / photon budget（CIDC25 自带噪声 + F1-F3 noise_stress）
+- [ ] Wiener λ 敏感性（v4 先验为 fill-first 家族，λ 语义不同于 v3 冻结λ）
+- [ ] no-PSF 消融线沿用（v3 EXP-021 结论：Wiener 增益主体来自 PSF 退卷积物理）
+- [ ] PSF mismatch（σ 标定误差）
 
-```
-PSRAS/
-├── PLAN.md                    # 本文件
-├── PROJECT_LOG.md             # 项目思路 + 每次实验改动的原理与结论（持续追加）
-├── physics/
-│   ├── psf.py                 # anisotropic 3D Gaussian PSF（物理单位 σ_xy_um / σ_z_um）
-│   ├── wiener.py              # build_gaussian_psf_3d / build_otf_3d / wiener_deconv_3d
-│   ├── sampling.py            # XY/Z/XYZ mask 生成（Protocol A/B 统一）
-│   └── acquisition.py         # simulate_acquisition: H, S, n, resampling 统一算子
-├── data/
-│   ├── observation.py         # build_observation -> (Y_grid, M, X0, C_s, U_p, metadata)
-│   ├── cidc25.py              # stack-level split datasets
-│   └── transforms.py          # dihedral 等（无 GT 统计依赖）
-├── models/
-│   ├── attention.py           # 带正确 shift mask 的 window attention（2D/3D 共用）
-│   ├── swin_unet_2d.py        # 修复版 2D Swin-UNet（Phase 1/2 载体）
-│   ├── unified_3d.py          # axial-3D 统一网络（Phase 3）
-│   └── prior_fusion.py        # sampling-aware prior encoding + gated fusion
-├── losses/
-│   ├── reconstruction.py      # L1 + MS-SSIM
-│   └── data_consistency.py    # masked measurement-domain DC（含 PSF 时启用）
-├── metrics/
-│   ├── image_metrics.py       # PSNR/SSIM/MS-SSIM/MAE
-│   ├── structure_metrics.py   # measured/missing split, FG metrics, profile corr
-│   └── statistics.py          # 按 sample_id 配对 Wilcoxon / bootstrap CI
-├── scripts/
-│   ├── prepare_sparse_v3.py   # 只保存 GT / raw Y / M / metadata
-│   ├── train.py
-│   ├── evaluate_v3.py
-│   └── sanity_checks.py       # 单元/合成 sanity test 入口
-├── tests/
-│   ├── test_wiener.py
-│   ├── test_acquisition.py
-│   └── test_normalization.py
-└── runs_v3/                   # 所有新实验输出（含完整 config + seed）
-```
+## 3. 交付物与论文图（v4 方案 §18-19）
 
----
+主图规划：Fig1 总概念 / Fig2 physics prior / Fig3 Y-sparse / Fig4 YZ-sparse /
+**Fig5 fixed-budget sampling allocation（核心创新）** / Fig6 unified model / Fig7 XYT 扩展 / Fig8 真实采集效率。
+已有素材：EXP-022/024 全部 run 的 config + 双口径指标 json（runs_v3/）；
+v3 期可视化协议（DEC-020/021，visualize_v3.py）可复用于 v4 结果制图。
 
-## 4. 分阶段执行计划
+## 4. 风险与注意（沿用 v3 §6，v4 修订）
 
-### Phase 0 — 冻结与基建（0.5 天）
-- [ ] threePM 旧结果不删除、不改动；在 PROJECT_LOG.md 记录 legacy 结论清单
-- [ ] 搭建 `PSRAS/` 骨架；`tests/` 就位
-- [ ] 固定随机种子与 config 保存规范（每次 run 落盘完整 yaml/json config）
-
-### Phase 1 — 科学正确性修复（P0，2–4 天，不含大模型改动）✅ 2026-09-09 完成
-- [x] `physics/acquisition.py`：统一 `Y = M⊙(H*X+n)`，严格分离 ①光学退化 ②采样 ③噪声 ④几何重采样 ⑤warm-start
-- [x] `scripts/prepare_sparse_v3.py`：训练集标定 + 归一化转换 + stack-level split；
-      sparse 观测改为 dataset runtime 生成（DEC-007，supersedes 原离线保存方案）
-- [x] 去除一切 GT 依赖 normalization（M4 方案，IntensityCalibration）
-- [x] `physics/wiener.py`：真 3D anisotropic Wiener（解析 Gaussian OTF，物理单位 σ）；
-      z 模式 warm-start 按 DEC-003（先反卷积 measured 切片、再轴向插值）
-- [x] `losses/data_consistency.py`：masked measurement-domain DC（M3 适用范围，identity 算子拒绝使用）
-- [x] 删除 DINOv2 loss（新代码中不再实现）
-- [x] `models/attention.py`：补齐 shifted-window attention mask（2D/3D 共用实现 + 相对位置偏置）
-- [x] **单元测试**：26 用例全部通过（acquisition 恒等性 / mask 几何与确定性 / Wiener 频域恢复 /
-      z warm-start 精确插值 / SW-MSA 跨区域阻断 / DC measured-域一致性 / 标定无泄漏 /
-      C_s-U_p 语义与单调性）
-- [x] **stack-level split** 落地（train={A1,B1,C2,D2}，val=F0[0:750)，test=F0[750:1500)）
-- [x] 数据就绪：`runs_v3/data/cidc25_v3/`（标定裁剪审计：train/val 均 ~0.03–0.04%，可忽略）
-
-### Phase 2 — 新 baseline 与消融矩阵（核心实验）
-在修复后的 2D Swin-UNet（XY）/ 2.5D（Z）上重建证据链：
-
-```
-B0  raw sparse → network（无 mask）
-B1  + sampling mask M
-B2  + bilinear warm-start X0
-B3  + true 3D Wiener X0（替换 bilinear）
-B4  + sampling-aware prior fusion（C_s + U_p，gated）
-B5  + residual 学习 X̂ = X0 + ΔX
-B6  + data consistency loss（仅含 PSF 线）
-```
-
-- 采样：K ∈ {2,4,8}，方向 ∈ {XY, Z, XYZ}（主表只取 2D-XY / 2.5D-Z / 3D-XYZ 三条代表线，其余进附录）
-- 指标：PSNR / SSIM / MS-SSIM / MAE / E_measured / E_missing / FG-PSNR
-- 每个 B 步骤单独成 run，全部带完整 config
-- **判定标准（预注册）**：B3>B2 且 B5>B3 且 B4>B1 才能写进论文主张；否则回退修改方法而不是改叙事
-
-### Phase 3 — 统一 3D 网络
-- [ ] `models/unified_3d.py`：spatial window attention + axial attention，T ∈ {1,3,5,9,16}，query mask Q
-- [ ] 验证同一权重/架构下 Q=[1] / [0,1,0] / 全 1 三种 regime
-- [ ] "PSNR vs axial context T" 曲线（context scaling 分析，GPT §27）
-
-### Phase 4 — 稳健性实验
-- [ ] sampling severity 曲线：PSNR vs r ∈ {50%, 25%, 12.5%, 6.25%}
-- [ ] photon budget：λ_photon ∈ {5,10,20,50} + read noise 扫描
-- [ ] Wiener λ 敏感性
-- [ ] no-PSF（纯 inpainting）消融线（M1）
-
-### Phase 5 — 泛化
-- [ ] Same-domain：CIDC25 → CIDC25 val（主结论）
-- [ ] Zero-shot：CIDC25 → MDC25
-- [ ] External acquisition transfer：CIDC25 → pollen（标注 acquisition-protocol difference）
-
----
-
-## 5. Benchmark 与数据协议（Protocol v3 定义）
-
-### 统一 forward model
-```
-Protocol A（真实采集，pollen 等）:
-  X → H*X → S_K 采样 + 噪声 → Y_low → 几何重采样 R → Y_grid   （M 用 support 映射，非 bilinear）
-
-Protocol B（dense-grid 模拟，CIDC25/MDC25）:
-  Y = M ⊙ (H*X + n)     （含 PSF；no-PSF 作为消融线）
-
-两者统一网络输入: (Y_grid, M, X0, C_s, U_p)
-```
-
-### 概念命名（严格区分，写入所有代码与文档）
-| 符号 | 名称 | 含义 |
-|---|---|---|
-| M | measurement support / sampling mask | 该位置是否有真实测量（**不是** uncertainty） |
-| C_s | sampling confidence | G_σ * M，距真实采样点的远近 |
-| U_p | physics uncertainty | 由 OTF 衰减 / Wiener 放大导出，K/(|H|²+K) |
-| X0 | physics warm-start | W(Y; H, M)，Wiener 或插值 |
-| Q | query/target mask | 2D=[1]，2.5D=[0,1,0]，3D=全 1 |
-
-### Loss
-```
-L = L1 + 0.5·L_MS-SSIM + λ_DC·L_DC        （λ_DC ∈ {0, 0.01, 0.05, 0.1} 消融，仅含 PSF 线）
-```
-
----
-
-## 6. 风险与注意
-
-1. **不要在 Phase 1 完成前跑任何"正式"实验**——protocol 未冻结前产出的数字都会成为新的 legacy。
-2. 3D Wiener 内存开销：OTF 为实可分离 Gaussian 时用 FFT 逐 batch 做；体积大时先在 patch 上验证。
-3. B5（residual）在 K=2-Z 下 ΔX 很小是预期，勿据此否定 residual 设计（见 M5）。
-4. 与 legacy 结果**不做任何同表对比**（数据协议不同，数值不可比）；对比只在 PSRAS 内部进行。
-5. 每次实验改动必须在 PROJECT_LOG.md 追加一条记录（原理 → 改动 → 结论），保持证据树可追溯。
-
----
-
-## 7. 执行优先级（供 codex / 后续会话使用）
-
-```
-[P0] 01 acquisition 统一算子        02 prepare_sparse_v3        03 去 GT normalization
-     04 anisotropic 3D Wiener       05 masked DC loss           06 删 DINO（不带入新代码）
-     07 shift attention mask        08 stack-level split        09 sanity/单元测试
-[P1] 10 B0–B6 消融矩阵              11 sampling confidence C_s  12 physics uncertainty U_p
-     13 prior fusion 升级           14 residual 学习            15 统一 3D 网络 + Q mask
-[P2] 16 K/噪声/λ 扫描               17 MDC25 zero-shot          18 pollen transfer
-     19 论文图表
-```
+1. 每次实验先预注册（EXP 条目）再启动；判据写在预注册里，收口时如实报告（含否证）。
+2. 3D Wiener 内存：解析可分离 OTF + FFT 逐 batch，未成瓶颈。
+3. 与 legacy 结果不做同表对比；PSRAS 内部对比只用 v4 口径。
+4. 每次改动在 PROJECT_LOG.md 追加记录（原理→改动→结论）。
+5. 单种子结果如实标注（如 (8,2) 主矩阵仅 seed0）；主张级结论须 3/3 种子同号。
