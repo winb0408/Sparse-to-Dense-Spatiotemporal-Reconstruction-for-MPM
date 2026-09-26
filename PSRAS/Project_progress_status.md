@@ -11,9 +11,11 @@
 
 ## 0. 当前一句话状态
 
-**Phase 0–3 全部关闭（Protocol Cleanup → Y baseline → YZ physics prior → YZ Mainline），
-核心科学问题"Y/Z 稀疏如何分配最有效"已回答：预算省在 z（(2,8) 最优，3/3 种子），
-最优先验配方为 FillFirst-Wiener (b4f)。下一步 = Phase 4 Unified Framework（待预注册）。**
+**Phase 0–4 全部关闭（Protocol Cleanup → Y baseline → YZ physics prior → YZ Mainline → Unified Framework）。
+核心科学问题"Y/Z 稀疏如何分配最有效"已回答：预算省在 z（(2,8) 最优，3/3 种子），最优先验配方为 FillFirst-Wiener (b4f)。
+Phase 4 收口（EXP-025）：统一架构定型 **UnifiedV4-noAZ**（A_Z 无稳健增量，轴向耦合由物理先验通道承载）；
+unified 跨 regime 代价 ≤0.74 dB vs specialist 迁移代价 1.4~2.6 dB（Y 套件 gate 临界未达，诚实披露）。
+下一步 = Phase 5 XYZ/XYT Extension + noise_stress（待预注册）。**
 
 ## 1. v4 阶段验收表
 
@@ -23,7 +25,7 @@
 | P1 | Corrected Y baseline（EXP-022，36 run） | ✅ 2026-09-23 | EXP-022 结果1-4 | Bilinear>Direct 全 K 3/3 同号；冻结λ Wiener 先验崩坏（负增益）但网络鲁棒 ✅ |
 | P2 | Genuine YZ physics prior（EXP-023，1008 行先验扫描） | ✅ 2026-09-23 | EXP-023 结果1 | P4 IterDC 5/6 最优、P2 FillFirst-Wiener kz 大时领先；P1/P3 淘汰；先验侧 (2,8) 最优 ✅ |
 | P3 | YZ Mainline（EXP-024，40 run 双口径） | ✅ 2026-09-24 | EXP-024 结果1-4 | **(2,8)>(4,4) 3/3 种子 (+2.0~+4.2 dB)、(8,2) 垫底——"预算省在 z"成立**；b4f ≥ b4i 全 6 组合；先验+融合 vs Direct 全组合 +0.5~+3.4 dB ✅ |
-| P4 | Unified Framework（shared encoder + fusion + Z adapter + specialist 对比） | 🔵 进行中 | EXP-025 预注册（2026-09-24） | 15 run 三链（GPU2 与他人进程共享已重排）；判读：U vs specialist gate + A_Z 增量 3/3 seed |
+| P4 | Unified Framework（shared encoder + fusion + Z adapter + specialist 对比） | ✅ 收口（部分达标） | EXP-025（2026-09-26） | 15/15 run；YZ 套件 gate 达标、Y 套件临界未达（−0.54~−0.74）；A_Z 无稳健增量→UnifiedV4-noAZ 定型；跨 regime 代价 1.4~2.6→≤0.74 dB |
 | P5 | XYZ / XYT Extension + noise_stress | ⬜ | — | XYT 数据依赖待确认 |
 | P6 | Protocol A / Real Acquisition | ⬜ | — | 未落地，不做主张 |
 
@@ -55,11 +57,11 @@
 
 ## 4. 下一步（待用户批准后预注册）
 
-1. 🔵 **Phase 4 Unified Framework 已启动（EXP-025，2026-09-24）**：UnifiedV4 架构（逐 slice 共享 stem/UNet + 零初始化 A_Z 深度可分离轴向适配器 + 梯度检查点）；5 arm × 3 seed = 15 run（Specialist-Y / Specialist-YZ / Unified / 两个 noAZ 消融），9 评估点双口径；预计 ~30h。
+1. ✅ **Phase 4 Unified Framework 已收口（EXP-025，2026-09-26）**：15/15 run + 270 个 reval json。判读：① Unified gate Y 套件临界未达（U−SY 三种子 −0.54/−0.62/−0.74，均超 −0.5 线；Y 套件 yK2 最易点稀释 −1.2~−1.6 dB 为主因）、YZ 套件达标（−0.38/+0.09/+0.23）；② A_Z 无稳健增量（两系列 5/6 种子为负，U_noAZ 为 YZ 套件最佳 arm）→ 回退叙事成立：轴向耦合由物理先验通道承载即可，最终架构 **UnifiedV4-noAZ**；③ specialist 跨 regime 迁移代价 1.4~2.6 dB，unified 压缩至 ≤0.74 dB（核心卖点成立）。详见 PROJECT_LOG.md EXP-025（结果1-5）。
 2. 候选并行：Phase 5 noise_stress（F1/F2/F3 配对 GT）、稳健性扫描（λ 敏感性 / PSF mismatch）。
 3. 远期：Phase 5 XYZ/XYT、Phase 6 Protocol A（pollen 真实采集）。
 
 ## 5. 资源状态
 
-- GPU1/2/3 空闲（EXP-024 三链 2026-09-24 05:01 全部 DONE）；GPU0 他人进程不碰。
-- runs_v3/：EXP-022 36 run + EXP-023 先验扫描 + EXP-024 40 run，全部含完整 config 与双口径指标。
+- GPU1 他人进程（EikonalViT，~13GB）；GPU2/3 空闲（EXP-025 全部链 2026-09-26 11:59 DONE）；GPU0 他人进程不碰。根分区 / 接近满（~900MB 空闲，/tmp 31GB 垃圾），建议清理；本项目长链已统一 TMPDIR=/data2/wjb/tmp。
+- runs_v3/：EXP-022 36 run + EXP-023 先验扫描 + EXP-024 40 run + EXP-025 15 run（UNIV4_*），全部含完整 config 与双口径指标。

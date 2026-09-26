@@ -1,0 +1,19 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:745: UserWarning: torch.utils.checkpoint: the use_reentrant parameter should be passed explicitly. In version 2.5 we will raise an exception if use_reentrant is not passed. use_reentrant=False is recommended, but if you need to preserve the current default behavior, you can pass use_reentrant=True. Refer to docs for more details on the differences between the two variants.
+  return fn(*args, **kwargs)
+[UNIV4_SYZ_s1] step 500: loss=0.1596 val PSNR=32.96 SSIM=0.9024
+[UNIV4_SYZ_s1] step 1000: loss=0.2757 val PSNR=33.60 SSIM=0.9094
+[UNIV4_SYZ_s1] step 1500: loss=0.2107 val PSNR=34.42 SSIM=0.9175
+[UNIV4_SYZ_s1] step 2000: loss=0.1957 val PSNR=35.07 SSIM=0.9268
+[UNIV4_SYZ_s1] step 2500: loss=0.1757 val PSNR=35.28 SSIM=0.9245
+[UNIV4_SYZ_s1] step 3000: loss=0.2084 val PSNR=32.76 SSIM=0.9097
+[UNIV4_SYZ_s1] step 3500: loss=0.1989 val PSNR=34.69 SSIM=0.9172
+[UNIV4_SYZ_s1] step 4000: loss=0.1569 val PSNR=34.37 SSIM=0.9145
+[UNIV4_SYZ_s1] step 4500: loss=0.2544 val PSNR=34.99 SSIM=0.9205
+[UNIV4_SYZ_s1] step 5000: loss=0.2031 val PSNR=34.06 SSIM=0.9153
+[UNIV4_SYZ_s1] step 5500: loss=0.1849 val PSNR=34.10 SSIM=0.9106
+[UNIV4_SYZ_s1] step 6000: loss=0.2045 val PSNR=34.48 SSIM=0.9122
+[UNIV4_SYZ_s1] step 6500: loss=0.1713 val PSNR=34.79 SSIM=0.9158
+[UNIV4_SYZ_s1] step 7000: loss=0.2349 val PSNR=34.59 SSIM=0.9130
+[UNIV4_SYZ_s1] step 7500: loss=0.1387 val PSNR=34.48 SSIM=0.9120
+[UNIV4_SYZ_s1] step 7950: loss=0.2018 val PSNR=34.41 SSIM=0.9112
+[UNIV4_SYZ_s1] done. best val PSNR=35.28, final={'per_regime': {'yz2_2x2': {'psnr': 37.39779090881348, 'ssim': 0.9581655561923981}, 'yz2_2x4': {'psnr': 36.36741638183594, 'ssim': 0.949611246585846}, 'yz2_2x8': {'psnr': 36.783424377441406, 'ssim': 0.9577034115791321}, 'yz2_4x2': {'psnr': 33.25313949584961, 'ssim': 0.8978999853134155}, 'yz2_4x4': {'psnr': 33.33283805847168, 'ssim': 0.9040631055831909}, 'yz2_8x2': {'psnr': 29.331822395324707, 'ssim': 0.7997605800628662}}, 'psnr': 34.41107193628947, 'ssim': 0.9112006475528082}

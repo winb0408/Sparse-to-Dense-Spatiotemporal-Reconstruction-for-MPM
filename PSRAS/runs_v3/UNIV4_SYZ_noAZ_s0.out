@@ -1,0 +1,19 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:745: UserWarning: torch.utils.checkpoint: the use_reentrant parameter should be passed explicitly. In version 2.5 we will raise an exception if use_reentrant is not passed. use_reentrant=False is recommended, but if you need to preserve the current default behavior, you can pass use_reentrant=True. Refer to docs for more details on the differences between the two variants.
+  return fn(*args, **kwargs)
+[UNIV4_SYZ_noAZ_s0] step 500: loss=0.2108 val PSNR=27.49 SSIM=0.6354
+[UNIV4_SYZ_noAZ_s0] step 1000: loss=0.1982 val PSNR=33.48 SSIM=0.9118
+[UNIV4_SYZ_noAZ_s0] step 1500: loss=0.2803 val PSNR=33.52 SSIM=0.9104
+[UNIV4_SYZ_noAZ_s0] step 2000: loss=0.1920 val PSNR=32.75 SSIM=0.8977
+[UNIV4_SYZ_noAZ_s0] step 2500: loss=0.1921 val PSNR=34.25 SSIM=0.9159
+[UNIV4_SYZ_noAZ_s0] step 3000: loss=0.3036 val PSNR=35.24 SSIM=0.9253
+[UNIV4_SYZ_noAZ_s0] step 3500: loss=0.1640 val PSNR=35.13 SSIM=0.9207
+[UNIV4_SYZ_noAZ_s0] step 4000: loss=0.2626 val PSNR=34.48 SSIM=0.9136
+[UNIV4_SYZ_noAZ_s0] step 4500: loss=0.2017 val PSNR=33.99 SSIM=0.9089
+[UNIV4_SYZ_noAZ_s0] step 5000: loss=0.2074 val PSNR=35.47 SSIM=0.9246
+[UNIV4_SYZ_noAZ_s0] step 5500: loss=0.2385 val PSNR=35.90 SSIM=0.9273
+[UNIV4_SYZ_noAZ_s0] step 6000: loss=0.2489 val PSNR=35.86 SSIM=0.9272
+[UNIV4_SYZ_noAZ_s0] step 6500: loss=0.2519 val PSNR=35.49 SSIM=0.9247
+[UNIV4_SYZ_noAZ_s0] step 7000: loss=0.2482 val PSNR=35.74 SSIM=0.9269
+[UNIV4_SYZ_noAZ_s0] step 7500: loss=0.1768 val PSNR=35.53 SSIM=0.9251
+[UNIV4_SYZ_noAZ_s0] step 7950: loss=0.1856 val PSNR=35.56 SSIM=0.9253
+[UNIV4_SYZ_noAZ_s0] done. best val PSNR=35.90, final={'per_regime': {'yz2_2x2': {'psnr': 39.0396614074707, 'ssim': 0.9701278805732727}, 'yz2_2x4': {'psnr': 37.99284744262695, 'ssim': 0.9633645713329315}, 'yz2_2x8': {'psnr': 38.66949653625488, 'ssim': 0.9702038764953613}, 'yz2_4x2': {'psnr': 33.90939712524414, 'ssim': 0.9116190373897552}, 'yz2_4x4': {'psnr': 33.848209381103516, 'ssim': 0.912841409444809}, 'yz2_8x2': {'psnr': 29.878128051757812, 'ssim': 0.8234246075153351}}, 'psnr': 35.556289990743004, 'ssim': 0.9252635637919108}

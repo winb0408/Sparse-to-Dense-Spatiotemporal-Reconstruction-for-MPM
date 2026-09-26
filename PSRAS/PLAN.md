@@ -70,14 +70,13 @@ legacy（threePM 旧分支）结果只引用不作证据；实验记录统一"�
   - 最优先验配方：**FillFirst-Wiener (b4f)** ≥ IterDC (b4i) 全 6 组合（先验好 ≠ 网络好：融合偏好"有结构偏差但可学习"的先验）
   - Question C(yz)：IterDC vs Bilinear 增益不均匀（部分否证，如实报告）
 
-### Phase 4 — Unified Framework ⬜（下一步，待预注册）
-- [ ] shared spatial encoder（2D 主干，v3 期已证 axial 3D 网络三变体不过线，DEC-019）
-- [ ] sampling-conditioned fusion（b4f 先验为默认输入：填洞→侧向 Wiener→轴向插值 + C_s/U_p 门控）
-- [ ] Z adapter（axial 交互的轻量位置）
-- [ ] specialist vs unified 对比（matched parameter / training budget）
-- [ ] 主验证采样点：(2,8)（预算最优）对照 (4,4)
-- Gate：unified 不显著牺牲 specialist 性能
-- 参考：T∈{1,3,5,9,16} query mask Q 机制（v3 期 T 缩放曲线 EXP-017：平台→陡升→饱和，临界上下文~3 帧）
+### Phase 4 — Unified Framework ✅（EXP-025，2026-09-26 收口）
+- [x] shared spatial encoder（2D 主干，v3 期已证 axial 3D 网络三变体不过线，DEC-019）
+- [x] sampling-conditioned fusion（b4f 先验默认输入；UnifiedV4 逐 slice 共享融合 stem，gate 零初始化）
+- [x] Z adapter（A_Z 零初始化轴向适配器）：**消融无稳健增量**（两系列 5/6 种子为负）→ 采纳回退：轴向耦合由物理先验通道承载，最终架构 UnifiedV4-noAZ
+- [x] specialist vs unified 对比（EXP-025，5 arm × 3 seed，matched budget）
+- [x] 主验证采样点：全 9 点双口径（y-K{2,4,8} + yz2-6 组合）
+- Gate：**部分通过**——YZ 套件达标（−0.38/+0.09/+0.23）；Y 套件临界未达（−0.54/−0.62/−0.74，超线 0.04~0.24 dB，归因混合稀释，yK2 最易点 −1.2~−1.6 dB 为主因）；specialist 跨 regime 迁移代价 1.4~2.6 dB vs unified ≤0.74 dB（核心卖点成立）
 
 ### Phase 5 — XYZ / XYT Extension ⬜
 - [ ] XYZ：full spatial undersampling 鲁棒性
