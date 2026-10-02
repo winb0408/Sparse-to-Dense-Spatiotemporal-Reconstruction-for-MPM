@@ -38,7 +38,7 @@ def main() -> None:
     # EXP-025: evaluate a (mixed-regime) run at a specific acquisition point
     # that may differ from the training config (unified/specialist runs are
     # scored on the full Y + YZ suite).  Overrides the protocol below.
-    p.add_argument("--eval_mode", choices=["y", "yz2"], default=None)
+    p.add_argument("--eval_mode", choices=["y", "yz2", "xyz2"], default=None)
     p.add_argument("--eval_K", type=int, default=0)
     p.add_argument("--eval_kz", type=int, default=0)
     args = p.parse_args()
@@ -55,7 +55,7 @@ def main() -> None:
     eval_tag = ""
     if args.eval_mode is not None:
         # EXP-025 point override: rebuild the protocol for one acquisition
-        # point (y: regime 2d, T=1 / yz2: regime 2.5d, T=2*kz-1).
+        # point (y: regime 2d, T=1 / yz2 & xyz2: regime 2.5d, T=2*kz-1).
         from scripts.train import point_params
         from physics.psf import PSFConfig as _P
         ev_regime, ev_K, ev_kz, ev_t = point_params(
@@ -66,7 +66,7 @@ def main() -> None:
                  voxel_xy_um=1.0, voxel_z_um=1.0)
         regime, mode, K, k2, t = ev_regime, args.eval_mode, ev_K, ev_kz, ev_t
         t_override = None
-        eval_tag = f"_{mode}_K{K}x{k2}" if mode == "yz2" else f"_{mode}_K{K}"
+        eval_tag = f"_{mode}_K{K}x{k2}" if mode in ("yz2", "xyz2") else f"_{mode}_K{K}"
     else:
         regime, mode, K, t_override = cfg["regime"], cfg["mode"], cfg["K"], cfg["t"]
     val_ds = make_val_dataset(args.data_dir, args.split, regime,

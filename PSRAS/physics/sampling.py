@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import torch
 
-__all__ = ["make_mask", "make_mask_yz2"]
+__all__ = ["make_mask", "make_mask_yz2", "make_mask_xyz2"]
 
 
 def _xy_mask_2d(H: int, W: int, K: int, pattern: str,
@@ -102,3 +102,28 @@ def make_mask_yz2(ky: int, kz: int, T: int, H: int, W: int,
     rows = ((torch.arange(H) + phase_y) % ky == 0).view(1, H, 1)
     planes = ((torch.arange(T) + phase_t) % kz == 0).view(T, 1, 1)
     return (rows & planes).expand(T, H, W)
+
+
+def make_mask_xyz2(klat: int, kz: int, T: int, H: int, W: int,
+                   seed: int = 0, phase_t: int = 0, phase_y: int = 0,
+                   phase_x: int = 0) -> torch.Tensor:
+    """XYZ mask with INDEPENDENT lateral and axial sparsity (EXP-026, Phase 5).
+
+    Planes: every kz-th slice measured.  Within a measured plane the lateral
+    support is the same cross lattice as mode="xy" grid: every klat-th FULL
+    row union every klat-th FULL column.  Per-plane sampling fraction is
+    (2k-1)/k^2, total (2k-1)/(k^2*kz) -- a stress-test regime for extreme
+    spatial undersampling (v4 plan 4.4), NOT equated with hardware speedup.
+    The full rows stay intact so the row-knot lateral interpolation in the
+    warm start (physics/wiener.py) keeps working.
+    Returns [T, H, W] bool, True = measured.
+    """
+    if klat < 1 or kz < 1:
+        raise ValueError(f"klat/kz must be >= 1, got {klat}/{kz}")
+    if klat == 1 and kz == 1:
+        return torch.ones(T, H, W, dtype=torch.bool)
+    rows = ((torch.arange(H) + phase_y) % klat == 0).view(1, H, 1)
+    cols = ((torch.arange(W) + phase_x) % klat == 0).view(1, 1, W)
+    cross = rows | cols                                # [1, H, W] full lines
+    planes = ((torch.arange(T) + phase_t) % kz == 0).view(T, 1, 1)
+    return (cross & planes).expand(T, H, W)

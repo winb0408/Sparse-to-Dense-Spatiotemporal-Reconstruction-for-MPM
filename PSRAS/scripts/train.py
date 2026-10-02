@@ -110,7 +110,8 @@ def make_psf(psf_xy: float, psf_z: float, regime: str) -> PSFConfig:
 
 # --------------------------------------------------------------------------
 # EXP-025 (Phase 4 Unified Framework): mixed-regime training.  A "point" is
-# (mode, severity): ('y', K) for the Y regime (2d), ('yz2', (ky, kz)) for YZ.
+# (mode, severity): ('y', K) for the Y regime (2d), ('yz2', (ky, kz)) for YZ,
+# ('xyz2', (klat, kz)) for XYZ (EXP-026, Phase 5).
 # --------------------------------------------------------------------------
 def parse_regime_mix(spec: str) -> list[tuple[str, object]]:
     points: list[tuple[str, object]] = []
@@ -119,10 +120,10 @@ def parse_regime_mix(spec: str) -> list[tuple[str, object]]:
         if mode == "y":
             for k in sev.split(","):
                 points.append(("y", int(k)))
-        elif mode == "yz2":
+        elif mode in ("yz2", "xyz2"):
             for c in sev.split(","):
-                ky, kz = c.split("x")
-                points.append(("yz2", (int(ky), int(kz))))
+                ka, kb = c.split("x")
+                points.append((mode, (int(ka), int(kb))))
         else:
             raise ValueError(f"regime_mix: unsupported mode {mode!r}")
     if not points:
@@ -134,6 +135,7 @@ def point_params(mode: str, sev, regime_2d: str, regime_25d: str):
     """(regime, K, kz, t) for a mix point."""
     if mode == "y":
         return regime_2d, sev, 0, window_T(regime_2d, "y", sev)
+    # yz2: (ky, kz); xyz2: (klat, kz).  Both are 2.5d with plane spacing kz.
     kz = sev[1]
     t = 1 if kz == 1 else 2 * kz - 1
     return regime_25d, sev[0], kz, t
@@ -311,7 +313,7 @@ def main() -> None:
                 warm_start_kind=args.warm or preset["warm"],
                 lam=args.lam_wiener, features=preset["features"],
                 patch=args.patch, seed=args.seed, noise=noise)
-            tag = f"{m}_{sev[0]}x{sev[1]}" if m == "yz2" else f"{m}_K{sev}"
+            tag = f"{m}_{sev[0]}x{sev[1]}" if m in ("yz2", "xyz2") else f"{m}_K{sev}"
             val_specs.append((tag, DataLoader(vds, batch_size=min(4, args.batch),
                                               num_workers=2), t_pt))
         val_loader, val_t = val_specs[0][1], val_specs[0][2]  # placeholders

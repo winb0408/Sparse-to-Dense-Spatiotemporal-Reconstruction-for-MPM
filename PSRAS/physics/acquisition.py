@@ -61,7 +61,7 @@ class NoiseConfig:
 
 @dataclass(frozen=True)
 class AcquisitionConfig:
-    mode: str = "xy"               # xy | y | z | yz | xyz | yz2
+    mode: str = "xy"               # xy | y | z | yz | xyz | yz2 | xyz2
     K: int = 2
     K2: int = 0                    # yz2: independent sparsity along the 2nd
                                    # axis (ky=K rows, kz=K2 planes); 0 = unused
@@ -133,6 +133,13 @@ def simulate_acquisition(x: torch.Tensor, cfg: AcquisitionConfig) -> Observation
         mask = make_mask_yz2(cfg.K, cfg.K2 or cfg.K, T, H, W,
                              seed=cfg.mask_seed, phase_t=cfg.phase_t,
                              phase_y=cfg.phase_y)
+    elif cfg.mode == "xyz2":
+        # EXP-026 (Phase 5): independent lateral cross spacing (K) and
+        # plane spacing (K2) -- extreme spatial undersampling stress-test.
+        from .sampling import make_mask_xyz2
+        mask = make_mask_xyz2(cfg.K, cfg.K2 or cfg.K, T, H, W,
+                              seed=cfg.mask_seed, phase_t=cfg.phase_t,
+                              phase_y=cfg.phase_y, phase_x=cfg.phase_x)
     else:
         mask = make_mask(cfg.mode, cfg.K, T, H, W, cfg.pattern, cfg.mask_seed,
                          phase_t=cfg.phase_t, phase_y=cfg.phase_y,

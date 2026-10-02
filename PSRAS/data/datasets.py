@@ -73,7 +73,9 @@ class CIDC25SparseDataset(Dataset):
         self.regime = regime
         self.T = window_T(regime, mode, K)
         # yz2 (EXP-024): T follows the PLANE spacing kz (K2), not ky.
-        if mode == "yz2":
+        # xyz2 (EXP-026): same rule -- the axial plane spacing K2 sets T;
+        # the lateral cross spacing K only affects the in-plane mask.
+        if mode in ("yz2", "xyz2"):
             kz = K2 if K2 else K
             self.T = 1 if kz == 1 else 2 * kz - 1
         # EXP-017 context-scaling: explicit window-depth override (must be
@@ -120,7 +122,8 @@ class CIDC25SparseDataset(Dataset):
         seeds = (_derive_seed(self.seed, index, 1000), _derive_seed(self.seed, index, 2000))
         # Stack-frame lattice phase (DEC-012): keeps the sampled pattern
         # aligned with the stack, not re-anchored to each window.
-        if self.acq.mode == "yz2":
+        # yz2/xyz2: the plane lattice follows kz (K2), lateral follows K.
+        if self.acq.mode in ("yz2", "xyz2"):
             kz = self.K2 if self.K2 else self.acq.K
             phases = (t0 % kz, y0 % self.acq.K, x0 % self.acq.K)
         else:
@@ -174,7 +177,7 @@ def make_val_dataset(data_dir: str | Path, split: str, regime: str, n_per_stack:
                                   ds.acq.noise.gaussian_sigma,
                                   _derive_seed(ds.seed, 7777, si, int(t0))),
                 mask_seed=_derive_seed(ds.seed, 8888, si, int(t0)),
-                phase_t=t0 % (ds.K2 if ds.acq.mode == "yz2" and ds.K2 else ds.acq.K),
+                phase_t=t0 % (ds.K2 if ds.acq.mode in ("yz2", "xyz2") and ds.K2 else ds.acq.K),
                 phase_y=y0 % ds.acq.K, phase_x=x0 % ds.acq.K,
             )
             obs = simulate_acquisition(torch.from_numpy(gt), acq)

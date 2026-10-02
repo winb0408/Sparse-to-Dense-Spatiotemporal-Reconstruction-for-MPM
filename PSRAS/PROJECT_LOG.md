@@ -1359,6 +1359,31 @@ val 口径全部读数与 test 同向（详见各 run val_metrics_corrected_*.js
 
 **结果5（Phase 5 建议）**：Phase 4 关闭，主线进入 Phase 5（XYZ 稀疏 / XYT 时序）。建议：① 主架构定为 UnifiedV4-noAZ（gate ②回退分支），Phase 5 扩展 regime 混合集时沿用逐 slice 共享 stem + 物理先验通道设计；② Y 套件稀释问题可在 Phase 5 统一用 regime 加权采样解决（若仍 >0.5 dB 再考虑两阶段）；③ A_Z 不再投入轴向学习式交互（两轮证伪），轴向耦合统一走物理先验通道。④ 附带运维教训：根分区 /tmp 满可致 dataloader ENOSPC 静默挂死，后续所有长链脚本统一 TMPDIR=/data2/wjb/tmp。
 
+### EXP-026（预注册）：Phase 5 XYZ 扩展——extreme spatial undersampling stress-test（用户同意，2026-09-26）
+
+**目的**（v4 方案 §4.4/§9.4）：验证 EXP-025 定型的 UnifiedV4-noAZ 架构（不改）能否把训练混合集从 Y+YZ 扩展到 XYZ（full spatial undersampling），并量化新 regime 进入训练集的必要性（zero-shot 直推差距）。XYZ 定位为 stress-test 扩展而非核心创新；严格区分 sampling compression 与 hardware speedup（X 稀疏是否省采集时间取决于扫描硬件）。XYT 维持延后（CIDC25 无时序，DEC-026 修正4）。Y 套件稀释问题按用户决定暂不处理（保持均匀采样，与 EXP-025 严格可比）。
+
+**Regime 定义（新 mode xyz2，独立稀疏度 (klat, kz)）**：每 kz 个平面测一个；测得平面内 cross 网格（每 klat 行取整行 ∪ 每 klat 列取整列，即 mode="xy" grid 语义）。面内采样率 (2k−1)/k²，总采样率 (2k−1)/(k²·kz)。T = 2kz−1（与 yz2 同规则）。**先验管线兼容性**：cross 网格的整行保持完全测量 → _lateral_interp 行结点机制可用，b4f（fill-first Wiener）管线对 xyz2 自动成立（physics/wiener.py 无改动）；x0 先验 PSNR 在 (4,4) 实测 ~10.0 dB（比 yz2 同点低 ~8 dB，xz 双向大洞插值本质更难——XYZ 任务难度显著更高，预期内）。
+
+**评估点（6 点，与 YZ 套件同网格）**：(klat,kz) ∈ {(2,2),(2,4),(2,8),(4,2),(4,4),(8,2)}，总采样率 0.375/0.1875/0.094/0.219/0.109/0.117。
+
+**Arm（全称+缩写双写法；均 preset=b4f=FillFirst-Wiener prior fusion、model=univ4 --no_az、7950 步、batch 8、base 48、seed 三重复；A_Z 已被 EXP-025 证伪不再设消融臂）**：
+| 缩写 | 全称 | 训练数据 |
+|---|---|---|
+| SXYZ | Specialist-XYZ | xyz2-6 点混合 |
+| U15 | Unified 15-point | y-K{2,4,8} + yz2-6 点 + xyz2-6 点（15 点均匀混合） |
+
+共 2 arm × 3 seed = 6 新 run（命名 UNIV4_SXYZ_s{0,1,2} / UNIV4_U15_s{0,1,2}）。零样本评估复用 EXP-025 checkpoint（U_noAZ/SYZ/SY × 3 seed × 6 点 × 双口径）。评估扩展：reval.py --eval_mode xyz2；混合训练 regime_mix 支持 xyz2: 前缀（冒烟 2026-09-26 通过：mask 采样率断言 (2k−1)/(k²·kz)、行结点完整、warm-start 无 NaN、40 步混合训练 per_regime 分点正确、reval 点覆盖 protocol 字段记录 mode/K/K2）。
+
+**判读规则（预注册）**：
+1. **Extension gate**：U15 − SXYZ 逐 seed 配对（XYZ 套件 6 点均值），≥2/3 seed 差 ≥ −0.5 dB；
+2. **Regression gate**：U15 − U_noAZ(EXP-025) 逐 seed 配对（Y 套件与 YZ 套件分别），≥2/3 seed 回退 ≤ 0.5 dB；
+3. **Zero-shot（描述性）**：EXP-025 U_noAZ 与 SYZ 直推 xyz2 点 vs SXYZ 专训的差距表（初测 U_noAZ_s0 在 (4,4) 12.7 dB，x0 先验 10.0 dB——起点低但相对先验有提升）；
+4. SXYZ 在 YZ 套件 / SYZ 在 XYZ 套件交叉迁移（描述性）；
+5. 若 Extension gate 不达标：归因混合稀释（15 点 vs 6 点专训），候选修复 regime 加权采样（另行实验，不改判据）。
+
+**执行记录（启动，2026-09-26）**：两链启动——GPU2 = SXYZ×3（串行）；GPU3 = U15×3（串行）；均 TMPDIR=/data2/wjb/tmp（根分区 /tmp ENOSPC 教训，EXP-025 事故记录）。预计 ~21h（两卡并行）。零样本 reval 训练期间穿插空闲显存执行。
+
 ### EXP-021（预注册）：M1 no-PSF 消融（用户指示）+ 我方 2D b1 补跑
 
 **动机**（用户指示"再启动 no-PSF 消融（M1）"）：量化"真 3D 各向异性 PSF 先验"本身的贡献。若无 PSF（H=I），Wiener 退卷积退化为平凡操作（x0≈y 的插值填充），EXP-020 中 z 情境 +5.4~+7.3 的跨架构 Wiener 增益若消失，则该增益可归因于各向异性 PSF 的可逆模糊结构，而非"多一路输入通道"。
