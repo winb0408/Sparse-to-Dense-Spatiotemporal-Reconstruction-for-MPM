@@ -1,0 +1,19 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:745: UserWarning: torch.utils.checkpoint: the use_reentrant parameter should be passed explicitly. In version 2.5 we will raise an exception if use_reentrant is not passed. use_reentrant=False is recommended, but if you need to preserve the current default behavior, you can pass use_reentrant=True. Refer to docs for more details on the differences between the two variants.
+  return fn(*args, **kwargs)
+[UNIV4_SXYZ_s1] step 500: loss=0.2009 val PSNR=23.26 SSIM=0.7846
+[UNIV4_SXYZ_s1] step 1000: loss=0.2370 val PSNR=30.32 SSIM=0.8239
+[UNIV4_SXYZ_s1] step 1500: loss=0.2082 val PSNR=32.53 SSIM=0.8489
+[UNIV4_SXYZ_s1] step 2000: loss=0.2234 val PSNR=34.18 SSIM=0.9007
+[UNIV4_SXYZ_s1] step 2500: loss=0.1423 val PSNR=35.67 SSIM=0.9184
+[UNIV4_SXYZ_s1] step 3000: loss=0.2098 val PSNR=33.92 SSIM=0.9020
+[UNIV4_SXYZ_s1] step 3500: loss=0.1568 val PSNR=35.85 SSIM=0.9270
+[UNIV4_SXYZ_s1] step 4000: loss=0.2027 val PSNR=35.83 SSIM=0.9346
+[UNIV4_SXYZ_s1] step 4500: loss=0.2230 val PSNR=36.15 SSIM=0.9351
+[UNIV4_SXYZ_s1] step 5000: loss=0.2673 val PSNR=35.95 SSIM=0.9310
+[UNIV4_SXYZ_s1] step 5500: loss=0.2048 val PSNR=35.71 SSIM=0.9258
+[UNIV4_SXYZ_s1] step 6000: loss=0.1529 val PSNR=35.84 SSIM=0.9314
+[UNIV4_SXYZ_s1] step 6500: loss=0.1381 val PSNR=35.73 SSIM=0.9309
+[UNIV4_SXYZ_s1] step 7000: loss=0.1613 val PSNR=36.09 SSIM=0.9360
+[UNIV4_SXYZ_s1] step 7500: loss=0.1339 val PSNR=35.98 SSIM=0.9339
+[UNIV4_SXYZ_s1] step 7950: loss=0.1637 val PSNR=35.96 SSIM=0.9339
+[UNIV4_SXYZ_s1] done. best val PSNR=36.15, final={'per_regime': {'xyz2_2x2': {'psnr': 36.00287628173828, 'ssim': 0.9361111521720886}, 'xyz2_2x4': {'psnr': 38.42677116394043, 'ssim': 0.9645846784114838}, 'xyz2_2x8': {'psnr': 38.75798416137695, 'ssim': 0.9669179916381836}, 'xyz2_4x2': {'psnr': 35.20391273498535, 'ssim': 0.9278427958488464}, 'xyz2_4x4': {'psnr': 35.90188980102539, 'ssim': 0.9421281218528748}, 'xyz2_8x2': {'psnr': 31.45011329650879, 'ssim': 0.8655831813812256}}, 'psnr': 35.95725790659586, 'ssim': 0.9338613202174505}

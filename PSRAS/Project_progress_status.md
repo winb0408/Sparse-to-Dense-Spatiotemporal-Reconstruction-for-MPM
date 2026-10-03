@@ -15,7 +15,7 @@
 核心科学问题"Y/Z 稀疏如何分配最有效"已回答：预算省在 z（(2,8) 最优，3/3 种子），最优先验配方为 FillFirst-Wiener (b4f)。
 Phase 4 收口（EXP-025）：统一架构定型 **UnifiedV4-noAZ**（A_Z 无稳健增量，轴向耦合由物理先验通道承载）；
 unified 跨 regime 代价 ≤0.74 dB vs specialist 迁移代价 1.4~2.6 dB（Y 套件 gate 临界未达，诚实披露）。
-下一步 = Phase 5 XYZ/XYT Extension + noise_stress（待预注册）。**
+Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖（XYZ 34.5~35.0 dB），Extension gate 未达（−0.6~−1.2 dB 混合稀释，诚实披露）、Regression 达标（≤0.6 dB）、zero-shot 崩溃确认新 regime 必须进训练集。下一步 = regime 加权采样（若追求 Extension 达标）或 noise_stress（复用 U15 checkpoint）+ Phase 6 Protocol A。**
 
 ## 1. v4 阶段验收表
 
@@ -26,7 +26,7 @@ unified 跨 regime 代价 ≤0.74 dB vs specialist 迁移代价 1.4~2.6 dB（Y �
 | P2 | Genuine YZ physics prior（EXP-023，1008 行先验扫描） | ✅ 2026-09-23 | EXP-023 结果1 | P4 IterDC 5/6 最优、P2 FillFirst-Wiener kz 大时领先；P1/P3 淘汰；先验侧 (2,8) 最优 ✅ |
 | P3 | YZ Mainline（EXP-024，40 run 双口径） | ✅ 2026-09-24 | EXP-024 结果1-4 | **(2,8)>(4,4) 3/3 种子 (+2.0~+4.2 dB)、(8,2) 垫底——"预算省在 z"成立**；b4f ≥ b4i 全 6 组合；先验+融合 vs Direct 全组合 +0.5~+3.4 dB ✅ |
 | P4 | Unified Framework（shared encoder + fusion + Z adapter + specialist 对比） | ✅ 收口（部分达标） | EXP-025（2026-09-26） | 15/15 run；YZ 套件 gate 达标、Y 套件临界未达（−0.54~−0.74）；A_Z 无稳健增量→UnifiedV4-noAZ 定型；跨 regime 代价 1.4~2.6→≤0.74 dB |
-| P5 | XYZ / XYT Extension + noise_stress | ⬜ | — | XYT 数据依赖待确认 |
+| P5 | XYZ / XYT Extension + noise_stress | 🔵 XYZ 已收口（EXP-026）/ noise_stress 待预注册 | EXP-026（2026-10-03） | Extension gate 未达（−0.6~−1.2 混合稀释，诚实披露）；Regression gate 达标（回退 ≤0.6）；zero-shot 崩溃 → 新 regime 必须进训练集；XYZ 专训特化最重（迁移掉 11+ dB） |
 | P6 | Protocol A / Real Acquisition | ⬜ | — | 未落地，不做主张 |
 
 ## 2. 已确立的论文级主张（v4 口径）
@@ -58,7 +58,7 @@ unified 跨 regime 代价 ≤0.74 dB vs specialist 迁移代价 1.4~2.6 dB（Y �
 ## 4. 下一步（待用户批准后预注册）
 
 1. ✅ **Phase 4 Unified Framework 已收口（EXP-025，2026-09-26）**：15/15 run + 270 个 reval json。判读：① Unified gate Y 套件临界未达（U−SY 三种子 −0.54/−0.62/−0.74，均超 −0.5 线；Y 套件 yK2 最易点稀释 −1.2~−1.6 dB 为主因）、YZ 套件达标（−0.38/+0.09/+0.23）；② A_Z 无稳健增量（两系列 5/6 种子为负，U_noAZ 为 YZ 套件最佳 arm）→ 回退叙事成立：轴向耦合由物理先验通道承载即可，最终架构 **UnifiedV4-noAZ**；③ specialist 跨 regime 迁移代价 1.4~2.6 dB，unified 压缩至 ≤0.74 dB（核心卖点成立）。详见 PROJECT_LOG.md EXP-025（结果1-5）。
-2. 候选并行：Phase 5 noise_stress（F1/F2/F3 配对 GT）、稳健性扫描（λ 敏感性 / PSF mismatch）。
+2. 候选并行：regime 加权采样修复 Extension gate（EXP-026 结果6 建议）、noise_stress（F1/F2/F3 配对 GT，复用 U15/U_noAZ checkpoint）、稳健性扫描（λ 敏感性 / PSF mismatch）。
 3. 远期：Phase 5 XYZ/XYT、Phase 6 Protocol A（pollen 真实采集）。
 
 ## 5. 资源状态

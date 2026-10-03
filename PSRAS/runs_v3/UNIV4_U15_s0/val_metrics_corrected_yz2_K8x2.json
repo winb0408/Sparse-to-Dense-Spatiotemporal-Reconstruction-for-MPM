@@ -1,0 +1,15 @@
+{
+  "psnr": 29.916378021240234,
+  "ssim": 0.8262152075767517,
+  "err_measured": 0.005121044698171318,
+  "err_missing": 0.018108855932950974,
+  "n_items": 8,
+  "ckpt": "best",
+  "split": "val",
+  "metrics_version": "v4: 2D gaussian SSIM window; split errors from M",
+  "protocol": {
+    "mode": "yz2",
+    "K": 8,
+    "K2": 2
+  }
+}

@@ -1,0 +1,19 @@
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:745: UserWarning: torch.utils.checkpoint: the use_reentrant parameter should be passed explicitly. In version 2.5 we will raise an exception if use_reentrant is not passed. use_reentrant=False is recommended, but if you need to preserve the current default behavior, you can pass use_reentrant=True. Refer to docs for more details on the differences between the two variants.
+  return fn(*args, **kwargs)
+[UNIV4_U15_s1] step 500: loss=0.2455 val PSNR=24.26 SSIM=0.7353
+[UNIV4_U15_s1] step 1000: loss=0.2831 val PSNR=30.87 SSIM=0.8639
+[UNIV4_U15_s1] step 1500: loss=0.1904 val PSNR=29.75 SSIM=0.8626
+[UNIV4_U15_s1] step 2000: loss=0.2551 val PSNR=32.44 SSIM=0.8911
+[UNIV4_U15_s1] step 2500: loss=0.2004 val PSNR=32.47 SSIM=0.8683
+[UNIV4_U15_s1] step 3000: loss=0.2598 val PSNR=30.03 SSIM=0.8881
+[UNIV4_U15_s1] step 3500: loss=0.1574 val PSNR=33.48 SSIM=0.8890
+[UNIV4_U15_s1] step 4000: loss=0.1617 val PSNR=32.94 SSIM=0.8802
+[UNIV4_U15_s1] step 4500: loss=0.2173 val PSNR=34.38 SSIM=0.9081
+[UNIV4_U15_s1] step 5000: loss=0.1769 val PSNR=35.14 SSIM=0.9191
+[UNIV4_U15_s1] step 5500: loss=0.1581 val PSNR=35.01 SSIM=0.9196
+[UNIV4_U15_s1] step 6000: loss=0.2159 val PSNR=35.32 SSIM=0.9218
+[UNIV4_U15_s1] step 6500: loss=0.1919 val PSNR=35.39 SSIM=0.9230
+[UNIV4_U15_s1] step 7000: loss=0.1989 val PSNR=35.34 SSIM=0.9221
+[UNIV4_U15_s1] step 7500: loss=0.2256 val PSNR=35.38 SSIM=0.9226
+[UNIV4_U15_s1] step 7950: loss=0.1927 val PSNR=35.36 SSIM=0.9225
+[UNIV4_U15_s1] done. best val PSNR=35.39, final={'per_regime': {'y_K2': {'psnr': 40.19529342651367, 'ssim': 0.9768626987934113}, 'y_K4': {'psnr': 33.7662296295166, 'ssim': 0.9097478687763214}, 'y_K8': {'psnr': 29.825712203979492, 'ssim': 0.8218621611595154}, 'yz2_2x2': {'psnr': 38.87790870666504, 'ssim': 0.9701507687568665}, 'yz2_2x4': {'psnr': 38.76748275756836, 'ssim': 0.9718081951141357}, 'yz2_2x8': {'psnr': 38.58242988586426, 'ssim': 0.9711813926696777}, 'yz2_4x2': {'psnr': 33.72387886047363, 'ssim': 0.9100159406661987}, 'yz2_4x4': {'psnr': 33.930625915527344, 'ssim': 0.9151084721088409}, 'yz2_8x2': {'psnr': 29.881845474243164, 'ssim': 0.8260764181613922}, 'xyz2_2x2': {'psnr': 37.093156814575195, 'ssim': 0.9498628675937653}, 'xyz2_2x4': {'psnr': 37.45516777038574, 'ssim': 0.9547568559646606}, 'xyz2_2x8': {'psnr': 37.82517051696777, 'ssim': 0.9585968852043152}, 'xyz2_4x2': {'psnr': 34.67982864379883, 'ssim': 0.922907680273056}, 'xyz2_4x4': {'psnr': 34.9469051361084, 'ssim': 0.9296747148036957}, 'xyz2_8x2': {'psnr': 30.8655424118042, 'ssim': 0.8488001823425293}}, 'psnr': 35.361145210266116, 'ssim': 0.9224942068258921}
