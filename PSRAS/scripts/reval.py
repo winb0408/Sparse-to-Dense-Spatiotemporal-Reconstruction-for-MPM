@@ -41,6 +41,10 @@ def main() -> None:
     p.add_argument("--eval_mode", choices=["y", "yz2", "xyz2"], default=None)
     p.add_argument("--eval_K", type=int, default=0)
     p.add_argument("--eval_kz", type=int, default=0)
+    # EXP-027 noise_stress: paired evaluation -- acquire from the given
+    # noisy F# stack, supervise against clean F0 at the same frames
+    # (DEC-025 结果3 semantics).  Implies gt_stack=F0, frame_range [750,1500].
+    p.add_argument("--noise_stack", choices=["F1", "F2", "F3"], default=None)
     args = p.parse_args()
 
     cfg = json.loads((args.run_dir / "config.json").read_text())
@@ -69,12 +73,15 @@ def main() -> None:
         eval_tag = f"_{mode}_K{K}x{k2}" if mode in ("yz2", "xyz2") else f"_{mode}_K{K}"
     else:
         regime, mode, K, t_override = cfg["regime"], cfg["mode"], cfg["K"], cfg["t"]
-    val_ds = make_val_dataset(args.data_dir, args.split, regime,
-                              mode=mode, K=K, K2=k2, psf=psf,
-                              patch_hw=(cfg["patch"], cfg["patch"]),
-                              warm_start_kind=cfg["warm_start"],
-                              lam=cfg["lam_wiener"], features=feats,
-                              t_override=t_override)
+    val_ds = make_val_dataset(
+        args.data_dir, args.split, regime,
+        mode=mode, K=K, K2=k2, psf=psf,
+        patch_hw=(cfg["patch"], cfg["patch"]),
+        warm_start_kind=cfg["warm_start"],
+        lam=cfg["lam_wiener"], features=feats,
+        t_override=t_override,
+        gt_stack="F0" if args.noise_stack else None,
+        stacks_override=[args.noise_stack] if args.noise_stack else None)
 
     ckpt = torch.load(args.run_dir / f"{args.ckpt}.pt", map_location="cpu",
                       weights_only=False)
@@ -120,8 +127,15 @@ def main() -> None:
            "n_items": len(psnrs), "ckpt": args.ckpt, "split": args.split,
            "metrics_version": "v4: 2D gaussian SSIM window; split errors from M",
            "protocol": {"mode": mode, "K": K, "K2": k2}}
+    if args.noise_stack:
+        out["input_stack"] = args.noise_stack
+        out["gt_stack"] = "F0"
+        out["frame_range"] = [750, 1500]
+        out["split"] = "noise_stress"
     out_name = "val_metrics_corrected.json" if args.split == "val" else \
         f"metrics_{args.split}.json"
+    if args.noise_stack:
+        out_name = f"metrics_noise_stress_{args.noise_stack}.json"
     if eval_tag:
         out_name = out_name.replace(".json", f"{eval_tag}.json")
     (args.run_dir / out_name).write_text(json.dumps(out, indent=2))

@@ -34,7 +34,7 @@
 | Phase 2 Genuine YZ physics prior | ✅ 2026-09-23 | EXP-023（结果1，1008 行先验扫描） |
 | Phase 3 YZ Mainline | ✅ 2026-09-24 | EXP-024（结果1-4，40/40 run） |
 | Phase 4 Unified Framework | ✅ 2026-09-26 | EXP-025（结果1-5，15/15 run；A_Z 证伪 → UnifiedV4-noAZ 定型） |
-| Phase 5 XYZ/XYT + noise_stress | 🔵 XYZ ✅ 2026-10-03（EXP-026，6/6 run）；XYT 延后 / noise_stress 待预注册 | — |
+| Phase 5 XYZ/XYT + noise_stress | 🔵 XYZ ✅ 2026-10-03（EXP-026）；noise_stress ✅ 2026-10-06（EXP-027，90 reval 零训练）；XYT 延后 | — |
 | Phase 6 Protocol A 真实采集 | ⬜ | — |
 
 <details>
@@ -1410,6 +1410,56 @@ val 口径全部读数与 test 同向（详见各 run val_metrics_corrected_*.js
 **结果6（Phase 5 后续建议）**：① Extension gate 未达的主因是均匀混合稀释——若追求达标，下一步预注册 regime 加权采样（XYZ 点采样概率 ↑，如按 regime 均匀而非点均匀），或两阶段训练（U_noAZ 预训练 → XYZ 混入微调）；② 15 点 U15 已可作为"实用统一模型"写入论文（Fig6/7 素材：三 regime 覆盖 + 诚实稀释披露）；③ XYT 维持延后（数据依赖）；④ noise_stress（F1/F2/F3 配对评估）仍待预注册，可复用 U15/U_noAZ checkpoint。
 
 **执行记录（收口，2026-10-03 18:53）**：6/6 run 完成 + 6×30 reval json + 零样本 9 run × 12 json。事故：他人 26GB 进程在 GPU3 上三次挤崩 run（U15_s1 step450、U15_s2 step450、SXYZ_s1 step450，均 OOM 无 checkpoint），全部重跑（GPU3c/GPU2b 链，wait_idle 保护）；TMPDIR=/data2/wjb/tmp 全程生效无 ENOSPC。全程 ~45h（10-02 21:47 → 10-03 18:23）。
+
+### EXP-027（预注册）：Phase 5 noise_stress——F1/F2/F3 配对干净 GT 稳健性评估（用户同意，2026-10-05）
+
+**目的**（v4 方案 Phase 5 B 项，DEC-027 下一步决策框架；用户指示"先做B"）：外部效度第一条检验通道（DEC-027 不足⑦——Phase 0-5 全部结论建立在 CIDC25 无噪（低噪）仿真上）。量化 UnifiedV4-noAZ checkpoint 对数据噪声水平的稳健性：输入侧噪声逐级升高时，重建质量退化的量级与形态。**零训练**：复用已有 checkpoint，纯评估 ~3h（GPU3）。
+
+**Paired-input 数据语义（DEC-025 结果3 澄清）**：F1/F2/F3 = F0 同内容不同噪声版本（corr 0.71/0.36/0.18，残差 std 0.072/0.180/0.309），非独立栈。**输入** = 在 F# 上模拟稀疏采集（mask + PSF，合成噪声关闭——与全部 v4 run 一致，DEC-008：CIDC25 栈自带仿真噪声）；**GT** = 干净 F0 同 (t0,y0,x0) 帧配对。v3 期初版"F1-F3 当 test 出现 16-17 dB 崩溃"是噪声 GT 语义错配，本实验以 paired 模式纠正。
+
+**帧域**：[750:1500]（与 test 相同）——基线直接取已存在的 metrics_test_*.json（F0、同 protocol/点/帧域），noise_stress 与 test 的差 = 纯数据噪声退化。
+
+**评估点（5 点）**：y-K{2,4,8}（Y 全 severity 扫描，T=1 最便宜）+ yz2-4x4 + xyz2-4x4（两个 2.5D regime 各取中档代表点）。
+
+**Arm（全称+缩写双写法；均零训练复用 checkpoint）**：
+| 缩写 | 全称 | checkpoint |
+|---|---|---|
+| U15 | Unified 15-point（EXP-026） | UNIV4_U15_s{0,1,2}（y+yz2+xyz2 15 点混合训练） |
+| U_noAZ | Unified-noAZ 9-point（EXP-025） | UNIV4_U_noAZ_s{0,1,2}（y+yz2 9 点混合训练） |
+
+共 6 checkpoint × 5 点 × 3 噪声栈 = 90 reval。实现：make_val_dataset 新增 gt_stack/stacks_override/frame_range 参数；reval.py 新增 --noise_stack {F1,F2,F3}（隐含 gt_stack=F0、帧域 [750,1500]、单栈）；输出 metrics_noise_stress_{F#}_{mode}_K{..}.json。
+
+**判读规则（预注册；描述性稳健性刻画，无 pass/fail gate）**：
+1. **噪声退化曲线**：ΔPSNR(F#) = noise_stress PSNR − test F0 PSNR（逐点逐 arm，逐 seed 配对后报均值±3seed 离散）；预期随噪声水平单调下降；0.5 dB 量级判读最低门槛沿用；
+2. **U15 vs U_noAZ 配对比较**（逐 seed × 点 × 噪声栈）：XYZ 混入稀释是否额外损害噪声稳健性（描述性，与 EXP-026 Regression gate 同向参照）；
+3. **x0 先验敏感性**：paired 评估中 x0（Wiener warm-start）通道自身 PSNR 随 F# 的退化——区分"退化来自先验通道坍塌"vs"网络对噪声输入的放大"；
+4. **可视化（用户指示）**：每点一 panel（行 = F1/F2/F3 噪声水平，列 = GT(F0 干净) | 噪声原始帧 | Sparse Y | X0 | U15_s0 重建 | U_noAZ_s0 重建），输出 eval_viz/exp027_noise_stress/（PNG 240dpi + PDF，DEC-020/021 约定），路径在 md 文档备注，用户人工查验。
+
+### EXP-027（结果）：noise_stress 收口——噪声水平主导的退化曲线、XYZ 稀释不损噪声稳健性、退化主因是网络放大噪声而非先验坍塌（2026-10-06）
+
+**结果1（全矩阵，noise_stress PSNR dB，3 seed 均值；括号 = 相对 test F0 基线差）**：
+
+| 点 | U15: F0→F1→F2→F3 | U_noAZ: F0→F1→F2→F3 |
+|---|---|---|
+| y-K2 | 39.36 → 26.42 (−12.95) → 18.61 (−20.75) → 15.80 (−23.56) | 40.11 → 26.00 (−14.11) → 18.10 (−22.01) → 14.40 (−25.71) |
+| y-K4 | 33.43 → 27.10 (−6.33) → 19.81 (−13.62) → 16.95 (−16.48) | 34.04 → 27.12 (−6.92) → 19.63 (−14.40) → 16.17 (−17.87) |
+| y-K8 | 29.55 → 26.69 (−2.86) → 20.86 (−8.69) → 17.94 (−11.61) | 29.68 → 26.80 (−2.88) → 20.74 (−8.95) → 17.52 (−12.17) |
+| yz2-4x4 | 33.71 → 27.65 (−6.06) → 21.14 (−12.57) → 18.47 (−15.24) | 34.03 → 27.95 (−6.09) → 21.10 (−12.94) → 17.77 (−16.26) |
+| xyz2-4x4 | 34.55 → 27.95 (−6.61) → 21.23 (−13.33) → 18.27 (−16.28) | 9.92 → 10.19 (+0.27) → 10.00 (+0.08) → 9.74 (−0.18) |
+
+（xyz2 行 U_noAZ 为零样本——EXP-025 9 点混合未含 xyz2，EXP-026 结果4 崩溃结论在噪声下复现且噪声不变（~10 dB 平坦），崩溃预测与输入噪声无关。）
+
+**结果2（判读①退化曲线：单调且存在噪声天花板）**：退化随噪声水平严格单调；**绝对退化量与稀疏度强相关**——y-K2（低稀疏、F0 基线 39.4 dB）掉 13~24 dB，y-K8（高稀疏、基线 29.6）只掉 3~12 dB。**F1（残差 std 0.072）下全部 5 点收敛到 26~28 dB**：噪声水平而非采样稀疏度成为绑定约束（noise ceiling）——干净协议下的 severity 曲线排序在真实噪声下被抹平。0.5 dB 门槛下所有退化均显著（远超量级门槛），无歧义。
+
+**结果3（判读②U15 vs U_noAZ：XYZ 稀释不额外损害噪声稳健性）**：y/yz2 四点逐 seed 配对差绝大多数 |Δ|<0.5 dB、符号混合（y-K8 F1: −0.03~−0.16；yz2 F1: −1.0~+0.6）；唯一系统差是 y-K2 F3 下 U15 略优（+1.1~+1.9，重噪声下更强先验融合可能略益）。结论：EXP-026 的 XYZ 混入稀释是**干净协议下的容量问题，不是噪声稳健性问题**。
+
+**结果4（判读③x0 先验敏感性：退化主因是网络放大噪声，非先验坍塌）**：x0 先验退化远小于模型输出（y-K4 F2: x0 23.38 vs 模型 19.81；yz2-4x4 F1: x0 32.56 vs 模型 27.65）——paired 输入下先验通道仍提供可用估计。但**训练于（近）干净数据的网络在 F1-F3 下比自身 x0 先验低 2~5 dB**（F0 下持平或略优）：网络把输入噪声当作结构放大。同时重建始终高于噪声原始输入 PSNR（F1: 26~28 vs 原始 22.8；F3: 15.8~18.3 vs 10.1，即 +4~+8 dB 边重建边去噪）。**指向明确的高价值后续方向：噪声感知训练（noisy 栈混入或合成噪声增广）**，预期可收回 2~5 dB 中的大部分。
+
+**结果5（协议核查）**：① paired 语义验证——F1/F2/F3 vs F0 同帧原始 PSNR = 22.8/14.8/10.1 dB，与 1/残差std（22.9/14.9/10.2）吻合，帧对齐正确；② 发现 mixed run config 记录 sigma_z_px=0.0（regime 字段为 "2d" 所致）而训练实际用 --psf_z 1.5——实证验证 query 切片 PSNR 对该差异不敏感（y=0 未测平面 + 匹配 Wiener 逆滤波，x0 PSNR 33.7829 vs 33.7831），且 EXP-025/026 全部 reval 用同一约定、val/test 吻合，结论不受影响；留作 config 记录规范的小修（未来 run 建议显式记录逐点 psf）。
+
+**可视化（用户指示，人工查验）**：`eval_viz/exp027_noise_stress/`——`noise_curve.{png,pdf}`（5 点退化曲线：U15/U_noAZ 3seed 均值±离散带 + x0 先验虚线 + 噪声输入点线）+ `panel_{y_K2,y_K4,y_K8,yz2_K4x4,xyz2_K4x4}.{png,pdf}`（行 = F1/F2/F3，列 = GT(F0 干净) | 噪声原始帧 | Sparse Y | X0 | U15_s0 | U_noAZ_s0，重建面板下标注 PSNR）。x0 先验数值另存 `runs_v3/exp027_x0_prior_noise.json`。
+
+**执行记录（收口，2026-10-06 17:30）**：零训练；90/90 reval（6 ckpt × 5 点 × 3 噪声栈）全成、0 失败，GPU3 约 8 分钟（每 reval ~5s，模型小 + 8 items）；实现 = make_val_dataset 新增 gt_stack/stacks_override/frame_range paired 模式 + reval.py --noise_stack；新脚本 scripts/visualize_noise_stress.py（panel/curve）。
 
 ### EXP-021（预注册）：M1 no-PSF 消融（用户指示）+ 我方 2D b1 补跑
 

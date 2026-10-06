@@ -78,14 +78,18 @@ legacy（threePM 旧分支）结果只引用不作证据；实验记录统一"�
 - [x] 主验证采样点：全 9 点双口径（y-K{2,4,8} + yz2-6 组合）
 - Gate：**部分通过**——YZ 套件达标（−0.38/+0.09/+0.23）；Y 套件临界未达（−0.54/−0.62/−0.74，超线 0.04~0.24 dB，归因混合稀释，yK2 最易点 −1.2~−1.6 dB 为主因）；specialist 跨 regime 迁移代价 1.4~2.6 dB vs unified ≤0.74 dB（核心卖点成立）
 
-### Phase 5 — XYZ / XYT Extension 🔵（XYZ 已收口 EXP-026，2026-10-03；XYT/noise_stress 待推进）
+### Phase 5 — XYZ / XYT Extension 🔵（XYZ 已收口 EXP-026；noise_stress 已收口 EXP-027，2026-10-06；XYT 延后）
 - [x] XYZ：full spatial undersampling 鲁棒性（xyz2 regime：cross 网格 + 平面跳采，6 点；SXYZ vs U15 15 点统一）
   - Extension gate **未达**：U15−SXYZ = −1.15/−0.61/−0.83（3/3 超线，混合稀释归因；U15 仍达 XYZ 34.5~35.0 dB 三 regime 全覆盖）
   - Regression gate **达标**：vs EXP-025 U_noAZ，Y −0.53/−0.39/−0.57、YZ −0.24/−0.95/−0.09
   - Zero-shot 崩溃（7.8~15.1 dB vs 专训 35.4）→ 新 regime 必须进训练集；SXYZ 跨 regime 掉 11+ dB（特化最重）
 - [ ] XYT：temporal generalization + temporal metrics（数据依赖待确认，DEC-025 修正项，维持延后）
-- [ ] noise_stress（F1/F2/F3 配对干净 GT）——需预注册，复用 U15/U_noAZ checkpoint
-- [ ] 候选：regime 加权采样修复 Extension gate（EXP-026 结果6）
+- [x] noise_stress（EXP-027，2026-10-06，零训练 90 reval）——paired F1/F2/F3 输入 + 干净 F0 GT
+  - 退化随噪声单调；**F1（残差 std 0.072）下全部点收敛 26~28 dB 噪声天花板**（稀疏度排序被噪声抹平）
+  - U15 vs U_noAZ 噪声稳健性无差（|Δ|<0.5 符号混合）→ XYZ 稀释是容量问题非稳健性问题
+  - **退化主因是网络放大噪声而非先验坍塌**（x0 先验退化远小于输出；网络比自身先验低 2~5 dB，仍高于原始输入 +4~+8 dB）→ 噪声感知训练为新候选方向（EXP-027 结果4）
+  - 可视化：`eval_viz/exp027_noise_stress/`（noise_curve + 5 panel）；x0 数值 `runs_v3/exp027_x0_prior_noise.json`
+- [ ] 候选：regime 加权采样修复 Extension gate（EXP-026 结果6；用户已批准为下一步 A，与 checkpoint-resume C 并行）
 
 ### Phase 6 — Protocol A / Real Acquisition ⬜
 - [ ] hardware-realistic sparse acquisition（pollen 等）

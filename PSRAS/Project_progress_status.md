@@ -3,7 +3,7 @@
 > 用途：对照 [PLAN.md](PLAN.md)（Protocol v4，2026-09-24 重写）的阶段计划，验收当前进度。
 > 实验证据树见 [PROJECT_LOG.md](PROJECT_LOG.md)（append-only）。
 > v3 时代的进度表已归档：[Historical_Plan/Project_progress_status_v3_20260924.md](Historical_Plan/Project_progress_status_v3_20260924.md)。
-> 更新至：2026-09-24
+> 更新至：2026-10-06
 >
 > 图例：✅ 完成且达标 ｜ 🟡 部分完成/有修订 ｜ ❌ 未通过/关闭 ｜ 🔵 进行中 ｜ ⬜ 未开始
 
@@ -15,7 +15,7 @@
 核心科学问题"Y/Z 稀疏如何分配最有效"已回答：预算省在 z（(2,8) 最优，3/3 种子），最优先验配方为 FillFirst-Wiener (b4f)。
 Phase 4 收口（EXP-025）：统一架构定型 **UnifiedV4-noAZ**（A_Z 无稳健增量，轴向耦合由物理先验通道承载）；
 unified 跨 regime 代价 ≤0.74 dB vs specialist 迁移代价 1.4~2.6 dB（Y 套件 gate 临界未达，诚实披露）。
-Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖（XYZ 34.5~35.0 dB），Extension gate 未达（−0.6~−1.2 dB 混合稀释，诚实披露）、Regression 达标（≤0.6 dB）、zero-shot 崩溃确认新 regime 必须进训练集。下一步 = regime 加权采样（若追求 Extension 达标）或 noise_stress（复用 U15 checkpoint）+ Phase 6 Protocol A。**
+Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖（XYZ 34.5~35.0 dB），Extension gate 未达（−0.6~−1.2 dB 混合稀释，诚实披露）、Regression 达标（≤0.6 dB）、zero-shot 崩溃确认新 regime 必须进训练集。noise_stress 已收口（EXP-027）：退化随噪声单调（F1 全点收敛 26~28 dB 噪声天花板）、XYZ 稀释不损噪声稳健性、退化主因是网络放大噪声而非先验坍塌（训练于干净数据的网络比自身 x0 先验低 2~5 dB，指向噪声感知训练方向）。下一步 = A（regime 加权采样）+ C（checkpoint-resume）并行。**
 
 ## 1. v4 阶段验收表
 
@@ -26,7 +26,7 @@ Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖
 | P2 | Genuine YZ physics prior（EXP-023，1008 行先验扫描） | ✅ 2026-09-23 | EXP-023 结果1 | P4 IterDC 5/6 最优、P2 FillFirst-Wiener kz 大时领先；P1/P3 淘汰；先验侧 (2,8) 最优 ✅ |
 | P3 | YZ Mainline（EXP-024，40 run 双口径） | ✅ 2026-09-24 | EXP-024 结果1-4 | **(2,8)>(4,4) 3/3 种子 (+2.0~+4.2 dB)、(8,2) 垫底——"预算省在 z"成立**；b4f ≥ b4i 全 6 组合；先验+融合 vs Direct 全组合 +0.5~+3.4 dB ✅ |
 | P4 | Unified Framework（shared encoder + fusion + Z adapter + specialist 对比） | ✅ 收口（部分达标） | EXP-025（2026-09-26） | 15/15 run；YZ 套件 gate 达标、Y 套件临界未达（−0.54~−0.74）；A_Z 无稳健增量→UnifiedV4-noAZ 定型；跨 regime 代价 1.4~2.6→≤0.74 dB |
-| P5 | XYZ / XYT Extension + noise_stress | 🔵 XYZ 已收口（EXP-026）/ noise_stress 待预注册 | EXP-026（2026-10-03） | Extension gate 未达（−0.6~−1.2 混合稀释，诚实披露）；Regression gate 达标（回退 ≤0.6）；zero-shot 崩溃 → 新 regime 必须进训练集；XYZ 专训特化最重（迁移掉 11+ dB） |
+| P5 | XYZ / XYT Extension + noise_stress | 🔵 XYZ ✅（EXP-026）/ noise_stress ✅（EXP-027）/ XYT 延后 | EXP-026（2026-10-03）+ EXP-027（2026-10-06） | Extension gate 未达（−0.6~−1.2 混合稀释，诚实披露）；Regression gate 达标（回退 ≤0.6）；zero-shot 崩溃 → 新 regime 必须进训练集；noise_stress：退化单调且 F1 下全点收敛 26~28 dB 噪声天花板，XYZ 稀释不额外损害噪声稳健性，网络比自身 x0 先验低 2~5 dB（噪声放大，非先验坍塌） |
 | P6 | Protocol A / Real Acquisition | ⬜ | — | 未落地，不做主张 |
 
 ## 2. 已确立的论文级主张（v4 口径）
@@ -65,14 +65,16 @@ Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖
 
 | 候选 | 投入 | 产出 | 状态 |
 |---|---|---|---|
-| B. noise_stress（F1/F2/F3 配对 GT，复用 U15/U_noAZ） | ~3h 评估 | 稳健性章节 + 外部效度首检 | 快赢，建议先做 |
-| A. regime 加权采样（U15 重训 3 seed） | 3 run ~21h | Extension gate 能否达标的直接回答 | 主判据修复 |
-| C. checkpoint-resume 机制 | ~2h 实现 | 消除长链重跑风险（工程债） | 并行实现 |
-| D. Phase 6 Protocol A 预调研（pollen 数据可行性） | 0.5 天调研 | 论文最终 gate 可行性判定 | 远期 |
+| B. noise_stress（F1/F2/F3 配对 GT，复用 U15/U_noAZ） | ~3h 评估 | 稳健性章节 + 外部效度首检 | ✅ 已收口（EXP-027，2026-10-06，90 reval 零训练） |
+| A. regime 加权采样（U15 重训 3 seed） | 3 run ~21h | Extension gate 能否达标的直接回答 | 🔵 下一步（用户已批准） |
+| C. checkpoint-resume 机制 | ~2h 实现 | 消除长链重跑风险（工程债） | 🔵 与 A 并行（用户已批准） |
+| D. Phase 6 Protocol A 预调研（pollen 数据可行性） | 0.5 天调研 | 论文最终 gate 可行性判定 | ⬜ 用户指示暂不做 |
+| E. 噪声感知训练（EXP-027 结果4 指向） | 未预注册 | 收回 F1-F3 下 2~5 dB 网络噪声放大损失 | 新增候选，待讨论 |
 
-论文素材现状：Fig1-6 齐备（EXP-022~026），Fig7（XYT）数据依赖缺，Fig8（真实采集/噪声）待 B/D 补。
+论文素材现状：Fig1-6 齐备（EXP-022~026），Fig7（XYT）数据依赖缺，Fig8（真实采集/噪声）noise_stress 侧已齐（EXP-027，图在 `eval_viz/exp027_noise_stress/`），真实采集侧待 D。
 
 ## 6. 资源状态
 
-- GPU1/2/3 空闲（EXP-026 全部链 2026-10-03 18:23 DONE）；GPU0 他人进程不碰。根分区 / 接近满（~900MB 空闲，/tmp 31GB 垃圾），建议清理；本项目长链已统一 TMPDIR=/data2/wjb/tmp。
-- runs_v3/：EXP-022 36 run + EXP-023 先验扫描 + EXP-024 40 run + EXP-025 15 run + EXP-026 6 run（UNIV4_*），全部含完整 config 与双口径指标。
+- GPU3 空闲（EXP-027 评估链 2026-10-06 17:24 DONE）；GPU1/2 当前有他人进程（~28GB each）；GPU0 他人进程不碰。根分区 / 接近满（~900MB 空闲，/tmp 31GB 垃圾），建议清理；本项目长链已统一 TMPDIR=/data2/wjb/tmp。
+- runs_v3/：EXP-022 36 run + EXP-023 先验扫描 + EXP-024 40 run + EXP-025 15 run + EXP-026 6 run（UNIV4_*）+ EXP-027 90 noise_stress reval json（零训练，复用 UNIV4 checkpoint），全部含完整 config 与双口径指标。
+- 可视化产物：`eval_viz/exp027_noise_stress/`（noise_curve + 5 panel，PNG+PDF）；x0 先验数值 `runs_v3/exp027_x0_prior_noise.json`。

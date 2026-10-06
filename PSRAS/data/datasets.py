@@ -66,10 +66,18 @@ class CIDC25SparseDataset(Dataset):
                  patches_per_epoch: int = 1000, seed: int = 0,
                  warm_start_kind: str = "wiener", lam: float = 0.01,
                  features: tuple[str, ...] = FEATURES,
-                 t_override: int | None = None, K2: int = 0):
+                 t_override: int | None = None, K2: int = 0,
+                 _stacks_override: list[str] | None = None,
+                 _frame_range: tuple[int, int] | None = None):
         self.dir = Path(data_dir)
         split_info = json.loads((self.dir / "split.json").read_text())
         self.split = split_info["split"][split]
+        # EXP-027: evaluate a specific stack list / frame window of a split
+        # (noise_stress single-stack evaluation); None = split's own.
+        if _stacks_override is not None:
+            self.split = {**self.split, "stacks": list(_stacks_override)}
+        if _frame_range is not None:
+            self.split = {**self.split, "frame_range": list(_frame_range)}
         self.regime = regime
         self.T = window_T(regime, mode, K)
         # yz2 (EXP-024): T follows the PLANE spacing kz (K2), not ky.
@@ -156,11 +164,32 @@ class CIDC25SparseDataset(Dataset):
 
 
 def make_val_dataset(data_dir: str | Path, split: str, regime: str, n_per_stack: int = 8,
-                     patch_hw: tuple[int, int] = (256, 256), **kwargs) -> CIDC25SparseDataset:
+                     patch_hw: tuple[int, int] = (256, 256),
+                     gt_stack: str | None = None,
+                     stacks_override: list[str] | None = None,
+                     frame_range: tuple[int, int] | None = None,
+                     **kwargs) -> CIDC25SparseDataset:
     """Deterministic validation/test dataset: a fixed grid of patch centres,
-    fixed acquisition seeds."""
+    fixed acquisition seeds.
+
+    Paired-input extensions (EXP-027, DEC-025 结果3 semantics): with
+    gt_stack set, the acquisition is simulated on the split's own (noisy)
+    stack while the reconstruction target comes from the paired clean
+    stack at identical (t0, y0, x0) -- the noise_stress protocol.  With
+    gt_stack set, stacks_override/frame_range default to the single
+    gt-matched frame domain [750, 1500] (same as test) unless given.
+    """
+    if gt_stack is not None:
+        stacks_override = stacks_override or [gt_stack]
+        frame_range = frame_range or (750, 1500)
+    if stacks_override is not None or frame_range is not None:
+        kwargs = dict(kwargs)
+        kwargs["_stacks_override"] = stacks_override
+        kwargs["_frame_range"] = frame_range
     ds = CIDC25SparseDataset(data_dir, split=split, regime=regime,
                              patch_hw=patch_hw, patches_per_epoch=0, **kwargs)
+    gt_clean = (np.load(ds.dir / "stacks" / f"{gt_stack}.npy", mmap_mode="r")
+                if gt_stack is not None else None)
     items = []
     for si, (stack, (f0, f1)) in enumerate(zip(ds.stacks, ds.frame_ranges)):
         th = ds.T
@@ -170,6 +199,11 @@ def make_val_dataset(data_dir: str | Path, split: str, regime: str, n_per_stack:
             x0 = (stack.shape[2] - patch_hw[1]) // 2
             gt = np.asarray(stack[t0:t0 + th, y0:y0 + patch_hw[0], x0:x0 + patch_hw[1]],
                             dtype=np.float32)
+            # EXP-027 paired mode: acquire from the noisy stack, supervise
+            # against the clean F0 frames at the same coordinates.
+            target = gt if gt_clean is None else np.asarray(
+                gt_clean[t0:t0 + th, y0:y0 + patch_hw[0], x0:x0 + patch_hw[1]],
+                dtype=np.float32)
             acq = AcquisitionConfig(
                 mode=ds.acq.mode, K=ds.acq.K, K2=ds.acq.K2,
                 pattern=ds.acq.pattern, psf=ds.acq.psf,
@@ -186,7 +220,7 @@ def make_val_dataset(data_dir: str | Path, split: str, regime: str, n_per_stack:
             feats = {"y": mi.y, "mask": mi.mask, "x0": mi.x0,
                      "confidence": mi.confidence, "uncertainty": mi.uncertainty}
             chans = torch.cat([feats[f].reshape(-1, *gt.shape[1:]) for f in ds.features], 0)
-            items.append({"inputs": chans, "target": torch.from_numpy(gt),
+            items.append({"inputs": chans, "target": torch.from_numpy(target),
                           "query": torch.tensor(ds.query, dtype=torch.float32)})
     ds.fixed_items = items
     ds.patches_per_epoch = len(items)
