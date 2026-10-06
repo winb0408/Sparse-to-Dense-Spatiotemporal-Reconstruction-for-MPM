@@ -66,8 +66,8 @@ Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖
 | 候选 | 投入 | 产出 | 状态 |
 |---|---|---|---|
 | B. noise_stress（F1/F2/F3 配对 GT，复用 U15/U_noAZ） | ~3h 评估 | 稳健性章节 + 外部效度首检 | ✅ 已收口（EXP-027，2026-10-06，90 reval 零训练） |
-| A. regime 加权采样（U15 重训 3 seed） | 3 run ~21h | Extension gate 能否达标的直接回答 | 🔵 下一步（用户已批准） |
-| C. checkpoint-resume 机制 | ~2h 实现 | 消除长链重跑风险（工程债） | 🔵 与 A 并行（用户已批准） |
+| A. regime 加权采样（U15W 重训 3 seed） | 3 run ~21h | Extension gate 能否达标的直接回答 | 🔵 EXP-028 已启动（2026-10-06 19:51，GPU3；XYZ 加权 1:1:2，用户确认——DEC-027 表 A 的『各 1/3』字面描述经算术核方向相反，已勘误） |
+| C. checkpoint-resume 机制 | ~2h 实现 | 消除长链重跑风险（工程债） | ✅ 已落地（train.py --ckpt_every 500 原子快照 + --resume；冒烟通过：model/opt/sched/scaler/step/best_psnr/mix_rng 恢复，log.csv resumed_from 标记；dataloader 批次序列不恢复为已声明限制） |
 | D. Phase 6 Protocol A 预调研（pollen 数据可行性） | 0.5 天调研 | 论文最终 gate 可行性判定 | ⬜ 用户指示暂不做 |
 | E. 噪声感知训练（EXP-027 结果4 指向） | 未预注册 | 收回 F1-F3 下 2~5 dB 网络噪声放大损失 | 新增候选，待讨论 |
 
@@ -75,6 +75,6 @@ Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖
 
 ## 6. 资源状态
 
-- GPU3 空闲（EXP-027 评估链 2026-10-06 17:24 DONE）；GPU1/2 当前有他人进程（~28GB each）；GPU0 他人进程不碰。根分区 / 接近满（~900MB 空闲，/tmp 31GB 垃圾），建议清理；本项目长链已统一 TMPDIR=/data2/wjb/tmp。
+- GPU3 = EXP-028 训练链（2026-10-06 19:51 启动，U15W × 3 seed 串行，预计 ~21h）；GPU1/2 他人进程（~28GB each）；GPU0 他人进程不碰。根分区 / 接近满（~900MB 空闲，/tmp 31GB 垃圾），建议清理；本项目长链已统一 TMPDIR=/data2/wjb/tmp。
 - runs_v3/：EXP-022 36 run + EXP-023 先验扫描 + EXP-024 40 run + EXP-025 15 run + EXP-026 6 run（UNIV4_*）+ EXP-027 90 noise_stress reval json（零训练，复用 UNIV4 checkpoint），全部含完整 config 与双口径指标。
 - 可视化产物：`eval_viz/exp027_noise_stress/`（noise_curve + 5 panel，PNG+PDF）；x0 先验数值 `runs_v3/exp027_x0_prior_noise.json`。

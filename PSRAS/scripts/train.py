@@ -23,6 +23,7 @@ import argparse
 import csv
 import json
 import math
+import os
 import sys
 import time
 from pathlib import Path
@@ -225,6 +226,17 @@ def main() -> None:
                         "kyxkz pairs.  Example: "
                         "'y:2,4,8;yz2:2x2,2x4,2x8,4x2,4x4,8x2'.  Batches "
                         "alternate uniformly across regimes/severities.")
+    p.add_argument("--regime_weights", type=str, default=None,
+                   help="EXP-028: per-regime sampling weights, comma-separated "
+                        "'mode:w' (e.g. 'y:1,yz2:1,xyz2:2' -> batch shares "
+                        "25/25/50%%).  None = point-uniform (EXP-025/026 "
+                        "behaviour).  Within a regime points stay uniform.")
+    p.add_argument("--resume", action="store_true",
+                   help="DEC-027 C: resume from resume.pt in the run dir "
+                        "(model/opt/sched/scaler/step restored; dataloader "
+                        "batch sequence restarts -- stated limitation)")
+    p.add_argument("--ckpt_every", type=int, default=500,
+                   help="steps between resume.pt writes (atomic replace)")
     p.add_argument("--no_az", action="store_true",
                    help="univ4 only: disable the A_Z axial adapter "
                         "(U-noAZ / SYZ-noAZ ablation arms, EXP-025)")
@@ -284,6 +296,7 @@ def main() -> None:
                   "window_t": 3 if args.model == "video3d" else 1,
                   "use_az": (args.model != "univ4") or (not args.no_az)},
         **({"regime_mix": args.regime_mix} if args.regime_mix else {}),
+        **({"regime_weights": args.regime_weights} if args.regime_weights else {}),
         "optim": {"steps": args.steps, "batch": args.batch, "lr": args.lr,
                   "accum": args.accum, "warmup_steps": args.warmup_steps},
         "patch": args.patch, "seed": args.seed,
@@ -320,8 +333,31 @@ def main() -> None:
 
         mix_rng = torch.Generator().manual_seed(args.seed)
 
+        # EXP-028: per-regime sampling weights.  A point in regime r draws
+        # P(point) = w_r / sum(w) / n_points_r -- regime-level shares are
+        # w-normalised, points stay uniform within a regime.
+        if args.regime_weights:
+            wmap = {}
+            for part in args.regime_weights.split(","):
+                m, w = part.strip().split(":")
+                wmap[m] = float(w)
+            missing = {m for m, _ in mix_points} - set(wmap)
+            assert not missing, f"regime_weights missing regimes: {missing}"
+            counts: dict[str, int] = {}
+            for m, _ in mix_points:
+                counts[m] = counts.get(m, 0) + 1
+            wsum = sum(wmap[m] for m in counts)
+            point_probs = torch.tensor(
+                [wmap[m] / wsum / counts[m] for m, _ in mix_points],
+                dtype=torch.float64)
+        else:
+            point_probs = None
+
         def _next_mixed_batch():
-            i = int(torch.randint(len(train_loaders), (1,), generator=mix_rng))
+            if point_probs is not None:
+                i = int(torch.multinomial(point_probs, 1, generator=mix_rng))
+            else:
+                i = int(torch.randint(len(train_loaders), (1,), generator=mix_rng))
             loader = train_loaders[i]
             if not hasattr(loader, "_mix_iter"):
                 loader._mix_iter = iter(loader)
@@ -360,7 +396,7 @@ def main() -> None:
         # memory per sample is much higher than training -- cap the val batch
         # by the training micro-batch (EXP-018: video3d OOM'd at val with 4).
         val_loader = DataLoader(val_ds, batch_size=min(4, args.batch), num_workers=2)
-        _next_mixed_batch, validate_mixed, val_t = None, None, t
+        _next_mixed_batch, validate_mixed, val_t, mix_rng = None, None, t, None
 
     model = build_model(preset, t, args.base, args.window, args.model,
                         axial_at=args.axial_at, output=args.output,
@@ -383,11 +419,35 @@ def main() -> None:
     scaler = torch.amp.GradScaler("cuda" if device.type == "cuda" else "cpu")
 
     log_path = out_dir / "log.csv"
-    with open(log_path, "w", newline="") as f:
-        csv.writer(f).writerow(["step", "loss", "l1", "ms_ssim", "dc", "lr", "elapsed_s"])
+    # DEC-027 C (checkpoint-resume): --resume restores model/opt/sched/
+    # scaler/step/best_psnr/mix_rng from the last periodic snapshot.
+    # Stated limitation: dataloader worker RNG is not snapshotted, so the
+    # batch sequence after a resume differs from an uninterrupted run.
+    resume_path = out_dir / "resume.pt"
+    start_step, best_psnr = 0, -math.inf
+    if args.resume and resume_path.exists():
+        ck = torch.load(resume_path, map_location=device, weights_only=False)
+        model.load_state_dict(ck["model"])
+        opt.load_state_dict(ck["opt"])
+        sched.load_state_dict(ck["sched"])
+        scaler.load_state_dict(ck["scaler"])
+        start_step, best_psnr = ck["step"], ck["best_psnr"]
+        if ck.get("mix_rng") is not None and mix_rng is not None:
+            mix_rng.set_state(ck["mix_rng"])
+        print(f"[{name}] resumed from step {start_step} "
+              f"(best_psnr={best_psnr:.2f})", flush=True)
+    if start_step == 0:
+        with open(log_path, "w", newline="") as f:
+            csv.writer(f).writerow(["step", "loss", "l1", "ms_ssim", "dc",
+                                    "lr", "elapsed_s"])
+    else:
+        with open(log_path, "a", newline="") as f:
+            csv.writer(f).writerow(["step", "loss", "l1", "ms_ssim", "dc",
+                                    "lr", "elapsed_s", "resumed_from",
+                                    start_step])
 
-    best_psnr, t0 = -math.inf, time.time()
-    step = 0
+    t0 = time.time()
+    step = start_step
     model.train()
     n_feats = len(preset["features"])
 
@@ -457,6 +517,16 @@ def main() -> None:
                             "val": vm}, out_dir / "best.pt")
             print(f"[{name}] step {step + 1}: loss={loss.item():.4f} "
                   f"val PSNR={vm['psnr']:.2f} SSIM={vm['ssim']:.4f}", flush=True)
+        if (step + 1) % args.ckpt_every == 0:
+            # DEC-027 C: atomic periodic snapshot (tmp + os.replace) so a
+            # crash mid-write never corrupts the resume point.  Placed after
+            # the val block so best_psnr is current when snapshotted.
+            snap = {"model": model.state_dict(), "opt": opt.state_dict(),
+                    "sched": sched.state_dict(), "scaler": scaler.state_dict(),
+                    "step": step + 1, "best_psnr": best_psnr,
+                    "mix_rng": mix_rng.get_state() if mix_rng is not None else None}
+            torch.save(snap, out_dir / "resume_tmp.pt")
+            os.replace(out_dir / "resume_tmp.pt", resume_path)
         step += 1
 
     torch.save({"model": model.state_dict(), "config": config},

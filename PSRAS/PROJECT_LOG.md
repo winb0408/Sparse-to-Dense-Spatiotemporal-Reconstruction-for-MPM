@@ -1461,6 +1461,27 @@ val 口径全部读数与 test 同向（详见各 run val_metrics_corrected_*.js
 
 **执行记录（收口，2026-10-06 17:30）**：零训练；90/90 reval（6 ckpt × 5 点 × 3 噪声栈）全成、0 失败，GPU3 约 8 分钟（每 reval ~5s，模型小 + 8 items）；实现 = make_val_dataset 新增 gt_stack/stacks_override/frame_range paired 模式 + reval.py --noise_stack；新脚本 scripts/visualize_noise_stress.py（panel/curve）。
 
+### EXP-028（预注册）：regime 加权采样重训——XYZ 加权 1:1:2 直接检验 Extension gate（用户批准，2026-10-06）
+
+**目的**（DEC-027 决策框架 A；EXP-026 结果6 ①）：回答 Extension gate 能否达标——XYZ 采样占比提高后，15 点统一模型能否在 XYZ 套件追平 specialist（≤0.5 dB 容差），以及为此付出的 Y/YZ 边际代价。
+
+**勘误（DEC-027 表 A 方向性错误）**：决策框架表中 A 的字面描述"Y:YZ:XYZ 各 1/3，而非点均匀"经算术核查方向相反——U15 点均匀的实际占比是 **Y 20% / YZ 40% / XYZ 40%**（y 3 点、yz2 6 点、xyz2 6 点），各 1/3 会把 XYZ 降到 33%、把 Y 升到 33%，按稀释定律将**加深** Extension 差距。经用户确认改为 **XYZ 加权 1:1:2**（与"修复 Extension gate"的目标一致）。
+
+**Arm（全称+缩写双写法）**：
+| 缩写 | 全称 | 训练数据 / 采样权重 |
+|---|---|---|
+| U15W | Unified 15-point Weighted | 与 U15 相同 15 点集合；regime 权重 y:yz2:xyz2 = 1:1:2 → 批次占比 Y 25% / YZ 25% / XYZ 50%（regime 内点均匀） |
+
+3 seed（UNIV4_U15W_s{0,1,2}）× 7950 步，其余超参与 U15 严格一致（b4f / univ4 --no_az / batch 8 / lr 2e-4 / patch 256 / psf_xy 1.0 psf_z 1.5）。对照臂不重训：U15、SXYZ（EXP-026）、U_noAZ（EXP-025）。
+
+**判读规则（预注册）**：
+1. **Extension gate（主判定）**：U15W − SXYZ 逐 seed 配对（XYZ 套件 6 点均值），≥2/3 seed ≥ −0.5 dB；
+2. **Regression gate**：U15W − U_noAZ 逐 seed 配对（Y 套件与 YZ 套件分别），≥2/3 seed 回退 ≤ 0.5 dB；
+3. **权衡刻画（描述性）**：U15W − U15 逐 seed 配对（三套件分别）——容量从 Y/YZ 移向 XYZ 的边际收益/代价（稀释定律的定量化测量点）；
+4. **回退分支**：1 达标 + 2 失败 → 三 regime 下 0.5 dB 容差无帕累托可行解（稀释定律定量结论，仍可写）；双达标 → "三 regime 统一不牺牲 specialist"主张完整；1 失败 → share 主导假设证伪，转向容量/干扰假设（两阶段训练为后续候选）。
+
+**执行（启动前）**：① train.py 新增 --regime_weights（点采样按 regime 权重）；② checkpoint-resume 机制（DEC-027 决策框架 C，本实验前落地）：--ckpt_every 500 步原子写 resume.pt（model/opt/sched/scaler/step/best_psnr/mix_rng），--resume 续训，崩溃恢复不再整 run 重跑；③ GPU3 串行 3 run（~21h，TMPDIR=/data2/wjb/tmp，完成判据 final_val.json 存在性）；④ 评估 = 15 点双口径 reval（EXP-026 同协议）+ EXP-027 noise_stress 5 点（U15W vs U15 噪声稳健性描述性对照）+ 可视化（curve 三线 + 代表点 panel，输出 eval_viz/exp028_regime_weight/，路径 md 备注）。
+
 ### EXP-021（预注册）：M1 no-PSF 消融（用户指示）+ 我方 2D b1 补跑
 
 **动机**（用户指示"再启动 no-PSF 消融（M1）"）：量化"真 3D 各向异性 PSF 先验"本身的贡献。若无 PSF（H=I），Wiener 退卷积退化为平凡操作（x0≈y 的插值填充），EXP-020 中 z 情境 +5.4~+7.3 的跨架构 Wiener 增益若消失，则该增益可归因于各向异性 PSF 的可逆模糊结构，而非"多一路输入通道"。

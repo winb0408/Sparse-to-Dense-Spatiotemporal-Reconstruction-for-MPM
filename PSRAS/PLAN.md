@@ -89,7 +89,8 @@ legacy（threePM 旧分支）结果只引用不作证据；实验记录统一"�
   - U15 vs U_noAZ 噪声稳健性无差（|Δ|<0.5 符号混合）→ XYZ 稀释是容量问题非稳健性问题
   - **退化主因是网络放大噪声而非先验坍塌**（x0 先验退化远小于输出；网络比自身先验低 2~5 dB，仍高于原始输入 +4~+8 dB）→ 噪声感知训练为新候选方向（EXP-027 结果4）
   - 可视化：`eval_viz/exp027_noise_stress/`（noise_curve + 5 panel）；x0 数值 `runs_v3/exp027_x0_prior_noise.json`
-- [ ] 候选：regime 加权采样修复 Extension gate（EXP-026 结果6；用户已批准为下一步 A，与 checkpoint-resume C 并行）
+- [ ] 🔵 EXP-028（进行中，2026-10-06 启动）：regime 加权采样 U15W 重训（y:yz2:xyz2 = 1:1:2 → 批次占比 25/25/50；用户确认——DEC-027 表 A『各 1/3』字面方向相反已勘误）；判读 = Extension gate（U15W−SXYZ）+ Regression gate（U15W−U_noAZ）+ U15W−U15 权衡刻画
+- [x] checkpoint-resume（DEC-027 C）：train.py --ckpt_every 原子快照 + --resume（2026-10-06 落地，冒烟通过）
 
 ### Phase 6 — Protocol A / Real Acquisition ⬜
 - [ ] hardware-realistic sparse acquisition（pollen 等）
