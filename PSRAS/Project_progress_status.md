@@ -55,13 +55,24 @@ Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖
 
 （val 口径同序；(2,8)/(4,4) 为 3 种子均值，(8,2) 单种子如实标注；原始 json 在 runs_v3/YZ_*/）
 
-## 4. 下一步（待用户批准后预注册）
+## 4. 经验与不足（Phase 4+5 复盘，详见 PROJECT_LOG.md DEC-027）
 
-1. ✅ **Phase 4 Unified Framework 已收口（EXP-025，2026-09-26）**：15/15 run + 270 个 reval json。判读：① Unified gate Y 套件临界未达（U−SY 三种子 −0.54/−0.62/−0.74，均超 −0.5 线；Y 套件 yK2 最易点稀释 −1.2~−1.6 dB 为主因）、YZ 套件达标（−0.38/+0.09/+0.23）；② A_Z 无稳健增量（两系列 5/6 种子为负，U_noAZ 为 YZ 套件最佳 arm）→ 回退叙事成立：轴向耦合由物理先验通道承载即可，最终架构 **UnifiedV4-noAZ**；③ specialist 跨 regime 迁移代价 1.4~2.6 dB，unified 压缩至 ≤0.74 dB（核心卖点成立）。详见 PROJECT_LOG.md EXP-025（结果1-5）。
-2. 候选并行：regime 加权采样修复 Extension gate（EXP-026 结果6 建议）、noise_stress（F1/F2/F3 配对 GT，复用 U15/U_noAZ checkpoint）、稳健性扫描（λ 敏感性 / PSF mismatch）。
-3. 远期：Phase 5 XYZ/XYT、Phase 6 Protocol A（pollen 真实采集）。
+**方法论经验**：① 零初始化恒等构造 + 预注册消融使架构问题低成本裁决（A_Z 两轮证伪成完整证据链）；② 逐 seed 配对 + val/test 双口径是 0.5 dB 判读最低门槛；③ 通道化 conditioning 的 regime 扩展成本极低（xyz2 仅 ~30 行 mask 代码，先验管线零改动）；④ 零样本基线先行锁定结论边界；⑤ 预注册回退分支让 gate 未达实验仍有完整产出。
 
-## 5. 资源状态
+**不足**：① 均匀点采样稀释定律——gate 0.5 dB 容差在 ≥12 点混合下结构性无法满足（数据占比决定回退幅度，EXP-026 XYZ 仅 6/15 → −0.6~−1.2 dB）；② 无 checkpoint-resume（崩溃即 7h 级重跑，两次事故损失 ~20 GPU·h）；③ bash 链 exit-0 误报（OOM/ENOSPC 崩溃被记为成功，须以 final_val.json 存在性为准）；④ 共享 GPU 脆弱（他人进程 5 run 崩溃，wait_idle 为事后补丁）；⑤ 单数据集依赖（全部结论基于 CIDC25 仿真，外部效度检验未开始）。
 
-- GPU1 他人进程（EikonalViT，~13GB）；GPU2/3 空闲（EXP-025 全部链 2026-09-26 11:59 DONE）；GPU0 他人进程不碰。根分区 / 接近满（~900MB 空闲，/tmp 31GB 垃圾），建议清理；本项目长链已统一 TMPDIR=/data2/wjb/tmp。
-- runs_v3/：EXP-022 36 run + EXP-023 先验扫描 + EXP-024 40 run + EXP-025 15 run（UNIV4_*），全部含完整 config 与双口径指标。
+## 5. 下一步（决策框架见 DEC-027，待用户批准后预注册）
+
+| 候选 | 投入 | 产出 | 状态 |
+|---|---|---|---|
+| B. noise_stress（F1/F2/F3 配对 GT，复用 U15/U_noAZ） | ~3h 评估 | 稳健性章节 + 外部效度首检 | 快赢，建议先做 |
+| A. regime 加权采样（U15 重训 3 seed） | 3 run ~21h | Extension gate 能否达标的直接回答 | 主判据修复 |
+| C. checkpoint-resume 机制 | ~2h 实现 | 消除长链重跑风险（工程债） | 并行实现 |
+| D. Phase 6 Protocol A 预调研（pollen 数据可行性） | 0.5 天调研 | 论文最终 gate 可行性判定 | 远期 |
+
+论文素材现状：Fig1-6 齐备（EXP-022~026），Fig7（XYT）数据依赖缺，Fig8（真实采集/噪声）待 B/D 补。
+
+## 6. 资源状态
+
+- GPU1/2/3 空闲（EXP-026 全部链 2026-10-03 18:23 DONE）；GPU0 他人进程不碰。根分区 / 接近满（~900MB 空闲，/tmp 31GB 垃圾），建议清理；本项目长链已统一 TMPDIR=/data2/wjb/tmp。
+- runs_v3/：EXP-022 36 run + EXP-023 先验扫描 + EXP-024 40 run + EXP-025 15 run + EXP-026 6 run（UNIV4_*），全部含完整 config 与双口径指标。
