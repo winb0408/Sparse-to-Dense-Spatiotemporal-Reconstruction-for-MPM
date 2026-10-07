@@ -78,7 +78,7 @@ legacy（threePM 旧分支）结果只引用不作证据；实验记录统一"�
 - [x] 主验证采样点：全 9 点双口径（y-K{2,4,8} + yz2-6 组合）
 - Gate：**部分通过**——YZ 套件达标（−0.38/+0.09/+0.23）；Y 套件临界未达（−0.54/−0.62/−0.74，超线 0.04~0.24 dB，归因混合稀释，yK2 最易点 −1.2~−1.6 dB 为主因）；specialist 跨 regime 迁移代价 1.4~2.6 dB vs unified ≤0.74 dB（核心卖点成立）
 
-### Phase 5 — XYZ / XYT Extension 🔵（XYZ 已收口 EXP-026；noise_stress 已收口 EXP-027，2026-10-06；XYT 延后）
+### Phase 5 — XYZ / XYT Extension ✅ 主体关闭（EXP-026/027/028 收口 2026-10-07；XYT 数据依赖维持延后）
 - [x] XYZ：full spatial undersampling 鲁棒性（xyz2 regime：cross 网格 + 平面跳采，6 点；SXYZ vs U15 15 点统一）
   - Extension gate **未达**：U15−SXYZ = −1.15/−0.61/−0.83（3/3 超线，混合稀释归因；U15 仍达 XYZ 34.5~35.0 dB 三 regime 全覆盖）
   - Regression gate **达标**：vs EXP-025 U_noAZ，Y −0.53/−0.39/−0.57、YZ −0.24/−0.95/−0.09
@@ -89,7 +89,8 @@ legacy（threePM 旧分支）结果只引用不作证据；实验记录统一"�
   - U15 vs U_noAZ 噪声稳健性无差（|Δ|<0.5 符号混合）→ XYZ 稀释是容量问题非稳健性问题
   - **退化主因是网络放大噪声而非先验坍塌**（x0 先验退化远小于输出；网络比自身先验低 2~5 dB，仍高于原始输入 +4~+8 dB）→ 噪声感知训练为新候选方向（EXP-027 结果4）
   - 可视化：`eval_viz/exp027_noise_stress/`（noise_curve + 5 panel）；x0 数值 `runs_v3/exp027_x0_prior_noise.json`
-- [ ] 🔵 EXP-028（进行中，2026-10-06 启动）：regime 加权采样 U15W 重训（y:yz2:xyz2 = 1:1:2 → 批次占比 25/25/50；用户确认——DEC-027 表 A『各 1/3』字面方向相反已勘误）；判读 = Extension gate（U15W−SXYZ）+ Regression gate（U15W−U_noAZ）+ U15W−U15 权衡刻画
+- [x] EXP-028（收口 2026-10-07）：regime 加权 U15W（1:1:2）——**Extension gate 3/3 未达（−1.03/−1.03/−0.73），share 主导假设证伪**：XYZ 占比 40%→50% 差距不动，XYZ 增益 ~0（+0.12/−0.42/+0.11）而 Y 付 −0.6；稀释定律修正 = 采样权重只移动回退分配、不缩小统一-专训差距（容量/干扰归因）；Regression gate 技术性达标但回退加深；噪声稳健性不变。图：`eval_viz/exp028_regime_weight/`
+- [ ] 候选（未预注册）：两阶段训练（U_noAZ 预训练 → XYZ 微调）/ 容量扩展 / 噪声感知训练（EXP-027 结果4）
 - [x] checkpoint-resume（DEC-027 C）：train.py --ckpt_every 原子快照 + --resume（2026-10-06 落地，冒烟通过）
 
 ### Phase 6 — Protocol A / Real Acquisition ⬜
