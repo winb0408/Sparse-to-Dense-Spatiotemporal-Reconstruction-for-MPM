@@ -71,11 +71,11 @@ Phase 5 XYZ 已收口（EXP-026）：15 点统一模型 U15 三 regime 全覆盖
 | D. Phase 6 Protocol A 预调研（pollen 数据可行性） | 0.5 天调研 | 论文最终 gate 可行性判定 | ⬜ 用户指示暂不做 |
 | E. 噪声感知训练（EXP-027 结果4 指向） | 未预注册 | 收回 F1-F3 下 2~5 dB 网络噪声放大损失 | 新增候选，待讨论 |
 
-论文素材现状：Fig1-6 齐备（EXP-022~026），Fig7（XYT）数据依赖缺，Fig8（真实采集/噪声）noise_stress 侧已齐（EXP-027，图在 `eval_viz/exp027_noise_stress/`），真实采集侧待 D。
+论文素材现状：Fig1-6 齐备（EXP-022~026），统一图集见 `eval_viz/paper_figures/`，Fig7（XYT）数据依赖缺，Fig8（真实采集/噪声）noise_stress 侧已齐（EXP-027，图在 `eval_viz/exp027_noise_stress/`），真实采集侧待 D。
 
 ## 6. 资源状态
 
 - GPU1/2/3 空闲（EXP-028 链 2026-10-07 10:34 DONE + reval 10:40 DONE）；GPU0 他人进程不碰。根分区 / 接近满（~900MB 空闲，/tmp 31GB 垃圾），建议清理；本项目长链已统一 TMPDIR=/data2/wjb/tmp。
 - runs_v3/：EXP-022 36 run + EXP-023 先验扫描 + EXP-024 40 run + EXP-025 15 run + EXP-026 6 run + EXP-027 90 noise_stress reval + EXP-028 3 run（UNIV4_U15W_*）× 45 reval，全部含完整 config 与双口径指标。
-- 可视化产物：`eval_viz/exp027_noise_stress/`（noise_curve + 5 panel）；`eval_viz/exp028_regime_weight/`（exp028_suite_curves 三套件三线对比）；x0 先验数值 `runs_v3/exp027_x0_prior_noise.json`。
-- 可视化产物：`eval_viz/exp027_noise_stress/`（noise_curve + 5 panel，PNG+PDF）；x0 先验数值 `runs_v3/exp027_x0_prior_noise.json`。
+- 可视化产物：`eval_viz/exp027_noise_stress/`（noise_curve + 5 panel，PNG+PDF）；`eval_viz/exp028_regime_weight/`（exp028_suite_curves 三套件三线对比）；x0 先验数值 `runs_v3/exp027_x0_prior_noise.json`。
+- 论文级图集：`eval_viz/paper_figures/`（交付 2026-10-19，脚本 `scripts/paper_figs.py`）——创新点 C1~C4 各有定量图 + 定性重建图，索引见 `eval_viz/paper_figures/INDEX.md`；数值备份 `key_numbers.csv`，定性面板原始数组 `*_data.npz`；未新增实验，全部由已提交 ckpt 复现。
