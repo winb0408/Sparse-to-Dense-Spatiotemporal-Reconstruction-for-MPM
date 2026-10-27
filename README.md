@@ -2,6 +2,13 @@
 
 **Three-Photon Microscopy** | Swin-UNet 2D / Video Swin-UNet 3D | DINOv2 + MS-SSIM Loss
 
+> **2026-10-19 — PSRAS v4 review snapshot**: the protocol-level rewrite lives in
+> [`PSRAS/`](PSRAS/) and its curated, self-contained review package (progress
+> assessment, innovation claims + evidence, figures, negative results) is in
+> [`REVIEW_v4/`](REVIEW_v4/). Start at [`REVIEW_v4/00_README.md`](REVIEW_v4/00_README.md).
+> Everything in this root directory is the frozen legacy pipeline and is *not* part
+> of the current evidence base.
+
 ---
 
 ## 当前推荐阅读路径
