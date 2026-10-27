@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spur-mpm"
+version = "0.1.0"
+description = "SPUR-MPM: self-supervised, physics-guided, uncertainty-aware sparse reconstruction for multiphoton microscopy"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = ["spur_mpm*"]
+
+[tool.pytest.ini_options]
+testpaths = ["spur_mpm/tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]

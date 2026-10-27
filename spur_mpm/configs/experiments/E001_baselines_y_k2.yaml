@@ -1,0 +1,14 @@
+# SPUR-E001 — no-learning baselines under Y-line skipping, k_y = 2.
+# Arms A0 (interpolation) and A1 (FillFirst-Wiener) are evaluated directly;
+# there is nothing to train.
+experiment: SPUR-E001
+model:
+  arm: A0
+sampling:
+  mode: y
+  ky: 2
+  kz: 1
+data:
+  context_slices: 1
+eval:
+  z_stride: 1

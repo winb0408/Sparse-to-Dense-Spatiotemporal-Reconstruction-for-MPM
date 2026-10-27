@@ -1,0 +1,79 @@
+# SPUR-MPM base configuration.
+# Every experiment YAML is merged onto this file; --set key=value overrides last.
+# A run's config.yaml in its run directory is the fully-resolved result.
+
+experiment: SPUR-E000
+
+data:
+  index: data_local/cache/index.json          # written by scripts/prepare_data.py
+  split: spur_mpm/experiments/E000_data_audit/split.json
+  fold: 0
+  patch_hw: [256, 256]
+  # Depth context. Express it in micrometres whenever more than one plane is
+  # stacked: two stacks with different z_step must be compared at equal
+  # physical context, not at equal slice count (plan §3.3).
+  context_slices: 1
+  context_z_um: null
+
+sampling:
+  mode: y            # y | z | yz | xy | full
+  ky: 2              # row spacing (Y-line skipping)
+  kz: 1              # plane spacing (depth skipping)
+  pattern: grid      # xy mode only: grid | rows | random
+  seed: 0
+
+physics:
+  # Identity PSF on purpose: real MPM stacks already carry the true optics.
+  # A non-identity PSF is a labelled degradation stress test only (plan §3.1).
+  psf:
+    sigma_xy_um: 0.0
+    sigma_z_um: 0.0
+    voxel_xy_um: 0.98
+    voxel_z_um: 5.0
+  lam: 0.01          # Wiener regularisation
+  u_kind: geo        # geo | phys | mean   (U channel source)
+  geo_mode: per_axis # per_axis | physical
+
+noise:               # extra synthetic noise; real data normally needs none
+  poisson_photons: 0.0
+  gaussian_sigma: 0.0
+  seed: 0
+
+selfsupervision:
+  ratio: 0.5         # fraction of MEASURED positions withheld as targets
+  geometry: row      # row | plane | scatter
+
+model:
+  arm: SS1
+  base: 48
+  window: 8
+  depths: [2, 2, 2]
+  heads: [4, 8, 16]
+
+train:
+  steps: 3000
+  batch: 8
+  lr: 2.0e-4
+  weight_decay: 1.0e-4
+  warmup_steps: 100
+  accum: 1
+  amp: true
+  patches_per_epoch: 1000
+  num_workers: 4
+  val_every: 500
+  log_every: 50
+  ckpt_every: 500
+
+loss:
+  l1: 1.0            # supervised arms only
+  ms_ssim: 0.5       # supervised arms only
+  rho: charbonnier   # self-supervised MMS penalty: l1 | l2 | charbonnier
+  dc_weight: 0.0     # measurement consistency; 0 = off (separate ablation)
+
+eval:
+  z_stride: 1
+
+run:
+  seed: 0
+  device: cuda
+  out_root: runs

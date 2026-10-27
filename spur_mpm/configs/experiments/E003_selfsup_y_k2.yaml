@@ -1,0 +1,22 @@
+# SPUR-E003 — self-supervised arms under Y-line skipping, k_y = 2.
+# Arms SS0 / SS1 / SS2 (+ SS2g with gated fusion).
+# The dense reference is NEVER read here: model selection uses the held-out
+# measurement loss on the validation group.
+experiment: SPUR-E003
+model:
+  arm: SS1
+sampling:
+  mode: y
+  ky: 2
+  kz: 1
+selfsupervision:
+  ratio: 0.5
+  geometry: row
+data:
+  context_slices: 1
+train:
+  steps: 3000
+  batch: 8
+loss:
+  rho: charbonnier
+  dc_weight: 0.0

@@ -1,0 +1,49 @@
+# Dataset spec for the Dryad 3P longitudinal dataset
+# (DOI 10.5061/dryad.wh70rxx2j; Schultz/Stas et al., amyloid plaques and
+# vascular degeneration). Read by scripts/audit_data.py.
+#
+# IMPORTANT: this file is a TEMPLATE. The glob patterns, filename regex and the
+# per-file metadata MUST be reconciled with the real archive once it is unpacked
+# (plan §2.2: "每个文件的轴顺序、页数、方向、样本身份和元数据要以实际 TIFF/README
+# 为准，不能从数组形状猜测"). Until then the audit will report unresolved
+# mouse_id / session_id / fov_id and refuse to produce a usable split.
+#
+# Official metadata to verify per file, not to assume:
+#   - Vessels*.tif / Plaques*.tif, plus GFP neuron/vessel series
+#   - typical XY pixel ~0.98 um; vessel/plaque Z-step 5 um; some neuron data 10 um
+#   - ~3 mice, multiple FOVs, two sessions, depth range ~0-900 um, 1340 nm
+
+name: dryad_3p_vessels
+root: data_local/dryad
+
+defaults:
+  axes: ZYX              # verify per file; a TYX file must NOT be loaded here
+  channel: vessels
+  voxel_xy_um: 0.98
+  z_step_um: 5.0
+  excitation_nm: 1340
+
+files:
+  - glob: "**/*Vessel*.tif"
+    metadata:
+      channel: vessels
+      z_step_um: 5.0
+  - glob: "**/*Vessel*.tiff"
+    metadata:
+      channel: vessels
+      z_step_um: 5.0
+  - glob: "**/*Plaque*.tif"
+    metadata:
+      channel: plaques
+      z_step_um: 5.0
+  - glob: "**/*Neuron*.tif"
+    metadata:
+      channel: neurons
+      z_step_um: 10.0    # confirm: neuron stacks in this dataset differ
+
+# Fill in once the archive layout is known. Example shape:
+# filename_regex: '(?P<mouse>M\\d+)[_-](?P<session>s\\d+)[_-](?P<fov>FOV?\\d+)'
+filename_regex: null
+
+# Exact per-filename overrides win over every pattern above.
+per_file: {}

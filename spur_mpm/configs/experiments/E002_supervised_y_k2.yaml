@@ -1,0 +1,19 @@
+# SPUR-E002 — supervised upper bound under Y-line skipping, k_y = 2.
+# Arms S0 / S1 / S2, identical backbone, sampling instance and budget.
+# These arms MAY train on the dense reference: they define the ceiling the
+# self-supervised arms are compared against, not the paper's zero-label claim.
+experiment: SPUR-E002
+model:
+  arm: S1
+sampling:
+  mode: y
+  ky: 2
+  kz: 1
+data:
+  context_slices: 1
+train:
+  steps: 3000
+  batch: 8
+loss:
+  l1: 1.0
+  ms_ssim: 0.5
