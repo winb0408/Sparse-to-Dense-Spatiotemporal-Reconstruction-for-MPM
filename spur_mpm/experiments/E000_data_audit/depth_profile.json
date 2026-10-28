@@ -1,0 +1,302 @@
+[
+ {
+  "sample_id": "M1_FOVII_S1_vessels",
+  "n_planes": 202,
+  "depth_span_um": 1005.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.7813377770899445,
+  "noisiest_plane": 196,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 43211.375,
+    "p99": 48878.0
+   },
+   {
+    "depth_um": 500.0,
+    "mean": 34589.91796875,
+    "p99": 40699.578125
+   },
+   {
+    "depth_um": 1005.0,
+    "mean": 33762.6796875,
+    "p99": 35531.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.71 of its maximum across the stack (depth 0->1005 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M1_FOVII_S2_vessels",
+  "n_planes": 190,
+  "depth_span_um": 945.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.9032593876439254,
+  "noisiest_plane": 179,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 37602.203125,
+    "p99": 42714.0
+   },
+   {
+    "depth_um": 470.0,
+    "mean": 34190.7578125,
+    "p99": 40959.578125
+   },
+   {
+    "depth_um": 945.0,
+    "mean": 33964.54296875,
+    "p99": 35766.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.73 of its maximum across the stack (depth 0->945 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M1_FOVI_S1_vessels",
+  "n_planes": 202,
+  "depth_span_um": 1005.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.7592169736396687,
+  "noisiest_plane": 199,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 43410.6953125,
+    "p99": 48302.578125
+   },
+   {
+    "depth_um": 500.0,
+    "mean": 34650.0390625,
+    "p99": 43659.578125
+   },
+   {
+    "depth_um": 1005.0,
+    "mean": 32958.13671875,
+    "p99": 34005.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.70 of its maximum across the stack (depth 0->1005 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M1_FOVI_S2_vessels",
+  "n_planes": 188,
+  "depth_span_um": 935.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.7933358554502323,
+  "noisiest_plane": 187,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 39700.859375,
+    "p99": 44563.0
+   },
+   {
+    "depth_um": 465.0,
+    "mean": 33149.77734375,
+    "p99": 37260.0
+   },
+   {
+    "depth_um": 935.0,
+    "mean": 31496.115234375,
+    "p99": 32896.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.73 of its maximum across the stack (depth 0->935 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M2_FOVII_S1_vessels",
+  "n_planes": 203,
+  "depth_span_um": 1010.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.7987053364777871,
+  "noisiest_plane": 200,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 43113.27734375,
+    "p99": 47390.0
+   },
+   {
+    "depth_um": 505.0,
+    "mean": 35867.6875,
+    "p99": 44632.578125
+   },
+   {
+    "depth_um": 1010.0,
+    "mean": 34434.8046875,
+    "p99": 37033.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.75 of its maximum across the stack (depth 0->1010 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M2_FOVII_S2_vessels",
+  "n_planes": 202,
+  "depth_span_um": 1005.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.7795601577351055,
+  "noisiest_plane": 201,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 42925.01171875,
+    "p99": 48152.578125
+   },
+   {
+    "depth_um": 500.0,
+    "mean": 34003.2109375,
+    "p99": 38231.3125
+   },
+   {
+    "depth_um": 1005.0,
+    "mean": 33462.62890625,
+    "p99": 34887.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.72 of its maximum across the stack (depth 0->1005 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M2_FOVI_S1_vessels",
+  "n_planes": 201,
+  "depth_span_um": 1000.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.9225330782194566,
+  "noisiest_plane": 200,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 36174.61328125,
+    "p99": 40349.0
+   },
+   {
+    "depth_um": 500.0,
+    "mean": 34541.8984375,
+    "p99": 40232.578125
+   },
+   {
+    "depth_um": 1000.0,
+    "mean": 33372.27734375,
+    "p99": 34602.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.72 of its maximum across the stack (depth 0->1000 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M2_FOVI_S2_vessels",
+  "n_planes": 152,
+  "depth_span_um": 755.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.827606778057285,
+  "noisiest_plane": 151,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 41415.58203125,
+    "p99": 48004.0
+   },
+   {
+    "depth_um": 375.0,
+    "mean": 34821.10546875,
+    "p99": 38886.0
+   },
+   {
+    "depth_um": 755.0,
+    "mean": 34275.81640625,
+    "p99": 37071.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.76 of its maximum across the stack (depth 0->755 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M3_FOVI_S1_vessels",
+  "n_planes": 158,
+  "depth_span_um": 785.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.9099046510834911,
+  "noisiest_plane": 157,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 36658.125,
+    "p99": 42332.0
+   },
+   {
+    "depth_um": 390.0,
+    "mean": 33566.25,
+    "p99": 35666.578125
+   },
+   {
+    "depth_um": 785.0,
+    "mean": 33355.3984375,
+    "p99": 34594.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.75 of its maximum across the stack (depth 0->785 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ },
+ {
+  "sample_id": "M3_FOVI_S2_vessels",
+  "n_planes": 168,
+  "depth_span_um": 835.0,
+  "max_saturated_frac": 0.0,
+  "max_zero_frac": 0.0,
+  "descending_ratio": 0.7917592704035955,
+  "noisiest_plane": 164,
+  "bands": [
+   {
+    "depth_um": 0.0,
+    "mean": 41899.44921875,
+    "p99": 46456.578125
+   },
+   {
+    "depth_um": 415.0,
+    "mean": 33934.30078125,
+    "p99": 36999.578125
+   },
+   {
+    "depth_um": 835.0,
+    "mean": 33174.27734375,
+    "p99": 34118.0
+   }
+  ],
+  "problems": [],
+  "notes": [
+   "p99 falls to 0.72 of its maximum across the stack (depth 0->835 µm): the stack mixes an SNR regime, so depth-pooled metrics average over it and bands must be reported separately"
+  ]
+ }
+]
