@@ -194,6 +194,55 @@ def depth_table(runs: list[dict], index_path: Path, band_um: float = 200.0) -> s
     return "\n\n".join(chunks) if chunks else "_no per-sample rows found_"
 
 
+def depth_compare(runs: list[dict], index_path: Path, arm_a: str, arm_b: str,
+                  band_um: float = 200.0) -> str:
+    """Per-depth-band paired delta, ``arm_b - arm_a``.
+
+    A whole-stack mean can hide a method that helps the top of the stack and
+    hurts the bottom. The stacks lose 14-30% of their p99 with depth
+    (SPUR-E000b), so each band is a different SNR regime and the delta has to
+    be shown band by band.
+    """
+    steps: dict[str, float] = {}
+    per_arm: dict[str, dict[str, dict[str, list[float]]]] = {}
+
+    for run in runs:
+        arm = run.get("arm", "?")
+        if arm not in (arm_a, arm_b):
+            continue
+        path = Path(run["_samples"])
+        if not path.exists():
+            continue
+        for row in csv.DictReader(open(path)):
+            sid = row["sample_id"]
+            if sid not in steps:
+                steps[sid] = _step_of(index_path, sid)[0]
+            lo = int((float(row["query_z"]) * steps[sid]) // band_um) * int(band_um)
+            band = f"{lo}-{lo + int(band_um)}"
+            bucket = per_arm.setdefault(arm, {}).setdefault(
+                band, {m: [] for m in DEPTH_METRICS})
+            for metric in DEPTH_METRICS:
+                bucket[metric].append(float(row[metric]))
+
+    bands = sorted(set(per_arm.get(arm_a, {})) & set(per_arm.get(arm_b, {})),
+                   key=lambda b: int(b.split("-")[0]))
+    if not bands:
+        return "_no overlapping depth bands_"
+
+    lines = ["| depth (µm) | n | " + " | ".join(f"Δ{m}" for m in DEPTH_METRICS)
+             + " |", "|---|---|" + "---|" * len(DEPTH_METRICS)]
+    for band in bands:
+        cells, n = [], 0
+        for metric in DEPTH_METRICS:
+            va = per_arm[arm_a][band][metric]
+            vb = per_arm[arm_b][band][metric]
+            n = max(n, len(va))
+            cells.append(f"{sum(vb) / len(vb) - sum(va) / len(va):+.4f}"
+                         if va and vb else "—")
+        lines.append(f"| {band} | {n} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--pattern", required=True, help="glob of run directories")
@@ -218,6 +267,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.index:
         parts += ["", f"## 按深度分层（band {args.band_um:g} µm）", "",
                   depth_table(runs, args.index, args.band_um)]
+    if args.compare and args.index:
+        parts += ["", f"## 深度分层的配对差异（{args.compare[1]} − {args.compare[0]}）",
+                  "", depth_compare(runs, args.index, *args.compare, args.band_um)]
     parts += ["", "## 运行清单", "", "| arm | fold | run | checkpoint |", "|---|---|---|---|"]
     for run in runs:
         parts.append(f"| {run['arm']} | {_fold_of(run)} | `{run['_path']}` | "
