@@ -112,40 +112,59 @@ def validate(model, loader, device, *, supervision: str, rho: str,
              amp: bool, max_batches: int | None = None) -> dict:
     """Validation on a held-out group.
 
-    Reported for every arm: dense-reference PSNR/SSIM (comparison only) and the
-    held-out measurement loss (the selection metric for self-supervised arms).
+    Supervised arms see dense-reference PSNR/SSIM and select on it -- they are
+    the labelled upper bound by design.
+
+    Self-supervised arms select on the held-out measurement loss **and do not
+    compute the dense metrics at all**. Not "compute but ignore": if the number
+    exists in the log, someone will eventually pick a checkpoint with their eyes.
+    The dense reference for an SS arm is produced by ``evaluate.py`` after the
+    weights are frozen (plan §2.3, strict self-supervised accounting).
     """
     model.eval()
     crit = MMSLoss(rho=rho)
+    use_dense = supervision != "self"
     ps, ss, ms = [], [], []
+    n_batches = 0
     for bi, batch in enumerate(loader):
         if max_batches is not None and bi >= max_batches:
             break
+        n_batches += 1
         x = batch["inputs"].to(device, non_blocking=True)
         with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
             out = model(x)
         out = out.float()
         pred = _select_centre(out, batch["center_index"])
-        target = batch["target"].to(device)
-        ps.append(float(psnr(pred, target)))
-        ss.append(float(ssim(pred[:, None], target[:, None])))
+        if use_dense:
+            target = batch["target"].to(device)
+            ps.append(float(psnr(pred, target)))
+            ss.append(float(ssim(pred[:, None], target[:, None])))
         if batch["hold_mask"].sum() > 0:
             res = crit(pred, batch["hold_target"].to(device),
                        batch["hold_mask"].to(device))
             ms.append(float(res["mms"]))
     model.train()
-    out = {"dense_psnr": _mean(ps), "dense_ssim": _mean(ss), "n_val": len(ps)}
+    out = {"n_val": n_batches}
+    if use_dense:
+        out["dense_psnr"] = _mean(ps)
+        out["dense_ssim"] = _mean(ss)
     if ms:
         out["holdout_loss"] = _mean(ms)
     # The selection metric, stated explicitly so the run log records *what*
     # chose the checkpoint.
     if supervision == "self":
+        if out.get("holdout_loss") is None:
+            # A self-supervised arm with nothing withheld has no selection
+            # signal; picking the first checkpoint would be arbitrary.
+            raise RuntimeError(
+                "self-supervised selection requires a held-out measurement loss "
+                "on the validation group, but no holdout voxel was present")
         out["select_metric"] = "holdout_loss"
-        out["select_value"] = out.get("holdout_loss", float("-inf"))
+        out["select_value"] = out["holdout_loss"]
         out["select_maximise"] = False
     else:
         out["select_metric"] = "dense_psnr"
-        out["select_value"] = out["dense_psnr"]
+        out["select_value"] = out.get("dense_psnr")
         out["select_maximise"] = True
     return out
 
@@ -268,14 +287,15 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
             sel = vm["select_value"]
             better = (sel < best - 1e-9) if arm.supervision == "self" \
                 else (sel > best + 1e-9)
-            if better and sel is not None:
+            if better:
                 best = sel
                 torch.save({"model": model.state_dict(), "config": cfg,
                             "val": vm}, run.path / "best.pt")
+            dense = vm.get("dense_psnr")
+            extra = ("" if dense is None
+                     else f" densePSNR={round(dense, 2)}")
             print(f"[{run_name}] step {step+1}: {vm['select_metric']}="
-                  f"{sel:.4f} densePSNR="
-                  f"{vm['dense_psnr'] if vm['dense_psnr'] is None else round(vm['dense_psnr'], 2)}",
-                  flush=True)
+                  f"{sel:.4f}{extra}", flush=True)
 
         if (step + 1) % int(cfg["train"].get("ckpt_every", 500)) == 0:
             snap = {"model": model.state_dict(), "opt": opt.state_dict(),

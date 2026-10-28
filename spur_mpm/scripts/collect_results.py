@@ -22,7 +22,8 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-__all__ = ["load_runs", "main_table", "cross_animal_table", "depth_table"]
+__all__ = ["load_runs", "main_table", "compare_arms", "cross_animal_table",
+           "depth_table"]
 
 METRICS = ("psnr", "ssim", "mae", "e_measured", "e_missing", "dice", "cl_dice")
 
@@ -69,6 +70,50 @@ def main_table(runs: list[dict]) -> str:
                     per_fold.append(value)
             means.append(f"{sum(per_fold) / len(per_fold):.4f}" if per_fold else "—")
         lines.append(f"| {metric} | " + " | ".join(cells + means) + " |")
+    return "\n".join(lines)
+
+
+def compare_arms(runs: list[dict], arm_a: str, arm_b: str) -> str:
+    """Paired per-fold delta, ``arm_b - arm_a``.
+
+    Paired is the only comparison this dataset supports: between-animal spread
+    is ~2.8 dB, far larger than any method effect, so an unpaired mean over
+    three animals cannot resolve a difference. Within a fold both arms see the
+    same test animal and the same sampling instance, and the animal-specific
+    component cancels.
+
+    With three PAIRS a paired t-test would be theatre. What is reported is the
+    per-fold delta, the mean delta, and the sign count -- ``3/3 folds agree``
+    is a fact, ``p < 0.05`` on n=3 would not be.
+    """
+    folds = sorted({_fold_of(r) for r in runs})
+    lines = [f"| metric | " + " | ".join(f"fold{f}" for f in folds)
+             + " | mean Δ | folds favouring " + arm_b + " |",
+             "|---" * (2 + len(folds) + 2) + "|"]
+    for metric in METRICS:
+        cells, deltas, signs = [], [], 0
+        for fold in folds:
+            a = next((r for r in runs if r["arm"] == arm_a
+                      and _fold_of(r) == fold), None)
+            b = next((r for r in runs if r["arm"] == arm_b
+                      and _fold_of(r) == fold), None)
+            va = (a or {}).get("metrics", {}).get(metric, {}).get(
+                "mean_of_group_means")
+            vb = (b or {}).get("metrics", {}).get(metric, {}).get(
+                "mean_of_group_means")
+            if va is None or vb is None:
+                cells.append("—")
+                continue
+            d = vb - va
+            cells.append(f"{d:+.4f}")
+            deltas.append(d)
+            # lower is better for mae / e_*, higher for the rest
+            better = d < 0 if metric in ("mae", "e_measured", "e_missing") \
+                else d > 0
+            signs += int(better)
+        mean = f"{sum(deltas) / len(deltas):+.4f}" if deltas else "—"
+        lines.append(f"| {metric} | " + " | ".join(cells + [mean,
+                                                           f"{signs}/{len(deltas)}"]) + " |")
     return "\n".join(lines)
 
 
@@ -157,6 +202,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--title", default="")
     p.add_argument("--band-um", type=float, default=200.0)
+    p.add_argument("--compare", nargs=2, metavar=("ARM_A", "ARM_B"),
+                   default=None, help="add a paired per-fold delta table")
     args = p.parse_args(argv)
 
     runs = load_runs(args.pattern)
@@ -165,6 +212,9 @@ def main(argv: list[str] | None = None) -> int:
              main_table(runs), "",
              "## 跨动物汇总（每折留出一只鼠；n=3，报范围不报置信区间）", "",
              cross_animal_table(runs)]
+    if args.compare:
+        parts += ["", f"## 配对比较（{args.compare[1]} − {args.compare[0]}，逐折）", "",
+                  compare_arms(runs, *args.compare)]
     if args.index:
         parts += ["", f"## 按深度分层（band {args.band_um:g} µm）", "",
                   depth_table(runs, args.index, args.band_um)]
