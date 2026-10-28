@@ -119,3 +119,28 @@ def test_mms_loss_ignores_unheld_positions():
     target[1:] = 99.0                                  # must be ignored
     res = crit(pred, target, hold)
     assert float(res["loss"]) == pytest.approx(1.0)
+
+
+# --- window configuration -------------------------------------------------
+
+def test_plane_skipping_requires_a_window_deep_enough_to_see_a_plane():
+    from spur_mpm.data.datasets import required_context_depth, validate_context_depth
+
+    spec = SamplingSpec(mode="z", kz=2, ky=2)
+    assert required_context_depth(2) == 3
+    with pytest.raises(ValueError, match="skips planes"):
+        validate_context_depth(spec, context_depth=1)
+    validate_context_depth(spec, context_depth=3)      # one plane each side
+
+    kz4 = SamplingSpec(mode="yz", kz=4, ky=2)
+    assert required_context_depth(4) == 7
+    with pytest.raises(ValueError, match="at least 7"):
+        validate_context_depth(kz4, context_depth=3)
+    validate_context_depth(kz4, context_depth=7)
+
+
+def test_in_plane_sampling_needs_no_axial_context():
+    from spur_mpm.data.datasets import validate_context_depth
+
+    validate_context_depth(SamplingSpec(mode="y", ky=2), context_depth=1)
+    validate_context_depth(SamplingSpec(mode="xy", ky=2), context_depth=1)

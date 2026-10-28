@@ -59,7 +59,8 @@ DEFAULTS = Path(__file__).parent / "configs" / "base.yaml"
 def build_components(cfg: dict, arm_name: str, seed: int):
     """Datasets, loaders and the item config implied by an arm + config."""
     arm = get_arm(arm_name)
-    cache = VolumeCache.load(cfg["data"]["index"])
+    cache = VolumeCache.load(cfg["data"]["index"],
+                              fold=int(cfg["data"].get("fold", 0)))
     split = read_split(cfg["data"]["split"])
     folds = {int(f["fold"]): f for f in split["folds"]}
     fold = folds[int(cfg["data"]["fold"])]

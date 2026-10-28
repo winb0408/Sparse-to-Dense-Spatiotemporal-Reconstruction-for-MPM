@@ -54,17 +54,23 @@ def prepare(manifest_path: str | Path, split_path: str | Path, cache_dir: str | 
     rows = read_manifest(manifest_path)
     data_root = read_manifest_meta(manifest_path).get("dataset_root")
     split = read_split(split_path)
-    fold = {int(f["fold"]): f for f in split["folds"]}[calib_fold]
-    train_ids = set(fold["train"])
+    folds = {int(f["fold"]): f for f in split["folds"]}
+    if calib_fold not in folds:
+        raise SystemExit(f"calib_fold {calib_fold} not in the split ({sorted(folds)})")
+    train_ids = set(folds[calib_fold]["train"])
 
     volumes: list[CachedVolume] = []
-    train_arrays: list[np.ndarray] = []
+    arrays_by_id: dict[str, np.ndarray] = {}
     skipped: list[str] = []
 
     for row in rows:
         sid = str(row["sample_id"])
         if row.get("issues"):
             skipped.append(f"{sid}: {row['issues']}")
+            continue
+        if str(row.get("use", "trainable") or "trainable") != "trainable":
+            skipped.append(f"{sid}: use={row.get('use')} "
+                           f"({row.get('exclude_reason') or 'no reason'})")
             continue
         src = resolve_row_path(row, manifest_path, root=data_root)
         if not src.exists():
@@ -88,22 +94,36 @@ def prepare(manifest_path: str | Path, split_path: str | Path, cache_dir: str | 
         if not out.exists() or out.stat().st_size != arr.nbytes:
             np.save(out, arr)
         volumes.append(CachedVolume(sid, str(out), geom))
-        if sid in train_ids:
-            train_arrays.append(arr)
+        arrays_by_id[sid] = arr
 
     if not volumes:
         detail = "\n  ".join(skipped[:20]) or "(no rows in manifest)"
         raise SystemExit(f"no volumes prepared; every row was skipped:\n  {detail}")
-    if not train_arrays:
+    if not set(train_ids) & set(arrays_by_id):
         raise SystemExit(
             f"fold {calib_fold} has no training volumes among the prepared files; "
             "the calibration must be fitted on training groups only")
 
-    calib = IntensityCalibration.fit(train_arrays)
-    calib_path = Path(calib_out) if calib_out else cache_dir / "calibration.json"
-    calib.save(calib_path)
+    # One calibration per fold, fitted on that fold's *training* animals. A
+    # single global calibration would normalise each test animal with constants
+    # derived, in part, from itself.
+    calib_paths: dict[int, Path] = {}
+    calib_dicts: dict[int, dict] = {}
+    for fi, fold in sorted(folds.items()):
+        ids = [sid for sid in arrays_by_id if sid in set(fold["train"])]
+        if not ids:
+            raise SystemExit(f"fold {fi} has no prepared training volumes")
+        calib = IntensityCalibration.fit([arrays_by_id[s] for s in ids])
+        path = (Path(calib_out) if (calib_out and fi == calib_fold)
+                else cache_dir / f"calibration_fold{fi}.json")
+        calib.save(path)
+        calib_paths[fi] = path
+        calib_dicts[fi] = {**calib.to_dict(), "n_volumes": len(ids),
+                           "train_ids": sorted(ids)}
 
-    write_cache_index(volumes, calib_path, index_path)
+    calib = IntensityCalibration.load(calib_paths[calib_fold])
+    write_cache_index(volumes, calib_paths[calib_fold], index_path,
+                      calibrations=calib_paths)
 
     summary = {
         "n_volumes": len(volumes),
@@ -111,7 +131,7 @@ def prepare(manifest_path: str | Path, split_path: str | Path, cache_dir: str | 
         "skipped": skipped,
         "calibration": calib.to_dict(),
         "calibration_fold": calib_fold,
-        "n_calibration_volumes": len(train_arrays),
+        "calibrations": {str(k): v for k, v in calib_dicts.items()},
         "index": str(index_path),
     }
     (Path(index_path).parent / "prepare_summary.json").write_text(

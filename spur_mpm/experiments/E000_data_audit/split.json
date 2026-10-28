@@ -1,0 +1,113 @@
+{
+  "config": {
+    "group_field": "mouse_id",
+    "inner_field": "fov_id",
+    "mode": "lomo",
+    "val_units": 1,
+    "seed": 0,
+    "test_groups": []
+  },
+  "folds": [
+    {
+      "fold": 0,
+      "test": [
+        "M1_FOVII_S1_vessels",
+        "M1_FOVII_S2_vessels",
+        "M1_FOVI_S1_vessels",
+        "M1_FOVI_S2_vessels"
+      ],
+      "val": [
+        "M2_FOVI_S1_vessels",
+        "M2_FOVI_S2_vessels"
+      ],
+      "train": [
+        "M2_FOVII_S1_vessels",
+        "M2_FOVII_S2_vessels",
+        "M3_FOVI_S1_vessels",
+        "M3_FOVI_S2_vessels"
+      ],
+      "groups": {
+        "test": [
+          "mouse_id:1"
+        ]
+      },
+      "inner_groups": {
+        "val": [
+          "fov:mouse_id:2/I"
+        ],
+        "train": [
+          "fov:mouse_id:3/I",
+          "fov:mouse_id:2/II"
+        ]
+      }
+    },
+    {
+      "fold": 1,
+      "test": [
+        "M2_FOVII_S1_vessels",
+        "M2_FOVII_S2_vessels",
+        "M2_FOVI_S1_vessels",
+        "M2_FOVI_S2_vessels"
+      ],
+      "val": [
+        "M1_FOVII_S1_vessels",
+        "M1_FOVII_S2_vessels"
+      ],
+      "train": [
+        "M1_FOVI_S1_vessels",
+        "M1_FOVI_S2_vessels",
+        "M3_FOVI_S1_vessels",
+        "M3_FOVI_S2_vessels"
+      ],
+      "groups": {
+        "test": [
+          "mouse_id:2"
+        ]
+      },
+      "inner_groups": {
+        "val": [
+          "fov:mouse_id:1/II"
+        ],
+        "train": [
+          "fov:mouse_id:3/I",
+          "fov:mouse_id:1/I"
+        ]
+      }
+    },
+    {
+      "fold": 2,
+      "test": [
+        "M3_FOVI_S1_vessels",
+        "M3_FOVI_S2_vessels"
+      ],
+      "val": [
+        "M1_FOVII_S1_vessels",
+        "M1_FOVII_S2_vessels"
+      ],
+      "train": [
+        "M1_FOVI_S1_vessels",
+        "M1_FOVI_S2_vessels",
+        "M2_FOVII_S1_vessels",
+        "M2_FOVII_S2_vessels",
+        "M2_FOVI_S1_vessels",
+        "M2_FOVI_S2_vessels"
+      ],
+      "groups": {
+        "test": [
+          "mouse_id:3"
+        ]
+      },
+      "inner_groups": {
+        "val": [
+          "fov:mouse_id:1/II"
+        ],
+        "train": [
+          "fov:mouse_id:2/I",
+          "fov:mouse_id:2/II",
+          "fov:mouse_id:1/I"
+        ]
+      }
+    }
+  ],
+  "fingerprint": "e473498d35c7955f1634bd79e9afcf367d62045d818073fe9378c62bb2cd07bc"
+}

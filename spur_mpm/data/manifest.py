@@ -54,7 +54,9 @@ class DatasetSpec:
     defaults: dict = field(default_factory=dict)
     rules: list[FileRule] = field(default_factory=list)
     filename_regex: str | None = None
+    sample_id_template: str | None = None
     per_file: dict = field(default_factory=dict)
+    scan: list[str] = field(default_factory=list)
 
     def match(self, path: Path) -> dict:
         """Metadata for one file: defaults <- first matching rule <- per-file."""
@@ -72,7 +74,23 @@ class DatasetSpec:
             m = re.search(self.filename_regex, path.name)
             if m:
                 meta.update({k: v for k, v in m.groupdict().items() if v is not None})
+                if self.sample_id_template:
+                    try:
+                        meta["sample_id"] = self.sample_id_template.format(**meta)
+                    except KeyError:
+                        pass        # incomplete match: fall back to the file stem
         return meta
+
+    def scan_globs(self) -> list[str]:
+        """Globs used to *find* files.
+
+        Distinct from the rule globs on purpose: the manifest must inventory the
+        whole archive (including files we deliberately exclude), otherwise an
+        excluded duplicate simply vanishes from the audit and nobody notices it
+        was ever there. Without an explicit ``scan`` key, fall back to the union
+        of the rule globs.
+        """
+        return list(self.scan) or [r.glob for r in self.rules] or ["**/*.tif", "**/*.tiff"]
 
 
 def load_spec(path: str | Path, repo_root: Path | None = None) -> DatasetSpec:
@@ -95,7 +113,9 @@ def load_spec(path: str | Path, repo_root: Path | None = None) -> DatasetSpec:
         defaults=raw.get("defaults", {}) or {},
         rules=rules,
         filename_regex=raw.get("filename_regex"),
+        sample_id_template=raw.get("sample_id_template"),
         per_file=raw.get("per_file", {}) or {},
+        scan=list(raw.get("scan", []) or []),
     )
 
 
@@ -105,6 +125,73 @@ def sha256_of(path: str | Path, chunk: int = 1 << 20) -> str:
         for block in iter(lambda: fh.read(chunk), b""):
             h.update(block)
     return h.hexdigest()
+
+
+def content_fingerprint(path: str | Path) -> str:
+    """SHA-256 of the *pixel data*, ignoring TIFF metadata.
+
+    Byte hashing is not enough: ``Fig 3/3a Vessels.tif`` in the Dryad 3P deposit
+    is pixel-identical to ``Mouse 2 FOV II Vessels Session 1.tif`` yet has a
+    different file hash because ImageJ rewrote the description tag. Only a
+    pixel-level digest catches that, and a duplicate is a leak: the same animal
+    would appear on both sides of a supposedly grouped split.
+    """
+    import tifffile
+
+    arr = tifffile.imread(path)
+    h = hashlib.sha256()
+    h.update(f"{arr.shape}|{arr.dtype.str}|".encode())
+    h.update(np.ascontiguousarray(arr).tobytes())
+    return h.hexdigest()
+
+
+def mark_duplicates(rows: list[dict], with_fingerprint: bool = True) -> list[dict]:
+    """Annotate rows whose pixels duplicate another row.
+
+    A duplicate of a *trainable* row by another *trainable* row is an ``issue``
+    (the audit must fail: the split cannot be trusted). A duplicate involving an
+    already-excluded row is a ``warning`` -- visible, but not blocking.
+    """
+    if not with_fingerprint or not rows:
+        return rows
+
+    by_fp: dict[str, list[dict]] = {}
+    for row in rows:
+        try:
+            fp = content_fingerprint(row["_source_path"])
+        except Exception as exc:                    # pragma: no cover - unreadable
+            row["warnings"] = "; ".join(
+                x for x in (row.get("warnings", ""), f"fingerprint failed: {exc}") if x)
+            continue
+        by_fp.setdefault(fp, []).append(row)
+
+    def identity_score(row: dict) -> int:
+        return sum(bool(str(row.get(k, "") or "").strip())
+                   for k in ("mouse_id", "session_id", "fov_id"))
+
+    for group in by_fp.values():
+        if len(group) < 2:
+            continue
+        # The canonical copy is the one that knows which animal it came from --
+        # a figure panel derived from a dataset stack must not become the
+        # reference and re-label the real acquisition as its duplicate.
+        group.sort(key=lambda r: (-identity_score(r), r.get("use") != "trainable",
+                                  r.get("path", "")))
+        canonical = group[0]
+        for row in group[1:]:
+            row["duplicate_of"] = str(canonical.get("sample_id", ""))
+            msg = (f"pixel-identical to {canonical.get('sample_id')} "
+                   f"({canonical.get('path')})")
+            blocking = row.get("use") == "trainable" and canonical.get("use") == "trainable"
+            if blocking:
+                row["issues"] = "; ".join(x for x in (row.get("issues", ""), msg) if x)
+            else:
+                row["warnings"] = "; ".join(x for x in (row.get("warnings", ""), msg) if x)
+        others = ", ".join(str(r.get("sample_id")) for r in group[1:])
+        canonical["warnings"] = "; ".join(
+            x for x in (canonical.get("warnings", ""),
+                        f"duplicated by {len(group) - 1} other file(s): {others}") if x)
+    return rows
 
 
 def probe_tiff(path: str | Path) -> dict:
@@ -135,12 +222,13 @@ def probe_tiff(path: str | Path) -> dict:
 
 
 def build_manifest(spec: DatasetSpec, with_sha256: bool = False,
-                   limit: int | None = None) -> list[dict]:
+                   limit: int | None = None,
+                   with_fingerprint: bool = True) -> list[dict]:
     """Scan every TIFF under ``spec.root`` and resolve its metadata."""
     if not spec.root.exists():
         raise FileNotFoundError(f"dataset root does not exist: {spec.root}")
 
-    patterns = [r.glob for r in spec.rules] or ["**/*.tif", "**/*.tiff"]
+    patterns = spec.scan_globs()
     seen: set[Path] = set()
     paths: list[Path] = []
     for pat in patterns:
@@ -153,12 +241,19 @@ def build_manifest(spec: DatasetSpec, with_sha256: bool = False,
 
     rows: list[dict] = []
     for path in paths:
-        rows.append(_manifest_row(spec, path, with_sha256))
+        row = _manifest_row(spec, path, with_sha256)
+        row["_source_path"] = str(path)       # consumed by mark_duplicates, not written
+        rows.append(row)
+    rows = mark_duplicates(rows, with_fingerprint=with_fingerprint)
+    for row in rows:
+        row.pop("_source_path", None)
     return rows
 
 
 def _manifest_row(spec: DatasetSpec, path: Path, with_sha256: bool) -> dict:
     meta = spec.match(path)
+    use = str(meta.get("use", "trainable") or "trainable")
+    exclude_reason = str(meta.get("exclude_reason", "") or "")
     issues: list[str] = []
 
     try:
@@ -219,13 +314,29 @@ def _manifest_row(spec: DatasetSpec, path: Path, with_sha256: bool) -> dict:
         warnings.append(f"ImageJ spacing {ij_spacing} vs spec z_step "
                         f"{geom.z_step_um} -- spec wins, reconcile manually")
 
+    # An excluded file is not going to be trained on, so "mouse_id unresolved"
+    # is a note, not a blocker -- but it stays visible in the report, because a
+    # wrong exclusion is just as damaging as a missing one.
+    if use != "trainable":
+        warnings = [f"excluded: {exclude_reason or 'no reason given'}"] + \
+                   [f"issue: {i}" for i in issues] + warnings
+        issues = []
+
     row = {k: getattr(geom, k) for k in AUDIT_FIELDS}
+    row["use"] = use
+    row["exclude_reason"] = exclude_reason
+    row["duplicate_of"] = ""
     row["shape"] = list(shape)
     row["path"] = str(path.relative_to(spec.root)) if path.is_relative_to(spec.root) else str(path)
     row["bytes"] = probe.get("bytes", 0)
     row["pages"] = probe.get("pages")
     row["tiff_series_axes"] = series_axes
-    row["z_span_um"] = round(geom.depth_span_um, 3) if geom.depth else 0.0
+    # A rejected volume (e.g. a TYX time series) has no Z axis at all; the audit
+    # must record that as a finding, not die on it.
+    try:
+        row["z_span_um"] = round(geom.depth_span_um, 3) if geom.depth else 0.0
+    except GeometryError:
+        row["z_span_um"] = 0.0
     row["sha256"] = sha256_of(path) if with_sha256 else ""
     row["issues"] = "; ".join(issues)
     row["warnings"] = "; ".join(warnings)
@@ -247,8 +358,9 @@ def write_manifest(rows: list[dict], out_dir: str | Path,
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    columns = list(AUDIT_FIELDS) + ["path", "bytes", "pages", "tiff_series_axes",
-                                    "z_span_um", "sha256", "issues", "warnings"]
+    columns = list(AUDIT_FIELDS) + ["use", "exclude_reason", "duplicate_of", "path",
+                                    "bytes", "pages", "tiff_series_axes", "z_span_um",
+                                    "sha256", "issues", "warnings"]
     csv_path = out / "manifest.csv"
     with open(csv_path, "w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=columns, extrasaction="ignore")

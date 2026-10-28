@@ -59,3 +59,148 @@
    再 `make_split` + `prepare_data`。
 2. 把 `spur_mpm/configs/data/dryad_3p_vessels.yaml`（当前为模板）的 glob、`filename_regex`、per-file 元数据与实际解包结构对齐。
 3. 在真实数据上先跑 A0/A1 与 S1（单臂、单 fold）确认管线在真实 TIFF 上不崩，再铺全臂全 fold。
+
+---
+
+## SPUR-E000 — Dryad 3PM 真实数据审计与泄漏隔离
+
+- **日期**：2026-10-28
+- **Git**：`research/spur-mpm-v1`
+- **阶段**：Phase 0
+- **数据**：`/ssd1/wjb/Data/Dryad_3PM`（DOI 10.5061/dryad.wh70rxx2j）
+- **产物**：`spur_mpm/experiments/E000_data_audit/{manifest.csv,manifest.json,audit_report.md,split.json}`、
+  `data_local/dryad_cache/`（10 卷 `.npy` + `index.json` + `calibration_fold{0,1,2}.json`）
+- **目的**：先读数据自带说明，再回答两个问题——**(a) 这批数据能怎么用；(b) 泄漏边界在哪、如何用代码锁死**。
+
+### 数据本身（README + 逐文件核对）
+
+APP NL-G-F 小鼠，Texas Red 标血管 + methoxy-XO4 标斑块，同一只鼠**相隔 4 周**成像两次；
+XY 0.98 µm，Z 步长 5 µm（血管/斑块）与 10 µm（神经元），成像深度约 0–900 µm，激发 1340 nm。
+另有 GFP 神经元片层与 6 张新生鼠肺图像（功率稳定性标定用）。
+
+29 个 TIFF → **10 纳入 / 19 排除 / 3 组像素级重复 / 0 未解决 issue**。
+
+### 泄漏边界与处置（本次审计的核心）
+
+| 泄漏轴 | 具体情况 | 处置 |
+|---|---|---|
+| **动物** | 只有 3 只鼠（M1/M2/M3），M3 仅 1 个 FOV | 测试集按**留一鼠**，不做单文件随机划分 |
+| **纵向 session** | 同一 FOV 的 Session 1/2 是同一批血管，相隔 4 周 | S1/S2 视为同一 `inner_key=(mouse, fov)`，**不跨 train/val** |
+| **FOV** | 每鼠 1–2 个视野 | 验证集 = 剩余动物中的**一个完整 FOV（含两个 session）** |
+| **通道** | 血管与斑块来自**同一次扫描** | 斑块通道全部排除：跨通道复用会泄漏组织身份 |
+| **重复文件** | `Fig 3/3a Vessels.tif` 与 `M2_FOVII_S1_vessels` 像素完全一致；`Fig 3/3a Plaques.tif` 同理；`M3_FOVI_S2_plaques` 与 `M2_FOVI_S2_plaques` 像素完全一致（**跨动物**） | 像素级指纹 `content_fingerprint()`（sha256 over shape+dtype+bytes）自动识别；重复项一律 `use=excluded` |
+| **时间轴** | 6 张新生鼠肺是 `TYX` 时间序列 | 明确拒绝进入 3D 管线（`GeometryError`），留给 Phase 6 钙成像 |
+| **图版文件** | `Fig 3/*`、`3b - GFP neurons` 是从数据集中派生的插图 | 全部排除，且它们本身缺少 mouse/session/fov 标签 |
+
+**为什么必须做像素指纹而不是文件哈希**：`Fig 3/3a Vessels.tif` 与原始卷的 TIFF 头（ImageJ 元数据）不同，
+字节哈希不同，但像素完全相同。只比文件大小或 md5 会漏掉这类泄漏。
+
+**标定必须是 per-fold**：`offset/scale` 用训练动物的分位数拟合。若用单一全局标定，
+fold 1/2 的测试动物会以**自身统计量**归一化，测试集信息通过归一化常数回流。
+现在 `VolumeCache.load(fold=f)` 在载入时选择该 fold 的标定，未登记则 `KeyError` 而非静默回退。
+
+### 划分结果（`split.json`，fingerprint `e473498d…`）
+
+| fold | test（留出动物） | val（留出 FOV，含两 session） | train |
+|---|---|---|---|
+| 0 | M1（4 卷） | M2 FOV I | M2 FOV II + M3（4 卷） |
+| 1 | M2（4 卷） | M1 FOV II | M1 FOV I + M3（4 卷） |
+| 2 | M3（2 卷） | M1 FOV II | M1 + M2（6 卷） |
+
+标定（仅训练动物拟合）：fold0 offset 32727.5 / scale 13631.5（4 卷）；fold1 32037.75 / 13511.25（4 卷）；
+fold2 32396.5 / 14603.33（6 卷）。
+
+### Z 步长决策
+
+ImageJ 头里的 spacing 在 5.0 / 7.0 / 15.0 之间自相矛盾，甚至同一 session 的血管与斑块通道给出不同值。
+**以 README 的 5 µm 为准**（血管/斑块）、10 µm（神经元），所有不一致写进 `audit_report.md` 的警告区，
+**不改数据、不静默取平均**——Z 步长直接决定深度分层的物理尺度。
+
+### 审计中暴露并修复的缺陷
+
+1. `content_fingerprint` 起初按文件字节算，漏掉「元数据不同、像素相同」的重复 → 改为像素指纹。
+2. 重复组的 canonical 按路径字典序选，把 `3a Plaques` 选成"正本" → 改为按 identity score（是否带 mouse/fov/session 标签）排序。
+3. 审计在肺数据上因 `no Z axis in axes='TYX'` 直接崩溃 → 拒绝是对的，但崩溃是错的：`z_span_um` 改为 try/except 记 0。
+4. `3b - GFP neurons` 被误判为 262 页超栈 → 声明页数应与 `prod(shape[:-2])` 比较，而非只比 Z 轴。
+5. manifest 存的是**相对数据根**的路径，`prepare` 却按 manifest 目录解析，导致全部跳过 → 补 `dataset_root` 与 `resolve_row_path`。
+
+### 结论
+
+数据可用但很小（10 卷、3 只鼠），**统计功效受限是结构性的**，bootstrap CI 只有 3 组时不可估（已用 `ci_estimable` 标注）。
+泄漏边界已全部落成代码与测试：动物 / session / FOV / 通道 / 重复文件 / 时间轴六条轴各自有断言。
+**本条目不含任何重建性能结论。**
+
+### 后续动作
+
+1. README 第 4 节列出的 `Vessels plus plaques.tif` / `Vessels plus plaques 2.tif` **不在上传包内**，需向数据提供方确认（不阻塞当前计划）。
+2. 单鼠 3D 血管分割评测的 GT 来自 vesselness 阈值化（无人工标注），需在论文口径中如实说明。
+3. 继续 Phase 1：SPUR-E001 无学习基线。
+
+---
+
+## SPUR-E001 — 无学习基线（A0 双线性 / A1 填零后 Wiener）
+
+- **日期**：2026-10-28
+- **阶段**：Phase 1（plan §6 参照基线）
+- **目的**：在真实数据的三个留一鼠 fold 上建立下游一切学习方法的参照线，
+  并**先证明「Wiener 不比插值好」这件事在本数据上的原因**，避免后面把插值器的上限当成方法的功劳。
+- **配置**：`configs/base.yaml`，Y 方向行采样 `k=2`（测量比例 0.5），恒等 PSF，`context_depth=1`，
+  `patch 512×512`（整幅），每折测试动物全部平面，共 782 个窗口/折。
+- **命令**：`for f in 0 1 2; do for a in A0 A1; do python -m spur_mpm.evaluate --arm $a --fold $f --split test ...; done; done`
+- **产物**：`runs/E001_{A0,A1}_fold{0,1,2}_test/`、`spur_mpm/experiments/E001_baselines/E001_table.md`
+
+### 结果（测试动物，三折均值，括号内为跨动物 min–max）
+
+| 指标 | A0 双线性 | A1 填零+Wiener |
+|---|---|---|
+| PSNR | 29.0616（27.60–30.42） | 29.0616（27.60–30.42） |
+| SSIM | 0.7132（0.687–0.729） | 0.7132（0.687–0.729） |
+| MAE | 0.0200（0.0172–0.0231） | 0.0200（0.0172–0.0231） |
+| E_measured | 0.0000 | 0.0000 |
+| E_missing | 0.0401（0.0343–0.0461） | 0.0401（0.0343–0.0461） |
+| 血管 Dice | 0.8692（0.825–0.907） | 0.8692（0.825–0.907） |
+| clDice | 0.8339（0.790–0.863） | 0.8339（0.790–0.863） |
+
+**A0 与 A1 在全部三折上逐位相同（PSNR 到小数点后四位一致），这不是 bug，而是恒等 PSF 的必然结果。**
+A1 的正则化解是 `argmin ||M_acq ⊙ (H x) − y||² + λ||x − x0||²`；当 `H = I` 时它在测量位置就是 `y` 本身，
+在未测量位置退化为 `x0`（双线性插值）。也就是说**真实数据自带的点扩散函数让「反卷积」这一支失去意义**——
+在没有额外 PSF 信息的前提下，Wiener 与插值是同一个算子。
+已加测试 `test_the_two_baseline_arms_are_the_same_method_under_an_identity_psf` 锁住这一点，
+并同时验证在非恒等 PSF（`sigma_xy_px=1.0, sigma_z_px=1.5`）下两臂确实分叉，说明代码路径本身是通的。
+plan §6 第 405 行预警过这个局面（"Wiener 不比简单插值好 → 检查像域目标、正则化／边界／物理 PSF"），
+现在的处置是：**保留插值作为先验，不伪造 PSF 优势**。
+
+### 按深度分层（A0，band 200 µm，三折合计）
+
+| 深度 (µm) | n | PSNR | Dice | clDice |
+|---|---|---|---|---|
+| 0–200 | 400 | 26.61 | 0.9085 | 0.8564 |
+| 200–400 | 400 | 27.93 | 0.8625 | 0.8173 |
+| 400–600 | 400 | 27.92 | 0.8551 | 0.8120 |
+| 600–800 | 390 | 30.09 | 0.8661 | 0.8434 |
+| 800–1000 | 266 | 32.38 | 0.8299 | 0.8156 |
+
+**PSNR 随深度上升而血管 Dice 下降**：深层信号本身衰减，插值误差的绝对幅度随之变小（PSNR 好看），
+但血管对比度不足让分割更容易断线（clDice 变差）。**结论：在本数据上 PSNR 不是深度层面的有效指标，
+后续所有深度结论以血管 Dice/clDice 为准**，PSNR 只作为整体一致性检查。
+
+### 需要注意的三件事
+
+1. **E_measured = 0 是结构恒等式，不是性能**：插值器在测量位置原样返回 `y`。
+   它的价值是回归测试——任何学习臂若 E_measured > 0，说明它把已经测到的体素改坏了。
+2. **跨动物方差远大于方法差异的量级**：同一方法在三只鼠上的 PSNR 极差 2.8 dB、Dice 极差 0.08。
+   只有 3 只动物，**任何小于约 1 dB / 0.03 Dice 的差异都不应被当作结论**；跨折只用范围表达，不报置信区间
+   （`ci_estimable=false`，脚本已强制标注）。要主张方法优势，必须靠同一折内的配对比较。
+3. 折间差异本身就是数据异质性：M2 作为测试动物时 PSNR 最低（27.60），与 M2 FOV I Session 2 只有 152 层有关。
+
+### 结论
+
+无学习基线在本数据上完全确定：**插值已是恒等 PSF 下的最优先验**，Dice 0.869 / clDice 0.834。
+任何学习臂必须在**同一折内**显著超过这条线，否则只能说明它学到了插值。
+A1 作为独立方法在本数据上不复存在，后续表格中与 A0 并列仅用于展示恒等性。
+
+### 后续动作
+
+1. SPUR-E002：有监督 S0/S1/S2（稠密参考作监督，用稠密验证集选模）。
+2. SPUR-E003：自监督 MMS SS0/SS1/SS2（holdout 只用真实测量，选模只看 held-out 测量损失）。
+3. 若要恢复 Wiener 的反卷积意义，需从数据估计 PSF（血管边缘的横向剖面）；已记录待决，不阻塞 E002/E003。

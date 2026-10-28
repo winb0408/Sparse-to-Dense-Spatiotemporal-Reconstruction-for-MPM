@@ -131,10 +131,16 @@ class VolumeGeometry:
             if self.shape and tuple(self.shape) != shape:
                 raise GeometryError(f"{self.sample_id}: declared shape "
                                     f"{tuple(self.shape)} != actual {shape}")
-            if declared_planes is not None and int(shape[self.z_index]) != declared_planes:
+            # A TIFF page count is Z*C for a hyperstack (ZCYX), not Z -- compare
+            # against the number of non-spatial planes so a two-channel stack is
+            # not reported as having twice the depth it really has.
+            n_planes = 1
+            for dim in shape[:-2]:
+                n_planes *= int(dim)
+            if declared_planes is not None and n_planes != declared_planes:
                 raise GeometryError(
-                    f"{self.sample_id}: declared {declared_planes} planes but Z axis "
-                    f"has {shape[self.z_index]} -- axis order or file is wrong")
+                    f"{self.sample_id}: declared {declared_planes} TIFF pages but "
+                    f"shape {shape} implies {n_planes} -- axis order or file is wrong")
             if int(shape[self.z_index]) < 2:
                 raise GeometryError(f"{self.sample_id}: Z depth "
                                     f"{shape[self.z_index]} is not a 3-D stack")

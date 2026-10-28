@@ -61,13 +61,34 @@ class CachedVolume:
 
 
 class VolumeCache:
-    """Lookup from ``sample_id`` to cached arrays and frozen calibration."""
+    """Lookup from ``sample_id`` to cached arrays and frozen calibrations.
+
+    Calibrations are stored **per fold**, because the calibration of a fold may
+    only be fitted on that fold's training animals. A single global calibration
+    would be reproducible and convenient -- and would quietly leak every test
+    animal's intensity statistics into the normalisation of its own evaluation.
+    """
 
     def __init__(self, volumes: dict[str, CachedVolume],
-                 calibration: IntensityCalibration):
+                 calibration: IntensityCalibration,
+                 calibrations: dict[int, IntensityCalibration] | None = None):
         self.volumes = volumes
         self.calibration = calibration
+        self.calibrations = dict(calibrations or {})
         self._arrays: dict[str, np.ndarray] = {}
+
+    def calibration_for(self, fold: int | None) -> IntensityCalibration:
+        """Calibration to use for a given fold (fold 0 when unspecified)."""
+        if fold is None:
+            return self.calibration
+        if not self.calibrations:
+            return self.calibration
+        if int(fold) not in self.calibrations:
+            raise KeyError(
+                f"no calibration for fold {fold}; the cache index has "
+                f"{sorted(self.calibrations)}. Re-run prepare_data so every fold "
+                "gets a calibration fitted on its own training animals.")
+        return self.calibrations[int(fold)]
 
     def __contains__(self, sample_id: str) -> bool:
         return sample_id in self.volumes
@@ -92,20 +113,33 @@ class VolumeCache:
         return arr
 
     @classmethod
-    def load(cls, index_path: str | Path) -> "VolumeCache":
+    def load(cls, index_path: str | Path, fold: int | None = None) -> "VolumeCache":
+        """Load the cache; pass ``fold`` to select that fold's calibration.
+
+        Every consumer must pass the fold it is working on. Leaving it ``None``
+        falls back to the index's default calibration, which is only correct for
+        inspection tools -- never for a run that reports a number.
+        """
         payload = json.loads(Path(index_path).read_text())
         volumes = {v["sample_id"]: CachedVolume.from_dict(v)
                    for v in payload["volumes"]}
         calib = IntensityCalibration.load(payload["calibration"])
-        return cls(volumes, calib)
+        calibrations = {int(k): IntensityCalibration.load(v)
+                        for k, v in (payload.get("calibrations") or {}).items()}
+        cache = cls(volumes, calib, calibrations)
+        if fold is not None:
+            cache.calibration = cache.calibration_for(fold)
+        return cache
 
 
 def write_cache_index(volumes: list[CachedVolume], calibration_path: str | Path,
-                      out_path: str | Path) -> Path:
+                      out_path: str | Path,
+                      calibrations: dict[int, str | Path] | None = None) -> Path:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"volumes": [v.to_dict() for v in volumes],
-               "calibration": str(calibration_path)}
+               "calibration": str(calibration_path),
+               "calibrations": {str(k): str(v) for k, v in (calibrations or {}).items()}}
     out_path.write_text(json.dumps(payload, indent=2))
     return out_path
 
@@ -113,6 +147,34 @@ def write_cache_index(volumes: list[CachedVolume], calibration_path: str | Path,
 # ---------------------------------------------------------------------------
 # item construction (shared by both datasets)
 # ---------------------------------------------------------------------------
+
+def required_context_depth(kz: int) -> int:
+    """Window depth that still contains a measured plane whatever the phase.
+
+    A k_z lattice leaves ``kz - 1`` consecutive unmeasured planes between two
+    measured ones. The query plane can sit ``kz - 1`` planes away from the
+    nearest measured plane, so a window needs that radius on both sides.
+    """
+    return 2 * (int(kz) - 1) + 1
+
+
+def validate_context_depth(spec, context_depth: int) -> None:
+    """Fail loudly instead of training on an input of zeros.
+
+    With plane skipping and a single-plane window, every second query plane has
+    no measured data at all: the network would be asked to invent a plane from
+    an all-zero input, and a poor result would be blamed on the method rather
+    than on the window. This is a configuration error, not a finding.
+    """
+    kz = int(getattr(spec, "kz", 1))
+    need = required_context_depth(kz)
+    if kz > 1 and int(context_depth) < need:
+        raise ValueError(
+            f"sampling {spec.tag} skips planes (kz={kz}) but context_depth="
+            f"{context_depth}; at least {need} planes are needed so the window "
+            "always contains a measured plane. Increase data.context_slices or "
+            "data.context_z_um.")
+
 
 @dataclass
 class ItemConfig:
@@ -221,6 +283,7 @@ class SparseVolumeDataset(Dataset):
                  patches_per_epoch: int = 1000, seed: int = 0):
         if not sample_ids:
             raise ValueError("SparseVolumeDataset needs at least one sample")
+        validate_context_depth(cfg.sampling, context_depth)
         missing = [s for s in sample_ids if s not in cache]
         if missing:
             raise KeyError(f"samples not in cache: {missing}")
@@ -290,6 +353,7 @@ class VolumeWindowDataset(Dataset):
                  z_stride: int = 1):
         if not sample_ids:
             raise ValueError("VolumeWindowDataset needs at least one sample")
+        validate_context_depth(cfg.sampling, context_depth)
         self.cache = cache
         self.sample_ids = list(sample_ids)
         self.cfg = cfg

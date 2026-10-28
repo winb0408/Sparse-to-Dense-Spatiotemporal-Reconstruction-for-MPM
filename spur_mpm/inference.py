@@ -46,7 +46,8 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
     device = torch.device(device or (cfg["run"].get("device", "cuda")
                                      if torch.cuda.is_available() else "cpu"))
     arm = get_arm(arm_name)
-    cache = VolumeCache.load(cfg["data"]["index"])
+    cache = VolumeCache.load(cfg["data"]["index"],
+                              fold=int(cfg["data"].get("fold", 0)))
     geom = cache.geometry(sample_id)
 
     sampling = SamplingSpec.from_dict(cfg["sampling"])

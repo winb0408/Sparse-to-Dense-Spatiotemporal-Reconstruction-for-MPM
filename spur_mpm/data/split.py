@@ -1,20 +1,33 @@
 """Grouped train/val/test splits with enforced leakage checks.
 
-The statistical unit is the **animal** (or an independent FOV when no animal
-identity exists) -- never a patch, a slice or a frame. Plan §2.3 requires
-``leave-one-mouse-out`` here: with a handful of mice, random patch splitting
-would report a random-split number as if it were generalisation.
+Two levels, because the data forces two (plan §2.3):
+
+``test`` level -- **animal** (``group_field``)
+    Leave-one-mouse-out. The test animal is the only unit that supports a
+    generalisation claim, so nothing from it may appear on the other side.
+``inner`` level -- **FOV within the remaining animals** (``inner_field``)
+    Validation is drawn from the animals left after the test animal is removed,
+    holding out a whole FOV (both longitudinal sessions together). Plan §2.3:
+    "训练／验证只能在剩余动物中按 FOV 或 session 分组". With three mice this is
+    what keeps two animals' worth of data in training instead of one.
+
+A held-out FOV must take *both* sessions with it: S1 and S2 of one FOV image the
+same vasculature four weeks apart, so putting S1 in train and S2 in val leaks
+the very structure the split is supposed to hide.
 
 Guarantees enforced on write and re-checked on load:
 
-* no group appears in more than one of train/val/test;
-* the same longitudinal session pair of one animal never straddles splits;
-* every fold's test group is disjoint from its training groups.
+* no sample id in more than one of train/val/test;
+* the test animal never appears in train or val;
+* train and val never share an inner unit (FOV) -- checked only when an inner
+  field is configured and resolvable;
+* no split is empty.
 
 A fold is a dict::
 
-    {"fold": 0, "test": ["<sample_id>", ...], "val": [...], "train": [...],
-     "groups": {"test": [...], "val": [...], "train": [...]}}
+    {"fold": 0, "test": [...], "val": [...], "train": [...],
+     "groups": {"test": ["mouse_id:M1"]},
+     "inner_groups": {"val": ["fov:M2/FOV I"], "train": [...]}}
 """
 
 from __future__ import annotations
@@ -25,7 +38,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 __all__ = ["SplitConfig", "SplitError", "make_folds", "assert_no_leakage",
-           "split_fingerprint", "write_split", "read_split", "group_key_of"]
+           "split_fingerprint", "write_split", "read_split", "group_key_of",
+           "inner_key_of"]
 
 
 class SplitError(ValueError):
@@ -40,20 +54,26 @@ class SplitConfig:
         ``lomo``  leave-one-group-out; one fold per group (the default and the
                   only mode that supports a generalisation claim with few animals).
         ``holdout`` a single split holding out ``test_groups`` groups.
-    ``val_groups``
-        How many of the remaining groups go to validation (they are never used
-        for training). Must leave at least one training group.
+    ``inner_field``
+        Field used to hold out validation *within* the remaining animals.
+        ``fov_id`` by default; the key is ``(group_field, inner_field)`` so that
+        FOV labels reused across animals cannot collide. Set to ``""`` to fall
+        back to the old behaviour (a whole animal for validation), which is only
+        sensible with many animals.
+    ``val_units``
+        How many inner units go to validation. Must leave at least one.
     """
 
     group_field: str = "mouse_id"
+    inner_field: str = "fov_id"
     mode: str = "lomo"
-    val_groups: int = 1
+    val_units: int = 1
     seed: int = 0
     test_groups: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {"group_field": self.group_field, "mode": self.mode,
-                "val_groups": self.val_groups, "seed": self.seed,
+        return {"group_field": self.group_field, "inner_field": self.inner_field,
+                "mode": self.mode, "val_units": self.val_units, "seed": self.seed,
                 "test_groups": list(self.test_groups)}
 
 
@@ -67,14 +87,35 @@ def group_key_of(row: dict, cfg: SplitConfig) -> str:
                      "animal identity is required for a grouped split")
 
 
+def inner_key_of(row: dict, cfg: SplitConfig) -> str | None:
+    """Inner (validation) unit of one row: the FOV *inside* an animal.
+
+    ``(group_field, inner_field)`` together, so ``FOV I`` of mouse 1 and
+    ``FOV I`` of mouse 2 stay distinct. Falls back to the session, then to the
+    sample id, so the split degrades predictably on datasets with no FOV label
+    rather than silently treating every row as its own unit.
+    """
+    if not cfg.inner_field:
+        return group_key_of(row, cfg)
+    group = group_key_of(row, cfg)
+    value = str(row.get(cfg.inner_field, "") or "").strip()
+    if value and value.lower() not in ("nan", "none", "unknown", "?"):
+        return f"fov:{group}/{value}"
+    for fallback in ("session_id", "sample_id"):
+        alt = str(row.get(fallback, "") or "").strip()
+        if alt and alt.lower() not in ("nan", "none", "unknown", "?"):
+            return f"{fallback}:{group}/{alt}"
+    return None
+
+
 def make_folds(rows: list[dict], cfg: SplitConfig) -> list[dict]:
-    """Build folds from manifest rows (one row per volume)."""
+    """Build folds: test on one animal, validate on a held-out FOV of the rest."""
     if not rows:
         raise SplitError("no rows to split")
 
-    by_group: dict[str, list[str]] = {}
+    by_group: dict[str, list[dict]] = {}
     for row in rows:
-        by_group.setdefault(group_key_of(row, cfg), []).append(str(row["sample_id"]))
+        by_group.setdefault(group_key_of(row, cfg), []).append(row)
 
     groups = sorted(by_group)
     if len(groups) < 3:
@@ -98,21 +139,38 @@ def make_folds(rows: list[dict], cfg: SplitConfig) -> list[dict]:
 
     folds: list[dict] = []
     for fi, test_groups in enumerate(test_sets):
-        rest = [g for g in groups if g not in test_groups]
-        if len(rest) < 2:
-            raise SplitError(
-                f"fold {fi}: {len(rest)} group(s) left after holding out "
-                f"{test_groups}; need >=1 for train and >=1 for val")
-        ordered = _shuffled(rest, cfg.seed + fi)
-        n_val = max(1, min(cfg.val_groups, len(ordered) - 1))
-        val_groups = ordered[:n_val]
-        train_groups = ordered[n_val:]
+        test_rows = [r for g in test_groups for r in by_group[g]]
+        rest = [r for g in groups if g not in test_groups for r in by_group[g]]
+        if not rest:
+            raise SplitError(f"fold {fi}: nothing left after holding out {test_groups}")
 
-        fold = {"fold": fi}
-        for name, gs in (("test", test_groups), ("val", val_groups),
-                         ("train", train_groups)):
-            fold[name] = sorted(s for g in gs for s in by_group[g])
-            fold.setdefault("groups", {})[name] = list(gs)
+        # Inner split of the remaining animals by FOV (both sessions together).
+        by_inner: dict[str, list[dict]] = {}
+        for row in rest:
+            key = inner_key_of(row, cfg)
+            by_inner.setdefault(key or f"row:{row['sample_id']}", []).append(row)
+        inner_units = sorted(by_inner)
+        if len(inner_units) < 2:
+            raise SplitError(
+                f"fold {fi}: only {len(inner_units)} inner unit(s) left after "
+                f"holding out {test_groups}. An inner validation split needs at "
+                "least 2 FOVs; do not fall back to a patch-level split, report "
+                "the sample-size limit instead (plan §2.3).")
+
+        ordered = _shuffled(inner_units, cfg.seed + fi)
+        n_val = max(1, min(cfg.val_units, len(ordered) - 1))
+        val_units = ordered[:n_val]
+        train_units = ordered[n_val:]
+
+        val_rows = [r for u in val_units for r in by_inner[u]]
+        train_rows = [r for u in train_units for r in by_inner[u]]
+
+        fold = {"fold": fi,
+                "test": sorted(str(r["sample_id"]) for r in test_rows),
+                "val": sorted(str(r["sample_id"]) for r in val_rows),
+                "train": sorted(str(r["sample_id"]) for r in train_rows),
+                "groups": {"test": list(test_groups)},
+                "inner_groups": {"val": list(val_units), "train": list(train_units)}}
         assert_no_leakage(fold, rows, cfg)
         folds.append(fold)
     return folds
@@ -126,7 +184,13 @@ def _shuffled(items: list[str], seed: int) -> list[str]:
 
 
 def assert_no_leakage(fold: dict, rows: list[dict], cfg: SplitConfig) -> None:
-    """Raise :class:`SplitError` if any independent unit crosses splits."""
+    """Raise :class:`SplitError` if any independent unit crosses splits.
+
+    Three levels are checked, and each one has to be checked separately because
+    they legitimately disagree: train and val *should* share an animal (plan
+    §2.3), while test and train must not -- so a single "groups are disjoint"
+    rule would either be wrong or useless.
+    """
     problems: list[str] = []
 
     sets = {name: set(fold.get(name, [])) for name in ("train", "val", "test")}
@@ -136,37 +200,51 @@ def assert_no_leakage(fold: dict, rows: list[dict], cfg: SplitConfig) -> None:
             problems.append(f"sample ids in both {a} and {b}: {sorted(overlap)[:5]}")
 
     row_by_id = {str(r["sample_id"]): r for r in rows}
-    group_sets = {name: {group_key_of(row_by_id[s], cfg) for s in ids if s in row_by_id}
-                  for name, ids in sets.items()}
-    for a, b in (("train", "test"), ("train", "val"), ("val", "test")):
-        shared = group_sets[a] & group_sets[b]
-        if shared:
-            problems.append(f"groups in both {a} and {b}: {sorted(shared)}")
 
-    # Longitudinal sessions of the same animal are inside a group, so a shared
-    # fov_id across splits means the grouping field is wrong. Only comparable
-    # when both identifiers are actually recorded: two blank mouse ids are not
-    # evidence that the same physical FOV appears twice.
-    def _fov_key(row: dict) -> tuple[str, str] | None:
+    def keys(ids: set[str], fn) -> set:
+        out = set()
+        for sid in ids:
+            row = row_by_id.get(sid)
+            if row is None:
+                continue
+            k = fn(row)
+            if k is not None:
+                out.add(k)
+        return out
+
+    # Test animals never appear on the training side, in any form.
+    test_groups = keys(sets["test"], lambda r: group_key_of(r, cfg))
+    train_val_groups = keys(sets["train"] | sets["val"], lambda r: group_key_of(r, cfg))
+    shared = test_groups & train_val_groups
+    if shared:
+        problems.append(f"animal(s) in both test and train/val: {sorted(shared)}")
+
+    # Train and val may share an animal, but never a physical FOV: S1 and S2 of
+    # one FOV image the same vasculature four weeks apart, so whichever inner
+    # field is configured, that pair must not straddle the split.
+    def _fov_key(row: dict):
         mouse = str(row.get("mouse_id", "") or "").strip()
         fov = str(row.get("fov_id", "") or "").strip()
         return (mouse, fov) if mouse and fov else None
 
-    fovs: dict[str, set] = {name: set() for name in sets}
-    for name, ids in sets.items():
-        for sid in ids:
-            row = row_by_id.get(sid)
-            key = _fov_key(row) if row is not None else None
-            if key is not None:
-                fovs[name].add(key)
-    for a, b in (("train", "test"), ("train", "val"), ("val", "test")):
-        shared = fovs[a] & fovs[b]
-        if shared:
-            problems.append(f"(mouse, fov) pairs in both {a} and {b}: "
-                            f"{sorted(shared)[:5]}")
+    shared_fov = keys(sets["train"], _fov_key) & keys(sets["val"], _fov_key)
+    if shared_fov:
+        problems.append(f"(mouse, fov) pair(s) in both train and val: {sorted(shared_fov)}")
+    shared_fov_test = keys(sets["test"], _fov_key) & keys(sets["train"] | sets["val"], _fov_key)
+    if shared_fov_test:
+        problems.append(f"(mouse, fov) pair(s) in both test and train/val: "
+                        f"{sorted(shared_fov_test)}")
+
+    if cfg.inner_field:
+        shared_inner = keys(sets["train"], lambda r: inner_key_of(r, cfg)) & \
+                       keys(sets["val"], lambda r: inner_key_of(r, cfg))
+        if shared_inner:
+            problems.append(f"inner unit(s) in both train and val: {sorted(shared_inner)}")
 
     if not sets["train"]:
         problems.append("empty training split")
+    if not sets["val"]:
+        problems.append("empty validation split")
     if not sets["test"]:
         problems.append("empty test split")
 

@@ -53,6 +53,31 @@ def test_identity_psf_collapses_wiener_to_interpolation():
     assert torch.allclose(bilinear, fill_first, atol=1e-6)
 
 
+def test_the_two_baseline_arms_are_the_same_method_under_an_identity_psf():
+    """A0 and A1 must differ only when there is an optic to invert.
+
+    On the Dryad data this is why SPUR-E001 reports A0 == A1 exactly: the
+    forward model is identity, so "FillFirst-Wiener" *is* gap filling. Pinning
+    it here means a future change to the PSF default or the warm start shows up
+    as a failing test rather than as a mysterious new baseline advantage.
+    """
+    from spur_mpm.models.registry import get_arm
+    from spur_mpm.physics.psf import PSFConfig
+
+    x = dense()
+    obs = observe(x, AcquisitionConfig(sampling=SamplingSpec(mode="y", ky=2)))
+
+    a0 = warm_start(obs.y, obs.mask, PSFConfig(), mode=get_arm("A0").warm_start)
+    a1 = warm_start(obs.y, obs.mask, PSFConfig(), mode=get_arm("A1").warm_start)
+    assert torch.allclose(a0, a1, atol=1e-6)
+
+    # With a real (non-identity) PSF the two arms separate.
+    blurred = PSFConfig.from_pixels(sigma_xy_px=1.0, sigma_z_px=1.5)
+    a0b = warm_start(obs.y, obs.mask, blurred, mode=get_arm("A0").warm_start)
+    a1b = warm_start(obs.y, obs.mask, blurred, mode=get_arm("A1").warm_start)
+    assert not torch.allclose(a0b, a1b, atol=1e-4)
+
+
 def test_warm_start_fills_and_preserves_measurements():
     x = dense()
     obs = observe(x, AcquisitionConfig(sampling=SamplingSpec(mode="y", ky=2)))

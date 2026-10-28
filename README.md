@@ -73,13 +73,54 @@ python -m spur_mpm.inference --arm SS1 --ckpt runs/smoke/<run>/best.pt --sample 
 `--set a.b=c` 是严格点号覆盖：键不存在会报错，不会静默新建配置项。
 每个 run 目录必须能通过 `RunDir.validate()`（`config.yaml` / `provenance.json` / `log.csv` / `metrics.jsonl` / `best.pt`）。
 
-## 真实数据接入（Dryad 到位后）
+## 真实数据（Dryad 3PM，已接入）
 
-1. 解包后编辑 `spur_mpm/configs/data/dryad_3p_vessels.yaml`：glob、`filename_regex`、逐文件元数据
-   （`mouse_id / session_id / fov_id / voxel_xy_um / z_step_um`）。该文件当前是模板，未与真实目录对齐。
-2. `audit_data` 必须 **0 unresolved issue** 才能继续：轴顺序、slice 数 vs z_span、各向异性、
-   动物身份缺一不可。ImageJ 里记录的 spacing 只作提示，冲突时以 spec 为准并记 warning。
-3. `make_split` → `prepare_data` → 先单臂单 fold 跑通，再铺全臂全 fold。
+数据：`/ssd1/wjb/Data/Dryad_3PM`（DOI 10.5061/dryad.wh70rxx2j），规格文件
+`spur_mpm/configs/data/dryad_3p_vessels.yaml`（glob / regex / 逐文件元数据 / z-step 决策均已与真实目录对齐）。
+29 个 TIFF → 10 个可用血管卷（3 只鼠、2 个 session、最多 2 个 FOV），19 个显式排除，3 组像素级重复。
+
+```bash
+# 1) 审计（必须 0 unresolved issue 才能继续）
+python -m spur_mpm.scripts.audit_data \
+    --spec spur_mpm/configs/data/dryad_3p_vessels.yaml \
+    --out spur_mpm/experiments/E000_data_audit
+
+# 2) 留一鼠三折划分（验证集 = 剩余动物中一个完整 FOV，含两个 session）
+python -m spur_mpm.scripts.make_split \
+    --manifest spur_mpm/experiments/E000_data_audit/manifest.json \
+    --group mouse_id --inner fov_id --mode lomo \
+    --out spur_mpm/experiments/E000_data_audit/split.json
+
+# 3) 载入缓存 + 逐折标定（标定只在训练动物上拟合）
+python -m spur_mpm.scripts.prepare_data \
+    --manifest spur_mpm/experiments/E000_data_audit/manifest.json \
+    --cache data_local/dryad_cache --index data_local/dryad_cache/index.json \
+    --split spur_mpm/experiments/E000_data_audit/split.json
+
+# 4) 训练 / 评估（一折一 GPU）
+python -m spur_mpm.train --config spur_mpm/configs/experiments/E002_supervised_y_k2.yaml \
+    --arm S1 --fold 0 --set data.index=data_local/dryad_cache/index.json \
+    --set data.split=spur_mpm/experiments/E000_data_audit/split.json \
+    --set data.patch_hw='[256,256]'
+
+# 5) 汇总（论文里的数字只能来自这里）
+python -m spur_mpm.scripts.collect_results --pattern 'runs/E00*_*' \
+    --index data_local/dryad_cache/index.json --out spur_mpm/experiments/summary.md
+```
+
+### 六条泄漏轴（不是口头约定，是代码断言）
+
+| 轴 | 断言位置 |
+|---|---|
+| 动物 | `split.py::assert_no_leakage`（留一鼠，测试动物不得出现在 train/val） |
+| session | `inner_key=(mouse, fov)`，同一 FOV 的两个 session 永远同侧 |
+| FOV | `(mouse, fov)` 无条件不跨 train∩val |
+| 通道 | 斑块通道全排除（与血管同一次扫描，跨通道泄漏组织身份） |
+| 重复文件 | `manifest.py::content_fingerprint`（像素级，不用文件哈希） |
+| 时间轴 | `geometry.py::VolumeGeometry.validate` 见 T 轴即 `GeometryError` |
+
+**标定必须逐折**：`VolumeCache.load(fold=f)` 选该 fold 的 `calibration_fold{f}.json`；
+单折标定会让别的折的测试动物用自己的统计量归一化。
 
 ## 实验臂
 

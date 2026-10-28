@@ -1,49 +1,89 @@
-# Dataset spec for the Dryad 3P longitudinal dataset
-# (DOI 10.5061/dryad.wh70rxx2j; Schultz/Stas et al., amyloid plaques and
-# vascular degeneration). Read by scripts/audit_data.py.
+# Dataset spec for the Dryad 3P longitudinal deposit
+# DOI 10.5061/dryad.wh70rxx2j -- "Longitudinal three-photon imaging for tracking
+# amyloid plaques and vascular degeneration in a mouse model of Alzheimer's
+# disease". Read by scripts/audit_data.py; every claim below was checked against
+# the unpacked archive and its README.md on 2026-10-28.
 #
-# IMPORTANT: this file is a TEMPLATE. The glob patterns, filename regex and the
-# per-file metadata MUST be reconciled with the real archive once it is unpacked
-# (plan §2.2: "每个文件的轴顺序、页数、方向、样本身份和元数据要以实际 TIFF/README
-# 为准，不能从数组形状猜测"). Until then the audit will report unresolved
-# mouse_id / session_id / fov_id and refuse to produce a usable split.
+# WHAT THIS PROJECT USES
+#   vessels channel, 10 stacks = 5 FOVs x 2 sessions x 3 mice.
+# Everything else in the archive is inventoried and explicitly excluded, because
+# an exclusion that is not written down is indistinguishable from a file that
+# was never seen.
 #
-# Official metadata to verify per file, not to assume:
-#   - Vessels*.tif / Plaques*.tif, plus GFP neuron/vessel series
-#   - typical XY pixel ~0.98 um; vessel/plaque Z-step 5 um; some neuron data 10 um
-#   - ~3 mice, multiple FOVs, two sessions, depth range ~0-900 um, 1340 nm
+# WHY THE EXCLUSIONS MATTER (leakage, not bookkeeping)
+#   * `Fig 3/3a Vessels.tif` and `Fig 3/3a Plaques.tif` are pixel-identical to
+#     `Mouse 2 FOV II ... Session 1` (verified by content digest). Using them as
+#     a figure panel for anything other than Mouse 2 would test on training data.
+#     The audit re-detects this automatically via `duplicate_of`.
+#   * `Mouse 3 FOV I Plaques Session 2.tif` is byte-identical to
+#     `Mouse 2 FOV I Plaques Session 2.tif`: the deposit contains a cross-animal
+#     duplicate. It is excluded here and flagged by the audit.
+#   * Plaques are acquired in the same scan as vessels; training on one channel
+#     and evaluating on the other would leak tissue identity.
+#   * Neonatal lung files are TYX intensity time series of a different tissue,
+#     for power-stability checks only. They must never reach the 3-D loader --
+#     `VolumeGeometry.validate` rejects a T axis outright.
 
 name: dryad_3p_vessels
-root: data_local/dryad
+root: /ssd1/wjb/Data/Dryad_3PM/wetransfer_data-3p_2025-11-21_1143/Data 3P
+
+# Inventory the whole archive, including what we exclude below.
+scan:
+  - "**/*.tif"
 
 defaults:
-  axes: ZYX              # verify per file; a TYX file must NOT be loaded here
-  channel: vessels
+  axes: ZYX
   voxel_xy_um: 0.98
   z_step_um: 5.0
   excitation_nm: 1340
+  channel: vessels
 
+# First matching rule wins, so the specific exclusions come first.
 files:
-  - glob: "**/*Vessel*.tif"
+  - glob: "Power changes Neonatal Lung/*"
     metadata:
-      channel: vessels
-      z_step_um: 5.0
-  - glob: "**/*Vessel*.tiff"
+      use: excluded
+      exclude_reason: "power-stability calibration: TYX intensity time series, neonatal lung, not a Z stack of mouse cortex"
+      channel: calibration
+      axes: TYX
+
+  - glob: "Fig 3/*"
     metadata:
-      channel: vessels
-      z_step_um: 5.0
+      use: excluded
+      exclude_reason: "figure panel derived from the dataset: reusing it risks testing on a training animal (see duplicate_of)"
+      channel: figure
+
   - glob: "**/*Plaque*.tif"
     metadata:
       channel: plaques
+      use: excluded
+      exclude_reason: "plaque channel: same scan as vessels, out of reconstruction scope; would leak tissue identity across channels"
       z_step_um: 5.0
-  - glob: "**/*Neuron*.tif"
+
+  - glob: "**/*Vessel*.tif"
     metadata:
-      channel: neurons
-      z_step_um: 10.0    # confirm: neuron stacks in this dataset differ
+      channel: vessels
+      use: trainable
+      z_step_um: 5.0
 
-# Fill in once the archive layout is known. Example shape:
-# filename_regex: '(?P<mouse>M\\d+)[_-](?P<session>s\\d+)[_-](?P<fov>FOV?\\d+)'
-filename_regex: null
+# Filenames are irregular in this deposit:
+#   "Mouse 1 FOV II Vessel Session 2.tif"   (singular "Vessel")
+#   "Mouse  2 FOV I Vessels Session 1.tif"  (double space)
+# so the patterns are deliberately loose; the audit verifies the file count.
+filename_regex: 'Mouse\s+(?P<mouse_id>\d+)\s+FOV\s+(?P<fov_id>[IVX]+)\s+(?P<kind>Vessels?|Plaques?)\s+Session\s+(?P<session_id>\d+)'
+sample_id_template: "M{mouse_id}_FOV{fov_id}_S{session_id}_{channel}"
+per_file:
+  # The neuron panel is ZCYX with a different axial step; declared explicitly so
+  # the audit reports a real axis/step mismatch instead of a generic shape error.
+  "3b - GFP neurons.tif":
+    axes: ZCYX
+    channel: neurons
+    z_step_um: 10.0     # README says 10 um, the ImageJ tag says 15 um -- see warning
 
-# Exact per-filename overrides win over every pattern above.
-per_file: {}
+# Z-STEP DECISION (recorded, not assumed)
+# README.md documents 5 um for all plaque/vessel stacks. ImageJ's `spacing` tag
+# disagrees on 5 of the 20 stacks (writes 7.0 for several Session-2 files) and
+# even disagrees between the two channels of one session (Mouse 2 FOV I:
+# Plaques S2 = 7.0, Vessels S2 = 5.0) -- two channels of one scan cannot have
+# different axial steps, so the tag is unreliable rather than informative.
+# 5 um is used throughout; the audit reports every disagreement as a warning.

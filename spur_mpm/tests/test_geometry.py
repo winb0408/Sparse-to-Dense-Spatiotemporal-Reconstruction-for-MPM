@@ -32,7 +32,7 @@ def test_shape_and_axes_length_must_agree():
 
 
 def test_declared_plane_count_checked():
-    with pytest.raises(GeometryError, match="declared .* planes"):
+    with pytest.raises(GeometryError, match="declared .* TIFF pages"):
         geom().validate(actual_shape=(32, 64, 64), declared_planes=31)
 
 

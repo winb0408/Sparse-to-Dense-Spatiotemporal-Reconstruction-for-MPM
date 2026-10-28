@@ -65,7 +65,8 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     device = torch.device(cfg["run"].get("device", "cuda")
                           if torch.cuda.is_available() else "cpu")
     arm = get_arm(arm_name)
-    cache = VolumeCache.load(cfg["data"]["index"])
+    cache = VolumeCache.load(cfg["data"]["index"],
+                              fold=int(cfg["data"].get("fold", 0)))
     folds = {int(f["fold"]): f for f in read_split(cfg["data"]["split"])["folds"]}
     fold = folds[int(cfg["data"]["fold"])]
     sample_ids = fold[split_name]

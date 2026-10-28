@@ -23,9 +23,11 @@ __all__ = ["run_audit", "write_report"]
 
 
 def run_audit(spec_path: str | Path, out_dir: str | Path,
-              with_sha256: bool = False, limit: int | None = None) -> dict:
+              with_sha256: bool = False, limit: int | None = None,
+              with_fingerprint: bool = True) -> dict:
     spec = load_spec(spec_path)
-    rows = build_manifest(spec, with_sha256=with_sha256, limit=limit)
+    rows = build_manifest(spec, with_sha256=with_sha256, limit=limit,
+                          with_fingerprint=with_fingerprint)
     if not rows:
         raise SystemExit(f"no TIFF files matched the spec under {spec.root}")
 
@@ -40,22 +42,29 @@ def write_report(rows: list[dict], out_dir: str | Path, spec) -> Path:
     out.mkdir(parents=True, exist_ok=True)
 
     n_bad = sum(1 for r in rows if r.get("issues"))
-    shapes = Counter(str(r.get("shape")) for r in rows)
-    dtypes = Counter(str(r.get("dtype")) for r in rows)
-    zspans = sorted({round(float(r.get("z_span_um") or 0), 1) for r in rows})
-    mice = sorted({str(r.get("mouse_id", "")) for r in rows})
-    fovs = sorted({str(r.get("fov_id", "")) for r in rows})
+    trainable = [r for r in rows if r.get("use", "trainable") == "trainable"]
+    excluded = [r for r in rows if r.get("use", "trainable") != "trainable"]
+    dupes = [r for r in rows if r.get("duplicate_of")]
+
+    shapes = Counter(str(r.get("shape")) for r in trainable)
+    dtypes = Counter(str(r.get("dtype")) for r in trainable)
+    zspans = sorted({round(float(r.get("z_span_um") or 0), 1) for r in trainable})
+    mice = sorted({str(r.get("mouse_id", "")) for r in trainable})
+    fovs = sorted({f"{r.get('mouse_id')}/{r.get('fov_id')}" for r in trainable})
+    sessions = sorted({str(r.get("session_id", "")) for r in trainable})
 
     lines = [
         "# SPUR-E000 数据审计报告",
         "",
         f"- 数据集目录: `{spec.root}`",
-        f"- 文件数: **{len(rows)}**（有 issue 的 {n_bad} 个）",
+        f"- 文件数: **{len(rows)}**（纳入 {len(trainable)}，排除 {len(excluded)}，"
+        f"有 issue 的 {n_bad} 个）",
         f"- 动物 (mouse_id): {mice}",
-        f"- FOV: {fovs}",
+        f"- FOV (mouse/fov): {fovs}",
+        f"- session: {sessions}",
         f"- Z 覆盖 (µm): {zspans}",
         "",
-        "## 形状与类型",
+        "## 形状与类型（仅纳入的文件）",
         "",
         "| shape | 文件数 |",
         "|---|---|",
@@ -64,14 +73,28 @@ def write_report(rows: list[dict], out_dir: str | Path, spec) -> Path:
     lines += ["", "| dtype | 文件数 |", "|---|---|"]
     lines += [f"| {d} | {n} |" for d, n in dtypes.most_common()]
 
-    lines += ["", "## 逐文件清单", "",
-              "| sample_id | mouse | session | fov | axes | shape | z_span_um | issues |",
+    lines += ["", "## 纳入清单（可进入分组划分）", "",
+              "| sample_id | mouse | session | fov | axes | shape | z_step | z_span_um |",
               "|---|---|---|---|---|---|---|---|"]
-    for r in rows:
+    for r in trainable:
         lines.append(
             f"| {r.get('sample_id')} | {r.get('mouse_id')} | {r.get('session_id')} | "
             f"{r.get('fov_id')} | {r.get('axes')} | {r.get('shape')} | "
-            f"{r.get('z_span_um')} | {r.get('issues') or '—'} |")
+            f"{r.get('z_step_um')} | {r.get('z_span_um')} |")
+
+    if excluded:
+        lines += ["", "## 排除清单（显式声明，不进入划分）", "",
+                  "| sample_id | 原因 | shape | axes |", "|---|---|---|---|"]
+        for r in excluded:
+            lines.append(f"| {r.get('sample_id')} | {r.get('exclude_reason') or '—'} | "
+                         f"{r.get('shape')} | {r.get('axes')} |")
+
+    if dupes:
+        lines += ["", "## 重复文件（像素级一致；这是泄漏源）", "",
+                  "| sample_id | 与谁重复 | use | path |", "|---|---|---|---|"]
+        for r in dupes:
+            lines.append(f"| {r.get('sample_id')} | {r.get('duplicate_of')} | "
+                         f"{r.get('use')} | {r.get('path')} |")
 
     if n_bad:
         lines += ["", "## 未解决项（必须先解决才能训练）", ""]
@@ -96,16 +119,22 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--sha256", action="store_true",
                    help="hash every file (slow, needed for the formal audit)")
     p.add_argument("--limit", type=int, default=None)
+    p.add_argument("--no-fingerprint", action="store_true",
+                   help="skip pixel-level duplicate detection (not recommended)")
     p.add_argument("--allow-issues", action="store_true",
                    help="exit 0 even when volumes have unresolved issues")
     args = p.parse_args(argv)
 
     result = run_audit(args.spec, args.out, with_sha256=args.sha256,
-                       limit=args.limit)
+                       limit=args.limit,
+                       with_fingerprint=not args.no_fingerprint)
     rows = result["rows"]
     n_bad = sum(1 for r in rows if r.get("issues"))
     summary = {
         "n_files": len(rows),
+        "n_trainable": sum(1 for r in rows if r.get("use", "trainable") == "trainable"),
+        "n_excluded": sum(1 for r in rows if r.get("use", "trainable") != "trainable"),
+        "n_duplicates": sum(1 for r in rows if r.get("duplicate_of")),
         "n_with_issues": n_bad,
         "manifest_csv": str(result["csv"]),
         "manifest_json": str(result["json"]),
