@@ -2,7 +2,8 @@
 
 **截至 2026-10-28**：仓库底座（代码结构 + 可跑通的合成数据竖切）已完成；
 Dryad 真实数据已到位并完成审计（SPUR-E000/E000b）、泄漏隔离（E003a）、划分、预备、
-无学习基线（SPUR-E001）与有监督上界（SPUR-E002）；**自监督臂（E003）正在训练**。
+无学习基线（SPUR-E001）、有监督上界（SPUR-E002）；
+自监督臂已完成三轮（E003 / E003b / E005）并**得到阴性结果**，当前在 `ky=4` 几何上复核（E009）。
 逐条实验记录见 [`Project_log.md`](Project_log.md)，研究计划见 [`plan.md`](plan.md)。
 
 ## 阶段状态
@@ -12,8 +13,8 @@ Dryad 真实数据已到位并完成审计（SPUR-E000/E000b）、泄漏隔离�
 | Phase 0 | 数据审计（SPUR-E000） | ✅ 完成 | 29 文件 → 10 纳入 / 19 排除 / 3 重复 / **0 unresolved issue** |
 | Phase 1 | 基线 A0/A1（SPUR-E001） | ✅ 完成 | 三折可复现（fingerprint `e473498d…`）；A0≡A1 已定性为恒等 PSF 的必然结果 |
 | Phase 2 | 有监督上界 S0/S1（SPUR-E002） | ✅ 完成 | 3/3 折优于插值（+1.37 dB / +0.014 Dice）；X0 无独立收益 |
-| Phase 3 | MMS 自监督 SS0/SS1（SPUR-E003） | 🔄 运行中 | 泄漏闸门已通过（E003a）；选模只看 holdout loss |
-| Phase 4 | 机制消融（SS2g / S1g，SPUR-E004/E005） | ⏳ 待数据 | 与 SS2 同预算同 fold |
+| Phase 3 | MMS 自监督 SS0/SS1（SPUR-E003／E003b／E005） | ⚠️ 阴性（`ky=2`） | SS1 低于插值 4.77 dB 且改写测量；`dc1` 修好测量一致性但仍低于插值 2.02 dB |
+| Phase 4 | 机制消融（SS2g / S1g，SPUR-E004） | ⏸ 暂缓 | 需先有合格的自监督臂，否则"零标签代价"无意义 |
 | Phase 5 | 不确定性场（SPUR-E006） | ⏳ 待数据 | U 与误差的相关性为实验结论，非前提 |
 | Phase 6 | 其他（DINOv3 / TYX 钙成像） | ⛔ 未启动 | 主线证明后才考虑 |
 
@@ -30,16 +31,23 @@ Dryad 真实数据已到位并完成审计（SPUR-E000/E000b）、泄漏隔离�
   因此深度分层必须单独报告，不能整卷平均。
 - 无学习基线（SPUR-E001）：A0 = A1 = PSNR 29.06 / Dice 0.869 / clDice 0.834（三折均值）。
   恒等 PSF 下 Wiener 解即插值本身，A0≡A1 逐位相同。
+- 自监督（SPUR-E003b / E005，**阴性**）：SS1 24.29 dB / Dice 0.754，比插值低 4.77 dB / 0.116 Dice，
+  且 `E_measured` 0.0491（在它被给定的体素上犯错）。加 `dc_weight=1.0` 后 `E_measured` 降到 0.0022
+  （与有监督臂同量级）、PSNR 28.44，但**仍低于插值 2.02 dB / 0.046 Dice**，差距全在缺失行
+  （`E_missing` 0.0456 vs 插值 0.0401）。改 `selfsupervision.ratio` 无效。
 - 有监督上界（SPUR-E002）：S0 = PSNR 30.43 / Dice 0.8835 / clDice 0.8575；
   相对 A0 **逐折 3/3** 提升 +1.37 dB / +0.014 Dice / +0.024 clDice，且每一深度档都有收益。
   S1（+X0）与 S0 无差别（≤0.064 dB），原因同 A0≡A1：X0 在有真实光学的数据上是插值。
 
 ## 立即待办（按序）
 
-1. 完成 E003b（SS0/SS1 训练 + 双口径评估），再做 E004（S1 vs SS1 同折配对）。
-2. 深度分层结论一律以血管 Dice/clDice 为准，PSNR 不作深度指标（SPUR-E001 已说明原因）。
-3. README 第 4 节列出的 `Vessels plus plaques*.tif` 不在上传包内，需向提供方确认。
-4. 跨动物方差约 2.8 dB PSNR / 0.08 Dice，**任何小于 1 dB / 0.03 Dice 的差异不得作为结论**。
+1. **SPUR-E009（`ky=4`）判定**：在插值明显变弱的几何下重比 A0 / S1 / SS1 / SS1+`dc1`。
+   它只能回答"结论是否依赖采样几何"，**不能**用来复活 `ky=2` 上的 MMS 主张。
+2. **修选模信号**：E005 已证伪"用 held-out 测量损失选模"（三折 holdout loss 变好、test 变差）。
+   在 E009 上先验证代理指标与 test 的相关性，再用于选模；在此之前 E003/E005 的 `best.pt` 可能未选中最好一步。
+3. 深度分层结论一律以血管 Dice/clDice 为准，PSNR 不作深度指标（SPUR-E001 已说明原因）。
+4. README 第 4 节列出的 `Vessels plus plaques*.tif` 不在上传包内，需向提供方确认。
+5. 跨动物方差约 2.8 dB PSNR / 0.08 Dice，**任何小于 1 dB / 0.03 Dice 的差异不得作为结论**。
 
 ## 已知限制（写在这里，避免日后被当成结论）
 
@@ -50,4 +58,6 @@ Dryad 真实数据已到位并完成审计（SPUR-E000/E000b）、泄漏隔离�
 - 自监督臂评估默认 `eval.input_support=full`（给全部 M_acq）；训练时只给一半。
   同一口径的次要结果写到 `runs_holdout/`，两者不得混在同一张表里。
 - `virtual_sparse` 只讨论虚拟稀疏；**任何加速/降剂量声明只能在 `hardware_sparse` 下提出**。
+- **held-out 测量损失不能当自监督臂的选模信号**：SPUR-E005 里三折 holdout loss 一致变好，
+  test PSNR 却两折变差、`E_measured` 三折一致变差。它奖励的是"在训练密度下内插"。
 - 仅 1 个测试组时 bootstrap 区间退化，已用 `ci_estimable: false` 显式标注，不得当作精度。

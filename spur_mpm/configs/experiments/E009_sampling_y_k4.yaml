@@ -1,0 +1,29 @@
+# SPUR-E009 -- does the measurement geometry decide who wins?
+#
+# E005's result: with hard measurement consistency the self-supervised arm stops
+# corrupting its inputs (E_measured 0.0491 -> 0.0022) but still loses 2.0 dB to
+# bilinear interpolation, entirely in the *missing* rows (E_missing 0.0456 vs
+# 0.0401). At k_y=2 every missing row borders a measured one, which is the
+# regime where bilinear interpolation is nearly optimal -- so that comparison
+# cannot separate "the learned prior is weak" from "the task is too easy for
+# interpolation". This experiment moves to k_y=4 (three missing rows between
+# measured ones) and keeps everything else fixed.
+experiment: SPUR-E009
+model:
+  arm: S1
+sampling:
+  mode: y
+  ky: 4
+  kz: 1
+selfsupervision:
+  ratio: 0.5
+  geometry: row
+data:
+  context_slices: 1
+train:
+  steps: 3000
+  batch: 8
+loss:
+  l1: 1.0
+  ms_ssim: 0.5
+  dc_weight: 0.0
