@@ -12,6 +12,8 @@ data_local/
 spur_mpm/configs/data/synthetic_smoke.yaml
 checkpoints_local/
 runs/
+# secondary evaluation protocol (interaction with the headline table)
+runs_holdout/
 *.npy
 *.npz
 *.tif

@@ -7,11 +7,17 @@
 #
 #   bash spur_mpm/experiments/eval_trained.sh E002_S0 E002_S1
 #
+# INPUT_SUPPORT=holdout keeps the training-time withholding and writes to
+# runs_holdout/ instead, so the secondary protocol never mixes with the
+# headline table. For self-supervised arms that regime is the only one with an
+# E_hold number; for supervised arms it is the same run as "full".
 set -eu
 cd "$(dirname "$0")/../.."
 
 INDEX=data_local/dryad_cache/index.json
 SPLIT=spur_mpm/experiments/E000_data_audit/split.json
+SUPPORT="${INPUT_SUPPORT:-full}"
+if [[ "$SUPPORT" == "full" ]]; then OUT_ROOT=runs; else OUT_ROOT=runs_holdout; fi
 
 for run_prefix in "$@"; do
   for fold in 0 1 2; do
@@ -26,10 +32,11 @@ for run_prefix in "$@"; do
       --arm "$arm" --ckpt "$run/best.pt" --fold "$fold" --split test \
       --set data.index="$INDEX" --set data.split="$SPLIT" \
       --set data.patch_hw='[512,512]' --set train.num_workers=0 \
-      --out "runs/${run_prefix}_fold${fold}_test" \
-      > "/tmp/eval_${run_prefix}_fold${fold}.log" 2>&1 &
+      --set eval.input_support="$SUPPORT" \
+      --out "${OUT_ROOT}/${run_prefix}_fold${fold}_test" \
+      > "/tmp/eval_${run_prefix}_fold${fold}_${SUPPORT}.log" 2>&1 &
   done
   wait
-  echo "evaluated ${run_prefix}"
+  echo "evaluated ${run_prefix} (${SUPPORT})"
 done
 echo ALL_EVALS_DONE

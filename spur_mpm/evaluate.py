@@ -58,6 +58,19 @@ def _feature_slice(features: tuple[str, ...], want: str, context: int) -> slice:
     return slice(i * context, (i + 1) * context)
 
 
+def withholds_at_eval(supervision: str, input_support: str) -> bool:
+    """Should the evaluation item keep part of M_acq back?
+
+    Only for a self-supervised arm scored under the training-time regime. Any
+    other combination gets everything it measured: withholding from a
+    supervised arm would silently change *its* input budget too.
+    """
+    if input_support not in ("full", "holdout"):
+        raise ValueError(f"eval.input_support must be 'full' or 'holdout', got "
+                         f"{input_support!r}")
+    return supervision == "self" and input_support == "holdout"
+
+
 @torch.no_grad()
 def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
              split_name: str = "test", out_dir: Path | None = None,
@@ -76,9 +89,21 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     noise = NoiseConfig(**cfg.get("noise", {"poisson_photons": 0.0,
                                             "gaussian_sigma": 0.0, "seed": 0}))
     features = _eval_features(arm)
+    # How much of the acquired data the arm is given at scoring time.
+    #
+    # "full"     : every acquired measurement (M_acq). A self-supervised arm is
+    #              trained with part of M_acq withheld as targets, but withholding
+    #              it again at test time would hand it HALF the input the
+    #              supervised arms get and turn S1 vs SS1 into a comparison of
+    #              measurement budgets rather than of methods. This is the
+    #              headline protocol.
+    # "holdout"  : the training-time regime, kept as a secondary number because
+    #              it is the only one where E_hold exists.
+    input_support = str(cfg.get("eval", {}).get("input_support", "full"))
+    withhold = withholds_at_eval(arm.supervision, input_support)
     holdout = HoldoutSpec(ratio=float(cfg["selfsupervision"]["ratio"]),
                           geometry=str(cfg["selfsupervision"]["geometry"]),
-                          seed=seed) if arm.supervision == "self" else None
+                          seed=seed) if withhold else None
 
     geom0 = cache.geometry(sample_ids[0])
     context = int(cfg["data"].get("context_slices", 1))
@@ -88,7 +113,11 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     item_cfg = ItemConfig(
         sampling=sampling, psf=psf, noise=noise,
         warm_start_kind=arm.warm_start, lam=float(cfg["physics"]["lam"]),
-        features=features, supervision=arm.supervision, holdout=holdout,
+        # "self" is what makes _make_item withhold; a self-supervised arm scored
+        # with the full acquired set is built as a dense item and scored the same
+        # way, so nothing about the numbers depends on the label.
+        features=features, holdout=holdout,
+        supervision="self" if withhold else "dense",
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
     )
@@ -159,6 +188,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         "physics": {"psf": psf.to_dict(), "lam": cfg["physics"]["lam"],
                     "u_kind": cfg["physics"].get("u_kind", "geo")},
         "supervision": arm.supervision,
+        "input_support": input_support,
         "n_windows": len(rows),
         "metrics": {},
     }

@@ -72,6 +72,11 @@ loss:
 
 eval:
   z_stride: 1
+  # full    : score every arm with all of M_acq (headline; self-supervised arms
+  #           are trained on less, so this is the deployment setting and the only
+  #           fair comparison against the supervised arms).
+  # holdout : keep the training-time withholding (secondary; where E_hold exists).
+  input_support: full
 
 run:
   seed: 0

@@ -73,3 +73,18 @@ def test_self_supervised_arm_refuses_to_select_without_a_holdout():
     with pytest.raises(RuntimeError, match="held-out measurement loss"):
         validate(_ZeroModel(), [_batch(holdout=False)], torch.device("cpu"),
                  supervision="self", rho="charbonnier", amp=False)
+
+
+def test_evaluation_withholds_only_for_a_self_supervised_arm_asked_to():
+    from spur_mpm.evaluate import withholds_at_eval
+
+    # headline protocol: everybody gets all of M_acq, so the comparison is
+    # between methods rather than between measurement budgets
+    assert withholds_at_eval("self", "full") is False
+    assert withholds_at_eval("dense", "full") is False
+    # secondary protocol: the training-time regime
+    assert withholds_at_eval("self", "holdout") is True
+    # withholding from a supervised arm would change its input budget too
+    assert withholds_at_eval("dense", "holdout") is False
+    with pytest.raises(ValueError, match="input_support"):
+        withholds_at_eval("self", "half")
