@@ -132,7 +132,17 @@ python -m spur_mpm.scripts.collect_results --pattern 'runs/E00*_*' \
 | SS2g / S1g | 门控融合变体 | 同上，与 S2/SS2 同预算 |
 
 自监督臂在**冻结权重之后**才允许看稠密参考；评估脚本与训练脚本的选模口径不同，这一点写在
-`train.py::validate` 里并由 run 目录的 `select_metric` 字段留痕。
+`train.py::validate` 里并由 run 目录的 `select_metric` 字段留痕。SS 臂训练期间连稠密 PSNR 都不计算，
+只写 `holdout_loss`——数字一旦出现在日志里，总有一天会被人拿来挑 checkpoint。
+
+### 评估口径（`eval.input_support`）
+
+| 取值 | 含义 | 落盘位置 |
+|---|---|---|
+| `full`（默认） | 所有臂都拿到完整的 `M_acq`（测量比例 0.5）。SS 臂训练时只见到一半，评估时给全部：这是部署口径，也是与有监督臂**同输入预算**的唯一公平比较 | `runs/` |
+| `holdout` | 保留训练时的扣留（SS 臂输入 0.25），是唯一存在 `E_hold` 的口径 | `runs_holdout/` |
+
+两个口径**绝不混在同一张表**里，每个 `summary.json` 都记录了自己用的是哪一个。
 
 ## 记录约定
 
