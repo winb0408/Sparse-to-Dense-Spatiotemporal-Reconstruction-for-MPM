@@ -254,6 +254,11 @@ def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
         "inputs": mi.stack(cfg.features),
         "target": target,                                   # dense reference
         "hold_target": acq.y[center],                       # real measurement
+        # The input support and the values behind it, centre plane, exposed so
+        # a data-consistency term can reach them. Without this the DC weight
+        # had no way to be used at all -- setting it raised on the first step.
+        "y_in": y_in[center],
+        "in_mask": m_in[center].float(),
         "hold_mask": hold_mask[center].float(),              # centre plane only
         "acq_mask": acq.mask[center].float(),
         "phase": torch.tensor(phase, dtype=torch.long),

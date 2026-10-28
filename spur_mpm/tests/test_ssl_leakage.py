@@ -144,3 +144,47 @@ def test_in_plane_sampling_needs_no_axial_context():
 
     validate_context_depth(SamplingSpec(mode="y", ky=2), context_depth=1)
     validate_context_depth(SamplingSpec(mode="xy", ky=2), context_depth=1)
+
+
+def test_data_consistency_term_can_actually_be_reached():
+    """dc_weight used to be a config knob that raised on the first step.
+
+    The training criterion was called without y_in/m_in, so any nonzero
+    dc_weight died with 'requires y_in and m_in' -- and nothing tested it.
+    """
+    pred = torch.zeros(2, 8, 8)
+    target = torch.full((2, 8, 8), 0.5)
+    hold = torch.zeros(2, 8, 8)
+    hold[:, ::2] = 1.0
+    y_in = torch.full((2, 8, 8), 0.5)
+    m_in = 1.0 - hold
+
+    without = MMSLoss(rho="charbonnier", dc_weight=0.0)(pred, target, hold)["loss"]
+    crit = MMSLoss(rho="charbonnier", dc_weight=1.0)
+    res = crit(pred, target, hold, y_in=y_in, m_in=m_in)
+    # pred is wrong everywhere; DC must add a penalty for the measured half
+    assert res["loss"] > without
+    assert "dc" in res and float(res["dc"]) > 0
+
+
+def test_item_exposes_the_input_support_for_consistency():
+    """A DC term cannot be computed if the item hides M_in and y_in."""
+    import numpy as np
+
+    from spur_mpm.data.datasets import _make_item
+    from spur_mpm.data.geometry import VolumeGeometry
+    from spur_mpm.data.datasets import ItemConfig
+
+    dense = np.random.default_rng(0).random((5, 16, 16)).astype(np.float32)
+    geom = VolumeGeometry(sample_id="S", mouse_id="1", session_id="1",
+                          fov_id="I", shape=dense.shape, axes="ZYX",
+                          voxel_xy_um=0.98, z_step_um=5.0)
+    cfg = ItemConfig(sampling=SamplingSpec(mode="y", ky=2),
+                     features=("y", "mask"),
+                     supervision="self",
+                     holdout=HoldoutSpec(ratio=0.5, geometry="row", seed=0))
+    item = _make_item(dense, geom, cfg, z0=0, y0=0, x0=0, holdout_seed=0)
+    assert "y_in" in item and "in_mask" in item
+    m_in, m_hold = item["in_mask"].bool(), item["hold_mask"].bool()
+    assert not bool((m_in & m_hold).any())
+    assert torch.equal(item["y_in"][~m_in], torch.zeros_like(item["y_in"][~m_in]))

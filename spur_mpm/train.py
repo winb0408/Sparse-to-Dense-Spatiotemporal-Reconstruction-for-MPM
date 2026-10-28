@@ -255,7 +255,9 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
 
         if arm.supervision == "self":
             res = train_crit(pred, batch["hold_target"].to(device),
-                             batch["hold_mask"].to(device))
+                             batch["hold_mask"].to(device),
+                             y_in=batch["y_in"].to(device),
+                             m_in=batch["in_mask"].to(device))
             loss = res["loss"]
         else:
             res = train_crit(pred, batch["target"].to(device))

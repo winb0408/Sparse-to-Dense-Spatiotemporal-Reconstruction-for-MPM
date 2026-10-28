@@ -140,6 +140,11 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         model.load_state_dict(payload["model"])
         model.eval()
 
+    projection = str(cfg.get("eval", {}).get("consistency_projection", "none"))
+    if projection not in ("none", "hard"):
+        raise ValueError("eval.consistency_projection must be 'none' or 'hard', "
+                         f"got {projection!r}")
+
     rows: list[dict] = []
     with torch.no_grad():
         for batch in loader:
@@ -154,6 +159,15 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
             target = batch["target"]
             acq = batch["acq_mask"].bool()
             hold = batch["hold_mask"].bool()
+
+            # Optional hard consistency step, applied identically to every
+            # trained arm: whatever the model was given back, it must agree with
+            # it at those positions. Parameter-free, so it cannot flatter one
+            # arm over another -- and without it a self-supervised model can
+            # ignore its own input entirely (see SPUR-E003b).
+            if projection == "hard" and model is not None:
+                given = batch["in_mask"].bool()
+                pred = torch.where(given, batch["y_in"], pred)
 
             for i in range(pred.shape[0]):
                 p, t = pred[i], target[i]
@@ -189,6 +203,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                     "u_kind": cfg["physics"].get("u_kind", "geo")},
         "supervision": arm.supervision,
         "input_support": input_support,
+        "consistency_projection": projection,
         "n_windows": len(rows),
         "metrics": {},
     }
