@@ -204,3 +204,53 @@ A1 作为独立方法在本数据上不复存在，后续表格中与 A0 并列�
 1. SPUR-E002：有监督 S0/S1/S2（稠密参考作监督，用稠密验证集选模）。
 2. SPUR-E003：自监督 MMS SS0/SS1/SS2（holdout 只用真实测量，选模只看 held-out 测量损失）。
 3. 若要恢复 Wiener 的反卷积意义，需从数据估计 PSF（血管边缘的横向剖面）；已记录待决，不阻塞 E002/E003。
+
+---
+
+## SPUR-E003a — 自监督泄漏闸门（真实数据）
+
+- **日期**：2026-10-28
+- **阶段**：Phase 3 前置（plan §2.3「严格自监督口径」、SPUR-E003「防伪自监督」）
+- **目的**：「零稠密标签」是一个需要被证明的断言，不是一句声明。在任何 SS 臂训练之前，
+  先在**真实数据**上把这个断言变成可以失败的检查。
+- **产物**：`spur_mpm/scripts/check_selfsup_leakage.py`、
+  `spur_mpm/experiments/E003_selfsup/leakage_check.json`
+- **覆盖面**：3 个 fold × (train/val/test 三种角色) = **30 卷**，每卷 3 个平面 × 3 个 holdout seed = **270 次探测**
+
+### 三项检查
+
+1. **盲性（主检查）**：定位 holdout 体素，把这些体素的**稠密像素替换为垃圾值**（`(x+0.37) mod 1`，保证与原值不同），
+   其余一切不变，重建 item，要求网络输入**逐位相同**。臂能读到的所有信息都在 `inputs` 张量里
+   （`y/mask/x0`，`U` 由 `y`、`mask` 推出），因此输入不变 = holdout 无路可达模型。
+2. **正对照（让检查有可能失败）**：把**测量位置**（`M_in \ M_hold`）的体素同样替换为垃圾值，要求输入**必须改变**。
+   没有这一项，第 1 项即使写成恒真也会"通过"。
+3. **目标必须是测量**：holdout 目标必须等于该位置的实际采集值；不能是稠密参考（那等于有监督），
+   不能是全零（那等于训练网络输出全黑）。同时校验 `M_in`、`M_hold` 恰好划分 `M_acq`。
+
+### 结果
+
+```
+volumes checked: 30  planes/volume: 3
+holdout share of M_acq: 0.500-0.500 (requested 0.5)
+OK: holdout is blind on real data
+```
+
+270 次探测全部通过：输入对 holdout 完全不敏感、对测量位置敏感、目标全部是真实测量、划分比例精确 0.500。
+
+### 闸门自身的测试（`spur_mpm/tests/test_leakage_harness.py`）
+
+只证明「检查通过」不够，还要证明「检查会失败」。新增 3 个测试：
+
+- 诚实构造 → 通过；
+- 构造器把 `hold_target` 偷偷拼进 `inputs`（模拟真实泄漏）→ 检查**必须**报 `inputs changed`；
+- 构造器把 holdout 目标置零 → 检查**必须**报 `all zero` / `not the acquired`。
+
+### 结论
+
+自监督路径在真实数据上的泄漏边界成立，且验证它的工具本身是可证伪的。
+这不是性能结论，是口径结论：后续 SS 臂的「无标签」主张有这个工件支撑。
+
+### 后续动作
+
+1. E003b：SS0/SS1 训练，选模**只用** held-out 测量损失（验证 FOV 的 holdout，不读稠密参考）。
+2. 冻结权重之后才允许 `evaluate.py` 读稠密参考，并在 run 目录留下 `select_metric=holdout_loss` 痕迹。

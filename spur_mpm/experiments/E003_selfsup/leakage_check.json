@@ -1,0 +1,290 @@
+{
+ "data": "real",
+ "artifacts": {
+  "index": "data_local/dryad_cache/index.json",
+  "split": "spur_mpm/experiments/E000_data_audit/split.json"
+ },
+ "sampling": {
+  "mode": "y",
+  "ky": 2
+ },
+ "holdout": {
+  "ratio": 0.5,
+  "geometry": "row"
+ },
+ "context_depth": 1,
+ "volumes": [
+  {
+   "sample_id": "M2_FOVII_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "train"
+  },
+  {
+   "sample_id": "M2_FOVII_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "train"
+  },
+  {
+   "sample_id": "M3_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "train"
+  },
+  {
+   "sample_id": "M3_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "train"
+  },
+  {
+   "sample_id": "M2_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "val"
+  },
+  {
+   "sample_id": "M2_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "val"
+  },
+  {
+   "sample_id": "M1_FOVII_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "test"
+  },
+  {
+   "sample_id": "M1_FOVII_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "test"
+  },
+  {
+   "sample_id": "M1_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "test"
+  },
+  {
+   "sample_id": "M1_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 0,
+   "role": "test"
+  },
+  {
+   "sample_id": "M1_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "train"
+  },
+  {
+   "sample_id": "M1_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "train"
+  },
+  {
+   "sample_id": "M3_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "train"
+  },
+  {
+   "sample_id": "M3_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "train"
+  },
+  {
+   "sample_id": "M1_FOVII_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "val"
+  },
+  {
+   "sample_id": "M1_FOVII_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "val"
+  },
+  {
+   "sample_id": "M2_FOVII_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "test"
+  },
+  {
+   "sample_id": "M2_FOVII_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "test"
+  },
+  {
+   "sample_id": "M2_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "test"
+  },
+  {
+   "sample_id": "M2_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 1,
+   "role": "test"
+  },
+  {
+   "sample_id": "M1_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "train"
+  },
+  {
+   "sample_id": "M1_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "train"
+  },
+  {
+   "sample_id": "M2_FOVII_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "train"
+  },
+  {
+   "sample_id": "M2_FOVII_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "train"
+  },
+  {
+   "sample_id": "M2_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "train"
+  },
+  {
+   "sample_id": "M2_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "train"
+  },
+  {
+   "sample_id": "M1_FOVII_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "val"
+  },
+  {
+   "sample_id": "M1_FOVII_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "val"
+  },
+  {
+   "sample_id": "M3_FOVI_S1_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "test"
+  },
+  {
+   "sample_id": "M3_FOVI_S2_vessels",
+   "n_planes": 3,
+   "n_seeds": 3,
+   "holdout_fraction": 0.5,
+   "problems": [],
+   "fold": 2,
+   "role": "test"
+  }
+ ],
+ "problems": [],
+ "ok": true
+}
