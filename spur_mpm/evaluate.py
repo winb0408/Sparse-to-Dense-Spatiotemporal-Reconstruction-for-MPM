@@ -58,17 +58,28 @@ def _feature_slice(features: tuple[str, ...], want: str, context: int) -> slice:
     return slice(i * context, (i + 1) * context)
 
 
-def withholds_at_eval(supervision: str, input_support: str) -> bool:
+def withholds_at_eval(supervision: str, input_support: str,
+                      holdout_baselines: bool = False) -> bool:
     """Should the evaluation item keep part of M_acq back?
 
-    Only for a self-supervised arm scored under the training-time regime. Any
-    other combination gets everything it measured: withholding from a
-    supervised arm would silently change *its* input budget too.
+    For a self-supervised arm under the training-time regime, yes -- that is the
+    input it was trained on. Every other combination gets everything it
+    measured, because withholding from a supervised arm would silently change
+    *its* input budget too.
+
+    ``holdout_baselines`` extends the withholding to the parameter-free arms
+    (A0/A1). Those two see nothing but the given voxels, so under the default
+    rule an A0 scored "under holdout" is really an A0 scored with twice the
+    input, and quoting it next to a self-supervised number compares two
+    different budgets. Set it to compare an interpolation floor against a
+    network *on the same support*.
     """
     if input_support not in ("full", "holdout"):
         raise ValueError(f"eval.input_support must be 'full' or 'holdout', got "
                          f"{input_support!r}")
-    return supervision == "self" and input_support == "holdout"
+    if input_support != "holdout":
+        return False
+    return supervision == "self" or holdout_baselines
 
 
 @torch.no_grad()
@@ -100,7 +111,9 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     # "holdout"  : the training-time regime, kept as a secondary number because
     #              it is the only one where E_hold exists.
     input_support = str(cfg.get("eval", {}).get("input_support", "full"))
-    withhold = withholds_at_eval(arm.supervision, input_support)
+    withhold = withholds_at_eval(arm.supervision, input_support,
+                                 bool(cfg.get("eval", {}).get(
+                                     "holdout_baselines", False)))
     holdout = HoldoutSpec(ratio=float(cfg["selfsupervision"]["ratio"]),
                           geometry=str(cfg["selfsupervision"]["geometry"]),
                           seed=seed) if withhold else None

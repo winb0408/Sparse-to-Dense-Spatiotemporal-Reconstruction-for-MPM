@@ -88,5 +88,13 @@
         "n_empty": 0.0
       }
     }
-  ]
+  ],
+  "mask_geometry": {
+    "measured_fraction": 0.25,
+    "kept_y_rows": 64,
+    "y_period": 4,
+    "x_dense": true,
+    "z_dense": true,
+    "row_pattern": "1000100010001000"
+  }
 }

@@ -77,6 +77,12 @@ eval:
   #           fair comparison against the supervised arms).
   # holdout : keep the training-time withholding (secondary; where E_hold exists).
   input_support: full
+  # false : under 'holdout' only self-supervised arms lose their holdout rows, so
+  #         a parameter-free arm scored there has twice the input and is not a
+  #         baseline for them.
+  # true  : withhold from A0/A1 too, giving an interpolation floor on exactly the
+  #         same support as the network (secondary protocols only).
+  holdout_baselines: false
   # none : score the raw network output (primary results)
   # hard : replace the output with the measured value wherever the arm was given
   #        one, applied to every trained arm alike (E005 data-consistency ablation)

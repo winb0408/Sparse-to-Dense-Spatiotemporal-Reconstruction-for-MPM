@@ -88,3 +88,11 @@ def test_evaluation_withholds_only_for_a_self_supervised_arm_asked_to():
     assert withholds_at_eval("dense", "holdout") is False
     with pytest.raises(ValueError, match="input_support"):
         withholds_at_eval("self", "half")
+
+    # an interpolation floor has no training budget of its own, so it only
+    # becomes comparable to a self-supervised arm when this is switched on --
+    # otherwise "A0 under holdout" quietly means "A0 with twice the input"
+    assert withholds_at_eval("none", "holdout", holdout_baselines=True) is True
+    assert withholds_at_eval("none", "holdout", holdout_baselines=False) is False
+    # it must never leak into the headline protocol
+    assert withholds_at_eval("none", "full", holdout_baselines=True) is False

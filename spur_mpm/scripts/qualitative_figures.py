@@ -103,7 +103,9 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
     features = _eval_features(arm)
 
     input_support = str(cfg.get("eval", {}).get("input_support", "full"))
-    withhold = withholds_at_eval(arm.supervision, input_support)
+    withhold = withholds_at_eval(arm.supervision, input_support,
+                                 bool(cfg.get("eval", {}).get(
+                                     "holdout_baselines", False)))
     holdout = HoldoutSpec(ratio=float(cfg["selfsupervision"]["ratio"]),
                           geometry=str(cfg["selfsupervision"]["geometry"]),
                           seed=0) if withhold else None
@@ -213,6 +215,31 @@ def _views(vol: np.ndarray) -> dict:
         "XZ (y=mid)": vol[:, h // 2, :],
         "YZ (x=mid)": vol[:, :, w // 2],
         "MIP-z": vol.max(axis=0),
+    }
+
+
+def _mask_geometry(mask: np.ndarray) -> dict:
+    """Describe a measured-support mask as a lattice, measured from the mask.
+
+    The sidecar exists so a figure can be re-read without the run config, and
+    the one thing a reader needs is *which* sparse pattern is on screen. Rather
+    than echo the config (which older dumps never recorded), measure it: keep a
+    y row only if it is entirely measured, then read the period off those rows.
+    ``x_dense``/``z_dense`` say whether the other two axes were left alone,
+    which is the whole difference between row skipping and a 2-D lattice.
+    """
+    z, h, w = mask.shape
+    rows = mask.all(axis=2).any(axis=0)              # [H]: row kept end-to-end
+    kept = np.flatnonzero(rows)
+    step = int(np.diff(kept).min()) if kept.size > 1 else 1
+    return {
+        "measured_fraction": round(float(mask.mean()), 4),
+        "kept_y_rows": int(rows.sum()),
+        "y_period": step,
+        # kept rows must be complete along x AND present in every z plane
+        "x_dense": bool(kept.size and mask[:, kept, :].all()),
+        "z_dense": bool(mask.any(axis=(1, 2)).all()),
+        "row_pattern": "".join("1" if r else "0" for r in rows[:4 * step]),
     }
 
 
@@ -485,6 +512,13 @@ def main(argv: list[str] | None = None) -> int:
             **{f"{v['arm']}_pred": _cast(v["pred"]) for v in vols})
     (out_dir / f"qualitative_{sample}{tag}.json").write_text(json.dumps(
         {"sample_id": sample, "fold": args.fold,
+         # Which sparse pattern this figure is about -- the same for every arm,
+         # which is why it sits at the top level and not in each arm's record.
+         "sampling": vols[0].get("sampling"),
+         "sampling_fraction": vols[0].get("sampling_fraction"),
+         # Measured off the mask that is actually on screen, so a dump made
+         # before the config string was recorded still states its geometry.
+         "mask_geometry": _mask_geometry(vols[0]["in_mask"]),
          "input_support": vols[0]["input_support"],
          "consistency_projection": vols[0]["consistency_projection"],
          "arms": [{"arm": v["arm"], "checkpoint": v["checkpoint"],
