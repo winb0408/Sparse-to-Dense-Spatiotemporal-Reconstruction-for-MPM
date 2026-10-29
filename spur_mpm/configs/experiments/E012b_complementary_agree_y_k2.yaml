@@ -1,0 +1,30 @@
+# SPUR-E012b -- the same dual-branch design plus branch agreement.
+#
+# The complementary MMS terms are mutual distillation *on the rows the other
+# branch was given*. Nothing constrains the branches on the rows neither was
+# given -- the true gaps of the acquisition -- where two independent networks can
+# invent different things. This variant adds
+#
+#   L_agree = mean rho(pred_A - stopgrad(pred_B)) + the reverse
+#
+# over the whole plane, so it acts chiefly where there is no measurement term to
+# fight with. Detached on one side so the pair cannot cheat by co-drifting.
+#
+# Run E012 and E012b side by side: the difference is what agreement is worth, and
+# the arms are otherwise identical.
+experiment: SPUR-E012b
+model:
+  arm: SS1c
+sampling:
+  mode: y
+  ky: 2
+  kz: 1
+selfsupervision:
+  ratio: 0.5
+  geometry: row
+train:
+  steps: 3000
+  batch: 8
+loss:
+  rho: charbonnier
+  dual_agree: 0.3

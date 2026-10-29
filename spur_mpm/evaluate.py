@@ -114,9 +114,13 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     withhold = withholds_at_eval(arm.supervision, input_support,
                                  bool(cfg.get("eval", {}).get(
                                      "holdout_baselines", False)))
+    # A dual arm (E012) is *defined* by the complementary split, so it needs the
+    # spec even when withholding is off: each of its branches must still be given
+    # only its own half, otherwise it would be scored on an input it never saw.
+    # The pair's coverage is then the whole acquisition, like every other arm's.
     holdout = HoldoutSpec(ratio=float(cfg["selfsupervision"]["ratio"]),
                           geometry=str(cfg["selfsupervision"]["geometry"]),
-                          seed=seed) if withhold else None
+                          seed=seed) if (withhold or arm.dual) else None
 
     geom0 = cache.geometry(sample_ids[0])
     context = int(cfg["data"].get("context_slices", 1))
@@ -129,7 +133,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         # "self" is what makes _make_item withhold; a self-supervised arm scored
         # with the full acquired set is built as a dense item and scored the same
         # way, so nothing about the numbers depends on the label.
-        features=features, holdout=holdout,
+        features=features, holdout=holdout, dual=arm.dual,
         supervision="self" if withhold else "dense",
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),

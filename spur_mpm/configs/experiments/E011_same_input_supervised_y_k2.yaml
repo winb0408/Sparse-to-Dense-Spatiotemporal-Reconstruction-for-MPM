@@ -1,0 +1,33 @@
+# SPUR-E011 -- is the self-supervised deficit just the missing half of the input?
+#
+# The objection this answers, in the form it was raised: a supervised arm trains
+# on a dense reference, a self-supervised arm on half of the measured rows, so
+# the comparison may be measuring measurement budgets rather than methods.
+#
+# Two changes of input support, everything else fixed:
+#
+#   S1  --input_support all      every acquired row       dense target
+#   S1h --input_support holdout  the same rows SS1 gets   dense target
+#   SS1 (E003, unchanged)        the same rows SS1 gets   withheld measurements
+#
+# S1h is new and is the point of this experiment. If S1h lands on SS1, the
+# supervised win was *input quantity* and MMS has no handicap once the rows are
+# equalised. If S1h stays near S1, the extra rows were nearly worthless and what
+# supervision buys is the dense target -- which is exactly the thing a
+# self-supervised method is supposed to do without, so the comparison is fair as
+# a labelled upper bound, not a rival.
+#
+# Read it against E010: that experiment gave every *scored* arm the same input at
+# test time; this one equalises the input during *training*.
+experiment: SPUR-E011
+sampling:
+  mode: y
+  ky: 2
+  kz: 1
+selfsupervision:
+  ratio: 0.5
+  geometry: row
+  split_supervised: true
+train:
+  steps: 3000
+  batch: 8

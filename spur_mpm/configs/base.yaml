@@ -42,6 +42,13 @@ noise:               # extra synthetic noise; real data normally needs none
 selfsupervision:
   ratio: 0.5         # fraction of MEASURED positions withheld as targets
   geometry: row      # row | plane | scatter
+  # false : a supervised arm is handed every measured row (headline).
+  # true  : a supervised arm is handed exactly the rows a self-supervised arm
+  #         would get, while keeping its dense target (E011). The control that
+  #         separates "the supervised win is the extra input rows" from "the
+  #         supervised win is having a dense target at all". Not to be confused
+  #         with eval.input_support, which is about test time.
+  split_supervised: false
 
 model:
   arm: SS1
@@ -69,6 +76,10 @@ loss:
   ms_ssim: 0.5       # supervised arms only
   rho: charbonnier   # self-supervised MMS penalty: l1 | l2 | charbonnier
   dc_weight: 0.0     # measurement consistency; 0 = off (separate ablation)
+  # dual arm only (SS1c): weight on "the two branches agree everywhere". The
+  # complementary MMS terms already are mutual distillation on each other's rows;
+  # this adds agreement on the rows neither branch was given.
+  dual_agree: 0.0
 
 eval:
   z_stride: 1

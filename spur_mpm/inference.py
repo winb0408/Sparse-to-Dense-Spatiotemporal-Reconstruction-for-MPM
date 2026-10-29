@@ -32,6 +32,7 @@ from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.models.registry import build_model, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
 from spur_mpm.physics.psf import PSFConfig
+from spur_mpm.ssl.holdout import HoldoutSpec
 from spur_mpm.physics.sampling import SamplingSpec
 
 __all__ = ["reconstruct_volume", "main"]
@@ -61,7 +62,11 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
     item_cfg = ItemConfig(
         sampling=sampling, psf=psf, noise=noise, warm_start_kind=arm.warm_start,
         lam=float(cfg["physics"]["lam"]), features=tuple(arm.features),
-        supervision="dense", holdout=None,
+        supervision="dense", holdout=(
+            HoldoutSpec(ratio=float(cfg["selfsupervision"]["ratio"]),
+                        geometry=str(cfg["selfsupervision"]["geometry"]),
+                        seed=0) if arm.dual else None),
+        dual=arm.dual,
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
     )

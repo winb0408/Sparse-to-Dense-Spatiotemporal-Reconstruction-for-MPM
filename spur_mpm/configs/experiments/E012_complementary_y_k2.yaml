@@ -1,0 +1,43 @@
+# SPUR-E012 -- dual-branch complementary MMS: use the whole acquisition.
+#
+# MMS (SS1) withholds half the measured rows and trains on the other half, so a
+# single branch never uses more than half of what was acquired. E011 equalises
+# the input; E012 removes the deficit instead of measuring it.
+#
+#   branch A : rows M_a given, rows M_b are its targets (real measurements)
+#   branch B : rows M_b given, rows M_a are its targets
+#
+# M_a and M_b are disjoint and together are the acquisition, so every measured
+# voxel is one branch's input *and* the other branch's training target. No dense
+# reference is read anywhere; the supervision is measurement data either way.
+# That is the mutual distillation: each branch is the teacher of the rows the
+# other one was denied.
+#
+# Cost: two backbones, so the parameter count and the step time are that of two
+# SS1s. Quote it with the result -- an equal-budget rival would be a wider single
+# network fed the same rows, which is a different (and still open) question.
+#
+# Arms to run: SS1c. Score with the usual eval.input_support=full: at test time
+# each branch is given its own half, so the pair sees the whole acquisition and
+# the comparison against S1/SS1 is at equal measured information.
+#
+# dual_agree (base.yaml, default 0) is the extra term that also pushes the two
+# branches together where neither was given anything; 0 here keeps this run the
+# minimal version of the design, so a follow-up can attribute any gain to the
+# complementary split alone.
+experiment: SPUR-E012
+model:
+  arm: SS1c
+sampling:
+  mode: y
+  ky: 2
+  kz: 1
+selfsupervision:
+  ratio: 0.5
+  geometry: row
+train:
+  steps: 3000
+  batch: 8
+loss:
+  rho: charbonnier
+  dual_agree: 0.0

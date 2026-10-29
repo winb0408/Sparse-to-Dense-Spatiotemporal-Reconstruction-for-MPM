@@ -22,7 +22,10 @@ def test_model_forward_shape(arm_name):
     arm = get_arm(arm_name)
     model = build_model(arm, context_depth=1, base=8, window=4,
                         depths=(1, 1, 1), heads=(2, 4, 8))
-    x = torch.rand(2, len(arm.features), 32, 32)
+    # A dual arm is handed one feature stack per branch, so its input tensor is
+    # twice as wide while its output stays a single plane per branch.
+    n = 2 if arm.dual else 1
+    x = torch.rand(2, n * len(arm.features), 32, 32)
     out = model(x)
     assert out.shape == (2, 1, 32, 32)
 

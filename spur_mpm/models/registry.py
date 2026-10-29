@@ -40,12 +40,15 @@ class Arm:
     fusion: bool = False
     needs_training: bool = True
     description: str = ""
+    # Two branches on complementary halves of the acquisition (E012). Only the
+    # network and the objective change; the data pipeline stays shared.
+    dual: bool = False
 
     def to_dict(self) -> dict:
         return {"name": self.name, "features": list(self.features),
                 "warm_start": self.warm_start, "supervision": self.supervision,
                 "fusion": self.fusion, "needs_training": self.needs_training,
-                "description": self.description}
+                "description": self.description, "dual": self.dual}
 
 
 ARMS: dict[str, Arm] = {
@@ -69,6 +72,12 @@ ARMS: dict[str, Arm] = {
                 fusion=True, description="SS2 with gated prior fusion"),
     "S1g": Arm("S1g", _BASE_FEATURES + ("x0",), "wiener", "dense", fusion=True,
                description="supervised + warm-start, gated fusion"),
+    # E012: the arm that answers "MMS only ever looks at half the acquisition".
+    # Same features, warm start and objective as SS1 per branch; two branches on
+    # disjoint halves, each scored on the other's real measurements.
+    "SS1c": Arm("SS1c", _BASE_FEATURES + ("x0",), "wiener", "self", dual=True,
+                description="dual-branch complementary MMS: each branch rebuilds "
+                            "the rows the other one withheld"),
 }
 
 TRAINED_ARMS = tuple(a.name for a in ARMS.values() if a.needs_training)
@@ -100,6 +109,17 @@ def build_model(arm: Arm | str, context_depth: int, base: int = 48,
         raise ValueError(f"arm {arm.name} has no network; use the baseline path")
     if arm.fusion and "x0" not in arm.features:
         raise ValueError(f"arm {arm.name}: fusion requires x0 in the feature set")
+    if arm.dual:
+        # Two full backbones, built from the same record with ``dual`` cleared.
+        # Anything shared between the branches (features, warm start, fusion)
+        # therefore stays identical by construction.
+        from spur_mpm.models.complement import ComplementaryDual
+        single = replace(arm, dual=False)
+        return ComplementaryDual(
+            build_model(single, context_depth, base=base, window=window,
+                        depths=depths, heads=heads),
+            build_model(single, context_depth, base=base, window=window,
+                        depths=depths, heads=heads))
 
     n_feat = len(arm.features)
     in_ch = n_feat * context_depth

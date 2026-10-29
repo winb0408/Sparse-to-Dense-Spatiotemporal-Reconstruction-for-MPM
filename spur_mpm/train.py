@@ -69,14 +69,23 @@ def build_components(cfg: dict, arm_name: str, seed: int):
     psf = PSFConfig(**cfg["physics"]["psf"])
     noise = NoiseConfig(**cfg.get("noise", {"poisson_photons": 0.0,
                                             "gaussian_sigma": 0.0, "seed": 0}))
+    # Who loses half of the measured rows, and why:
+    #   self          the objective needs withheld *measurements* as targets
+    #   dense + holdout (E011) a control arm: same input as the self-supervised
+    #                 one, dense target -- isolates input quantity from labels
+    #   dual (E012)   both branches lose half, but disjoint halves, so the pair
+    #                 covers the whole acquisition
+    withhold = (arm.supervision == "self" or arm.dual or
+                bool(cfg["selfsupervision"].get("split_supervised", False)))
     holdout = HoldoutSpec(ratio=float(cfg["selfsupervision"]["ratio"]),
                           geometry=str(cfg["selfsupervision"]["geometry"]),
-                          seed=seed) if arm.supervision == "self" else None
+                          seed=seed) if withhold else None
 
     item_cfg = ItemConfig(
         sampling=sampling, psf=psf, noise=noise,
         warm_start_kind=arm.warm_start, lam=float(cfg["physics"]["lam"]),
         features=arm.features, supervision=arm.supervision, holdout=holdout,
+        dual=arm.dual,
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
     )
@@ -109,7 +118,8 @@ def build_components(cfg: dict, arm_name: str, seed: int):
 
 @torch.no_grad()
 def validate(model, loader, device, *, supervision: str, rho: str,
-             amp: bool, max_batches: int | None = None) -> dict:
+             amp: bool, max_batches: int | None = None,
+             dual: bool = False) -> dict:
     """Validation on a held-out group.
 
     Supervised arms see dense-reference PSNR/SSIM and select on it -- they are
@@ -132,14 +142,31 @@ def validate(model, loader, device, *, supervision: str, rho: str,
         n_batches += 1
         x = batch["inputs"].to(device, non_blocking=True)
         with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
-            out = model(x)
-        out = out.float()
-        pred = _select_centre(out, batch["center_index"])
+            if dual:
+                out_a, out_b = model.forward_both(x)
+            else:
+                out = model(x)
+        if dual:
+            pred = 0.5 * (_select_centre(out_a.float(), batch["center_index"]) +
+                          _select_centre(out_b.float(), batch["center_index"]))
+        else:
+            pred = _select_centre(out.float(), batch["center_index"])
         if use_dense:
             target = batch["target"].to(device)
             ps.append(float(psnr(pred, target)))
             ss.append(float(ssim(pred[:, None], target[:, None])))
-        if batch["hold_mask"].sum() > 0:
+        if dual:
+            # The selection signal is each branch's own held-out error, kept
+            # separate: averaging the predictions first would score a model that
+            # is not the one that gets deployed and would flatter a branch that
+            # simply copies its neighbour.
+            y_hold = batch["hold_target"].to(device)
+            m_a = batch["hold_mask_a"].to(device)
+            m_b = batch["hold_mask_b"].to(device)
+            la = crit(_select_centre(out_a.float(), batch["center_index"]), y_hold, m_a)
+            lb = crit(_select_centre(out_b.float(), batch["center_index"]), y_hold, m_b)
+            ms.append(0.5 * (float(la["mms"]) + float(lb["mms"])))
+        elif batch["hold_mask"].sum() > 0:
             res = crit(pred, batch["hold_target"].to(device),
                        batch["hold_mask"].to(device))
             ms.append(float(res["mms"]))
@@ -211,6 +238,7 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
 
     opt = torch.optim.AdamW(model.parameters(), lr=float(cfg["train"]["lr"]),
                             weight_decay=float(cfg["train"]["weight_decay"]))
+    agree = float(cfg["loss"].get("dual_agree", 0.0))
     steps = int(cfg["train"]["steps"])
     warmup = int(cfg["train"].get("warmup_steps", 0))
     accum = max(1, int(cfg["train"].get("accum", 1)))
@@ -248,20 +276,42 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
         if step >= steps:
             break
         x = batch["inputs"].to(device, non_blocking=True)
-        with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
-            out = model(x)
-        out = out.float()
-        pred = _select_centre(out, batch["center_index"])
-
-        if arm.supervision == "self":
-            res = train_crit(pred, batch["hold_target"].to(device),
-                             batch["hold_mask"].to(device),
-                             y_in=batch["y_in"].to(device),
-                             m_in=batch["in_mask"].to(device))
-            loss = res["loss"]
+        if arm.dual:
+            with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
+                out_a, out_b = model.forward_both(x)
+            ci = batch["center_index"]
+            pred_a = _select_centre(out_a.float(), ci)
+            pred_b = _select_centre(out_b.float(), ci)
+            y_hold = batch["hold_target"].to(device)
+            ra = train_crit(pred_a, y_hold, batch["hold_mask_a"].to(device))
+            rb = train_crit(pred_b, y_hold, batch["hold_mask_b"].to(device))
+            loss = ra["loss"] + rb["loss"]
+            res = {"loss": loss, "mms_a": ra["mms"], "mms_b": rb["mms"]}
+            if agree > 0:
+                # Optional extra: the branches should agree where *neither* was
+                # given anything. Detached on one side so the term cannot be
+                # minimised by both branches drifting together for free.
+                dis = 0.5 * (train_crit._rho(pred_a - pred_b.detach()).mean() +
+                             train_crit._rho(pred_b - pred_a.detach()).mean())
+                loss = loss + agree * dis
+                res["loss"] = loss
+                res["agree"] = dis.detach()
+            pred = 0.5 * (pred_a + pred_b)
         else:
-            res = train_crit(pred, batch["target"].to(device))
-            loss = res["loss"]
+            with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
+                out = model(x)
+            out = out.float()
+            pred = _select_centre(out, batch["center_index"])
+
+            if arm.supervision == "self":
+                res = train_crit(pred, batch["hold_target"].to(device),
+                                 batch["hold_mask"].to(device),
+                                 y_in=batch["y_in"].to(device),
+                                 m_in=batch["in_mask"].to(device))
+                loss = res["loss"]
+            else:
+                res = train_crit(pred, batch["target"].to(device))
+                loss = res["loss"]
 
         if step % accum == 0:
             opt.zero_grad(set_to_none=True)
@@ -283,7 +333,7 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
 
         if (step + 1) % int(cfg["train"]["val_every"]) == 0 or step == steps - 1:
             vm = validate(model, val_loader, device, supervision=arm.supervision,
-                          rho=cfg["loss"]["rho"], amp=amp)
+                          rho=cfg["loss"]["rho"], amp=amp, dual=arm.dual)
             vm.update({"step": step + 1, "arm": arm.name})
             run.log_metrics(vm)
             sel = vm["select_value"]
@@ -309,7 +359,7 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
 
     torch.save({"model": model.state_dict(), "config": cfg}, run.path / "last.pt")
     final = validate(model, val_loader, device, supervision=arm.supervision,
-                     rho=cfg["loss"]["rho"], amp=amp)
+                     rho=cfg["loss"]["rho"], amp=amp, dual=arm.dual)
     (run.path / "final_val.json").write_text(json.dumps(final, indent=2))
     problems = run.validate(expect_weights=True)
     run.close()

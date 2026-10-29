@@ -29,6 +29,7 @@ from spur_mpm.data.observation import build_model_inputs
 from spur_mpm.physics.acquisition import AcquisitionConfig, NoiseConfig, observe
 from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.physics.sampling import SamplingSpec
+from spur_mpm.ssl.complement import split_complement
 from spur_mpm.ssl.holdout import HoldoutSpec, split_holdout
 from spur_mpm.ssl.leakage import (
     assert_holdout_is_measured,
@@ -187,7 +188,16 @@ class ItemConfig:
     lam: float = 0.01
     features: tuple[str, ...] = ("y", "mask", "x0")
     supervision: str = "dense"            # dense | self
+    # ``holdout`` decides *which measured rows the network may look at*; it is no
+    # longer tied to ``supervision``, which only says what the loss targets. The
+    # two were the same thing until E011 needed a supervised arm on the withheld
+    # input: giving both arms the same rows is the only way to tell "the
+    # supervised win comes from the extra rows" apart from "it comes from having
+    # a dense target at all".
     holdout: HoldoutSpec | None = None
+    # Dual-branch complementary arm (E012): two networks on disjoint halves of
+    # the acquisition, each reconstructing the other's rows.
+    dual: bool = False
     u_kind: str = "geo"
     geo_mode: str = "per_axis"
     check_leakage: bool = True
@@ -196,7 +206,7 @@ class ItemConfig:
         return {"sampling": self.sampling.to_dict(), "psf": self.psf.to_dict(),
                 "noise": self.noise.to_dict(), "warm_start": self.warm_start_kind,
                 "lam": self.lam, "features": list(self.features),
-                "supervision": self.supervision,
+                "supervision": self.supervision, "dual": self.dual,
                 "holdout": self.holdout.to_dict() if self.holdout else None,
                 "u_kind": self.u_kind, "geo_mode": self.geo_mode}
 
@@ -226,32 +236,52 @@ def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
     )
 
     hold_mask = torch.zeros_like(acq.mask)
-    if cfg.supervision == "self":
+    obs = dict(psf=cfg.psf, lam=cfg.lam, warm_start_kind=cfg.warm_start_kind,
+               u_kind=cfg.u_kind, geo_mode=cfg.geo_mode,
+               ky=spec.ky, kz=spec.kz,
+               voxel_xy_um=geometry.voxel_xy_um, voxel_z_um=geometry.z_step_um)
+
+    if cfg.dual:
         if cfg.holdout is None:
-            raise ValueError("self-supervised supervision requires a HoldoutSpec")
+            raise ValueError("the dual arm requires a HoldoutSpec (the split ratio)")
+        spec_c = HoldoutSpec(ratio=cfg.holdout.ratio,
+                             geometry=cfg.holdout.geometry, seed=holdout_seed)
+        m_in, hold_mask = split_complement(acq.mask, spec_c)
+        y_in = torch.where(m_in, acq.y, torch.zeros_like(acq.y))
+        y_hold = torch.where(hold_mask, acq.y, torch.zeros_like(acq.y))
+        # One model input per branch: branch A sees m_in and is scored on
+        # hold_mask, branch B sees hold_mask and is scored on m_in. The two
+        # stacks are concatenated along the feature axis, so the dataloader,
+        # the trainer and inference all keep handing over a single tensor.
+        mi = build_model_inputs(y_in, m_in, **obs)
+        mi_b = build_model_inputs(y_hold, hold_mask, **obs)
+        if cfg.check_leakage:
+            assert_split_disjoint(m_in, hold_mask)
+            assert_holdout_is_measured(hold_mask, acq.mask)
+            assert_inputs_blind(mi.y, hold_mask)
+            assert_inputs_blind(mi_b.y, m_in)
+    elif cfg.holdout is not None:
         spec_h = HoldoutSpec(ratio=cfg.holdout.ratio, geometry=cfg.holdout.geometry,
                              seed=holdout_seed)
         m_in, hold_mask = split_holdout(acq.mask, spec_h)
         y_in = torch.where(m_in, acq.y, torch.zeros_like(acq.y))
+        mi = build_model_inputs(y_in, m_in, **obs)
+        if cfg.check_leakage:
+            assert_split_disjoint(m_in, hold_mask)
+            assert_holdout_is_measured(hold_mask, acq.mask)
+            assert_inputs_blind(mi.y, hold_mask)
     else:
-        m_in, y_in = acq.mask, acq.y
+        m_in = acq.mask
+        y_in = acq.y
+        mi = build_model_inputs(y_in, m_in, **obs)
 
-    mi = build_model_inputs(
-        y_in, m_in, psf=cfg.psf, lam=cfg.lam,
-        warm_start_kind=cfg.warm_start_kind,
-        u_kind=cfg.u_kind, geo_mode=cfg.geo_mode,
-        ky=spec.ky, kz=spec.kz,
-        voxel_xy_um=geometry.voxel_xy_um, voxel_z_um=geometry.z_step_um,
-    )
-
-    if cfg.check_leakage and cfg.supervision == "self":
-        assert_split_disjoint(m_in, hold_mask)
-        assert_holdout_is_measured(hold_mask, acq.mask)
-        assert_inputs_blind(mi.y, hold_mask)
+    inputs = mi.stack(cfg.features)
+    if cfg.dual:
+        inputs = torch.cat([inputs, mi_b.stack(cfg.features)], dim=0)
 
     target = torch.from_numpy(np.ascontiguousarray(dense[center]))
-    return {
-        "inputs": mi.stack(cfg.features),
+    item = {
+        "inputs": inputs,
         "target": target,                                   # dense reference
         "hold_target": acq.y[center],                       # real measurement
         # The input support and the values behind it, centre plane, exposed so
@@ -265,6 +295,13 @@ def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
         "z0": torch.tensor(z0, dtype=torch.long),
         "center_index": torch.tensor(center, dtype=torch.long),
     }
+    if cfg.dual:
+        # Branch-specific targets: branch A is scored where branch B looked, and
+        # the other way round. ``in_mask`` above stays branch A's, which is what
+        # the data-consistency term and the figures equate with "measured".
+        item["hold_mask_b"] = m_in[center].float()
+        item["hold_mask_a"] = hold_mask[center].float()
+    return item
 
 
 # ---------------------------------------------------------------------------
