@@ -1,20 +1,27 @@
 """Inspect the MPM-3P-SQH upload: what is in it, and could it validate our task?
 
-The upload is *not* volumetric like Dryad_3PM.  It is two 2-D time-lapse movies
-(TYX): ``CellVideo 1(256 256).tif`` with 3191 frames and ``CellVideo 1(512
-512).tif`` with 800 frames.  ``CellVideo 1(128 128).tif`` is byte-identical to
-the 256 file (same SHA-256), so there are really only two movies.
+The upload is *not* volumetric like Dryad_3PM.  It is three 2-D time-lapse movies
+(TYX), each a different acquisition:
+
+    CellVideo 1(128 128).tif    128x128, 5000 frames
+    CellVideo 1(256 256).tif    256x256, 3191 frames
+    CellVideo 1(512 512).tif    512x512,  800 frames
+
+None of them is a subsample of another: the time means do not correlate at any
+scale factor we tried (|r| <= 0.27).  So the three files are three separate
+recordings, and their photon budgets differ by more than an order of magnitude.
 
 This script measures, per movie, the things that decide whether the data can be
 used at all -- pedestal, gain (counts per detected photon), photons per pixel
 per frame, temporal drift, how much of a single frame is noise versus structure,
-and the spatial scale of the structure -- and then renders three figures plus a
+and the spatial scale of the structure -- and then renders four figures plus a
 JSON of every number, so the reader can check the claims by opening the files.
 
 Outputs, under ``spur_mpm/figures/sqh/``:
     sqh_1_movies.png     one row per movie: raw frame / short mean / full mean / temporal std
-    sqh_2_physics.png    photon transfer, noise-vs-blur, lag correlation, drift, averaging gain
+    sqh_2_physics.png    photon transfer, noise-vs-blur, lag correlation, drift, SNR, morphology
     sqh_3_sparsity.png   what a row-sparse acquisition of this data would look like
+    sqh_4_calibration.png  does the photon model predict the per-pixel error?
     sqh_stats.json       every number quoted in the report
 
 Run:
@@ -34,6 +41,7 @@ DATA = Path("/ssd1/wjb/Data/MPM-3P-SQH")
 OUT = Path("spur_mpm/figures/sqh")
 
 MOVIES = {
+    "128 (5000 frames)": DATA / "CellVideo 1(128 128).tif",
     "256 (3191 frames)": DATA / "CellVideo 1(256 256).tif",
     "512 (800 frames)": DATA / "CellVideo 1(512 512).tif",
 }
@@ -198,7 +206,7 @@ def figure_movies(data: dict, out: Path) -> None:
             ("temporal s.d.", np.sqrt(var), _win(np.sqrt(var))),
         ]))
 
-    fig, axes = plt.subplots(len(rows), 4, figsize=(9.6, 5.0))
+    fig, axes = plt.subplots(len(rows), 4, figsize=(9.6, 2.5 * len(rows)))
     fig.patch.set_facecolor("white")
     for r, (name, cols) in enumerate(rows):
         for c, (lab, img, rng) in enumerate(cols):
@@ -208,7 +216,7 @@ def figure_movies(data: dict, out: Path) -> None:
             if r == 0:
                 ax.set_title(lab, fontsize=8, pad=4)
         axes[r][0].set_ylabel(name, fontsize=8)
-    fig.suptitle("MPM-3P-SQH: two 2-D time-lapse movies, not a 3-D volume",
+    fig.suptitle("MPM-3P-SQH: three 2-D time-lapse movies, not a 3-D volume",
                  fontsize=9.5, y=0.985)
     fig.tight_layout(rect=(0, 0, 1, 0.96), w_pad=0.6, h_pad=0.8)
     fig.savefig(out / "sqh_1_movies.png", dpi=220, facecolor="white")
@@ -221,7 +229,9 @@ def figure_physics(stats: dict, data: dict, out: Path) -> None:
     import matplotlib.pyplot as plt
     from scipy.ndimage import gaussian_filter
 
-    colors = {"256 (3191 frames)": "#e8536b", "512 (800 frames)": "#3f8ee0"}
+    colors = {"128 (5000 frames)": "#2f9e6f",
+              "256 (3191 frames)": "#e8536b",
+              "512 (800 frames)": "#3f8ee0"}
     fig, axes = plt.subplots(2, 3, figsize=(10.4, 6.2))
     fig.patch.set_facecolor("white")
 
@@ -288,21 +298,21 @@ def figure_physics(stats: dict, data: dict, out: Path) -> None:
 
     # (e) where the data is trustworthy: temporal mean over temporal s.d.
     ax = axes[1][1]
-    d = data["256 (3191 frames)"]
+    d = data["128 (5000 frames)"]
     snr = d["mu"] / np.sqrt(d["var"])
     _show(ax, snr, (float(np.percentile(snr, 1)), float(np.percentile(snr, 99.5))),
           cmap="viridis")
     _note(ax, f"median {np.median(snr):.1f}\nmax {snr.max():.1f}")
-    ax.set_title("(e) 256: mean/s.d. per pixel — the SNR is very uneven", fontsize=8)
+    ax.set_title("(e) 128: mean/s.d. per pixel — the SNR is very uneven", fontsize=8)
 
     # (f) morphology: high-passed time mean, structure only
     ax = axes[1][2]
-    h = data["256 (3191 frames)"]["mu"]
+    h = data["128 (5000 frames)"]["mu"]
     hp = h - gaussian_filter(h, 12)
     rng = (float(np.percentile(hp, 1)), float(np.percentile(hp, 99.5)))
     _show(ax, hp, rng)
     _note(ax, "high-pass σ=12 px\nremoves illumination gradient")
-    ax.set_title("(f) 256 time-mean, high-passed: sparse compact objects", fontsize=8)
+    ax.set_title("(f) 128 time-mean, high-passed: sparse compact objects", fontsize=8)
 
     fig.suptitle("MPM-3P-SQH: what the numbers in these movies actually are",
                  fontsize=9.5, y=0.985)
@@ -317,7 +327,7 @@ def figure_sparsity(data: dict, out: Path) -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    d = data["256 (3191 frames)"]
+    d = data["128 (5000 frames)"]
     ref, frame = d["mu"], d["vol"][0].astype(np.float64)
     h, w = ref.shape
     yy = np.arange(h)[:, None]
@@ -349,7 +359,7 @@ def figure_sparsity(data: dict, out: Path) -> None:
         if not np.isfinite(img).all():
             frac = float(np.isfinite(img).mean())
             _note(ax, f"measured {frac:.0%}\nof rows")
-    fig.suptitle("MPM-3P-SQH under the Dryad row mask: the same sparsity, on real MPM noise",
+    fig.suptitle("MPM-3P-SQH under the Dryad row mask: the same sparsity, on real MPM noise (128 movie)",
                  fontsize=9.5, y=0.985)
     fig.tight_layout(rect=(0, 0, 1, 0.95), w_pad=0.6, h_pad=1.0)
     fig.savefig(out / "sqh_3_sparsity.png", dpi=220, facecolor="white")
@@ -364,7 +374,7 @@ def figure_calibration(stats: dict, data: dict, out: Path) -> None:
     import matplotlib.pyplot as plt
     from scipy.ndimage import gaussian_filter
 
-    name = "256 (3191 frames)"
+    name = "128 (5000 frames)"
     st, d = stats[name], data[name]
     vol = d["vol"]
     ref = np.asarray(vol[:1000], np.float64).mean(0)      # long average = reference
