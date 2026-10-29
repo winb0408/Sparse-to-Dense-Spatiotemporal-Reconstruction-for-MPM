@@ -1,0 +1,92 @@
+{
+  "sample_id": "M1_FOVII_S1_vessels",
+  "fold": 0,
+  "input_support": "full",
+  "consistency_projection": "none",
+  "arms": [
+    {
+      "arm": "A0",
+      "checkpoint": null,
+      "supervision": "none",
+      "metrics_on_shown_crop": {
+        "psnr": 27.000289916992188,
+        "mae": 0.022835006937384605,
+        "ssim": 0.6994348271648483,
+        "e_measured": 0.0,
+        "e_missing": 0.045670015700530295,
+        "dice": 0.8936925329479509,
+        "cl_dice": 0.8606501598363184,
+        "pred_fraction": 0.4070011554378094,
+        "ref_fraction": 0.38676422421294865,
+        "threshold": 0.2830578299278413,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 31.712871287128714,
+        "n_components_ref": 46.89108910891089,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "S1",
+      "checkpoint": "runs/E002_S1_fold0/best.pt",
+      "supervision": "dense",
+      "metrics_on_shown_crop": {
+        "psnr": 28.358173370361328,
+        "mae": 0.020604930818080902,
+        "ssim": 0.766746983669772,
+        "e_measured": 0.002921925023161244,
+        "e_missing": 0.03828793449677748,
+        "dice": 0.9112026771200409,
+        "cl_dice": 0.8884407549867434,
+        "pred_fraction": 0.43131988827544865,
+        "ref_fraction": 0.38676422421294865,
+        "threshold": 0.2830578299278413,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 34.83168316831683,
+        "n_components_ref": 46.89108910891089,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "SS1",
+      "checkpoint": "runs/E003_SS1_fold0/best.pt",
+      "supervision": "self",
+      "metrics_on_shown_crop": {
+        "psnr": 22.464942932128906,
+        "mae": 0.05835169553756714,
+        "ssim": 0.41464809394708957,
+        "e_measured": 0.0543992697344263,
+        "e_missing": 0.06230411923831642,
+        "dice": 0.8215477850334952,
+        "cl_dice": 0.7780388488845073,
+        "pred_fraction": 0.4962720210009282,
+        "ref_fraction": 0.38676422421294865,
+        "threshold": 0.2830578299278413,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 9.138613861386139,
+        "n_components_ref": 46.89108910891089,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "dc1",
+      "checkpoint": "runs/E005_dc1_fold0/best.pt",
+      "supervision": "self",
+      "metrics_on_shown_crop": {
+        "psnr": 24.732452392578125,
+        "mae": 0.027123060077428818,
+        "ssim": 0.7238328348439519,
+        "e_measured": 0.003046401144157505,
+        "e_missing": 0.051199714284353326,
+        "dice": 0.8859497428479288,
+        "cl_dice": 0.8435882446390213,
+        "pred_fraction": 0.41606767106764386,
+        "ref_fraction": 0.38676422421294865,
+        "threshold": 0.2830578299278413,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 42.18811881188119,
+        "n_components_ref": 46.89108910891089,
+        "n_empty": 0.0
+      }
+    }
+  ]
+}

@@ -24,8 +24,11 @@ for run_prefix in "$@"; do
   for fold in 0 1 2; do
     run="runs/${run_prefix}_fold${fold}"
     [[ -f "$run/best.pt" ]] || { echo "skip ${run}"; continue; }
+    # A run label is not necessarily an arm name (E005_dc1 runs the SS1 arm with
+    # dc_weight=1.0), so let the caller state the arm when the label is opaque.
     arm="${run_prefix#E???_}"
     arm="${arm%%_*}"
+    arm="${ARM:-$arm}"
     CUDA_VISIBLE_DEVICES=$fold python -m spur_mpm.evaluate \
       --arm "$arm" --ckpt "$run/best.pt" --fold "$fold" --split test \
       --set data.index="$INDEX" --set data.split="$SPLIT" \

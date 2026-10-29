@@ -8,9 +8,14 @@ table and obvious in an image, so this script exists.
 
 What it produces, per (fold, sample)::
 
-    <out>/qualitative_<sample>.png  -- one row per arm, six views, same window
-    <out>/error_<sample>.png        -- |pred - reference|, one shared error scale
+    <out>/qualitative_<sample>.png  -- sparse input, dense reference, then one
+                                       row per arm; six views, one window per
+                                       column, unmeasured voxels painted blue
+    <out>/error_<sample>.png        -- |pred - reference|, one shared error scale,
+                                       with the measurement's own error on top
     <out>/support_<sample>.png      -- where the measurements were (what is given)
+    <out>/profile_<sample>.png      -- one intensity cut across y, so skipped
+                                       rows show up as gaps
     <out>/qualitative_<sample>.npz  -- raw arrays (one shared reference + one
                                        prediction per arm), for re-rendering
 
@@ -64,9 +69,24 @@ __all__ = ["predict_volume", "render", "main"]
 DEFAULTS = Path(__file__).resolve().parents[1] / "configs" / "base.yaml"
 
 
-def _arm_spec(text: str) -> tuple[str, Path | None]:
-    name, _, ckpt = text.partition("=")
-    return name.strip(), (Path(ckpt) if ckpt else None)
+def _arm_spec(text: str) -> tuple[str, str, Path | None]:
+    """``LABEL/ARM=CKPT`` / ``ARM=CKPT`` / ``ARM`` -> (label, arm, checkpoint).
+
+    The label is what the figure row says. It differs from the arm name when a
+    run is a variant of a registered arm -- E005's ``dc1`` is the SS1 recipe
+    trained with ``loss.dc_weight=1.0``, and there is no registry entry to call
+    by that name.
+    """
+    # A '/' before the '=' separates the label from the arm spec; a '/' after
+    # it is just part of a checkpoint path.
+    eq, slash = text.find("="), text.find("/")
+    if slash != -1 and (eq == -1 or slash < eq):
+        label, rest = text[:slash], text[slash + 1:]
+    else:
+        label, rest = "", text
+    name, _, ckpt = rest.partition("=")
+    name = name.strip()
+    return (label.strip() or name), name, (Path(ckpt) if ckpt else None)
 
 
 @torch.no_grad()
@@ -120,7 +140,7 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
         model.eval()
 
     projection = str(cfg.get("eval", {}).get("consistency_projection", "none"))
-    preds, targets, m_acq, m_in, zs = [], [], [], [], []
+    preds, targets, m_acq, m_in, zs, y_given = [], [], [], [], [], []
     for batch in loader:
         if model is not None:
             pred = select_centre(model(batch["inputs"].to(device)).float(),
@@ -132,6 +152,7 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
             given = batch["in_mask"].bool()
             pred = torch.where(given, batch["y_in"], pred)
         preds.append(pred)
+        y_given.append(batch["y_in"])
         targets.append(batch["target"])
         m_acq.append(batch["acq_mask"].bool())
         m_in.append(batch["in_mask"].bool())
@@ -145,8 +166,13 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
         "checkpoint": str(ckpt) if ckpt else None,
         "supervision": arm.supervision,
         "input_support": input_support,
+        "sampling": sampling.tag,
+        "sampling_fraction": float(sampling.ideal_fraction()),
         "consistency_projection": projection,
         "pred": cat(preds).astype(np.float32),
+        # what the arm was handed: zero-filled measurements. Rendered with the
+        # unmeasured voxels masked out, so the figure shows the acquisition.
+        "y_in": cat(y_given).astype(np.float32),
         "target": cat(targets).astype(np.float32),
         "acq_mask": cat(m_acq),
         "in_mask": cat(m_in),
@@ -195,7 +221,8 @@ def _window(img: np.ndarray) -> tuple[float, float]:
     return float(lo), float(max(hi, lo + 1e-6))
 
 
-def render(vols: list[dict], out_dir: Path, dpi: int = 150) -> list[Path]:
+def render(vols: list[dict], out_dir: Path, dpi: int = 150,
+           tag: str = "") -> list[Path]:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -204,23 +231,43 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 150) -> list[Path]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     ref = vols[0]["target"]
-    names = [v["arm"] for v in vols]
     views = _views(ref)
     cols = list(views)
     written: list[Path] = []
 
-    # ---- figure 1: reconstruction -------------------------------------------
+    # ---- figure 1: sparse input -> reconstructions -> dense reference -------
+    # Row order is the argument: what was measured, what every arm produced
+    # from it, and the dense reference all arms are scored against. The first
+    # row is a masked array, so the unmeasured voxels are painted, not
+    # interpolated by the renderer into something that looks reconstructable.
+    given = np.where(vols[0]["in_mask"], vols[0]["y_in"], np.nan)
+    n_rows = len(vols) + 2
     wnd = {c: _window(views[c]) for c in cols}
-    fig, axes = plt.subplots(len(vols) + 1, len(cols),
-                             figsize=(3.0 * len(cols), 2.6 * (len(vols) + 1)),
+    fig, axes = plt.subplots(n_rows, len(cols),
+                             figsize=(3.0 * len(cols), 2.6 * n_rows),
                              squeeze=False)
+
+    def _panel(ax, img, col):
+        ax.imshow(img, cmap="gray", vmin=wnd[col][0], vmax=wnd[col][1],
+                  interpolation="nearest", aspect="auto")
+        ax.set_xticks([]); ax.set_yticks([])
+
+    gv = _views(given)
+    frac = float(vols[0]["in_mask"].mean())
     for r, col in enumerate(cols):
         ax = axes[0][r]
-        ax.imshow(views[col], cmap="gray", vmin=wnd[col][0], vmax=wnd[col][1],
-                  interpolation="nearest", aspect="auto")
+        im = ax.imshow(gv[col], cmap="gray", vmin=wnd[col][0], vmax=wnd[col][1],
+                       interpolation="nearest", aspect="auto")
+        im.cmap.set_bad("#1f6fb4")           # blue = never measured
         ax.set_title(col, fontsize=9)
         ax.set_xticks([]); ax.set_yticks([])
-    axes[0][0].set_ylabel("reference\n(dense GT)", fontsize=9)
+    axes[0][0].set_ylabel(f"sparse input\n{vols[0].get('sampling', '')}\n"
+                          f"{100 * frac:.0f}% of voxels given\n(blue = no data)",
+                          fontsize=8)
+
+    for r, col in enumerate(cols):
+        _panel(axes[1][r], views[col], col)
+    axes[1][0].set_ylabel("dense reference\n(the scoring target)", fontsize=8)
 
     for i, v in enumerate(vols):
         m = _metrics(v)
@@ -229,37 +276,39 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 150) -> list[Path]:
                  f"E_meas {m['e_measured']:.4f}")
         vv = _views(v["pred"])
         for r, col in enumerate(cols):
-            ax = axes[i + 1][r]
-            ax.imshow(vv[col], cmap="gray", vmin=wnd[col][0], vmax=wnd[col][1],
-                      interpolation="nearest", aspect="auto")
-            ax.set_xticks([]); ax.set_yticks([])
-            if r == 0 and col.startswith("XY"):
-                ax.set_ylabel(label, fontsize=8)
-            if r == 0 and col.startswith("XZ"):
-                ax.set_ylabel(label, fontsize=8)
-    fig.suptitle(f"{sample} -- same data, same window, one panel per arm\n"
-                 f"input support: {vols[0]['input_support']}, "
-                 f"projection: {vols[0]['consistency_projection']}", fontsize=10)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
-    p1 = out_dir / f"qualitative_{sample}.png"
+            _panel(axes[i + 2][r], vv[col], col)
+        axes[i + 2][0].set_ylabel(label, fontsize=8)
+    fig.suptitle(f"{sample} -- sparse measurement -> reconstruction -> dense "
+                 f"reference (one shared window per column)\n"
+                 f"acquisition: {vols[0].get('sampling', '?')}, input support: "
+                 f"{vols[0]['input_support']}, projection: "
+                 f"{vols[0]['consistency_projection']}", fontsize=10)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    p1 = out_dir / f"qualitative_{sample}{tag}.png"
     fig.savefig(p1, dpi=dpi); plt.close(fig)
     written.append(p1)
 
-    # ---- figure 2: error maps, one shared scale per column -------------------
+    # ---- figure 2: error maps, one shared scale for every row ----------------
     ecols = ["XY z=50%", "XZ (y=mid)", "MIP-z"]
     errs = [{c: np.abs(_views(v["pred"])[c] - views[c]) for c in ecols}
             for v in vols]
-    vmax = max(float(np.percentile(e[c], 99.5)) for e in errs for c in ecols)
+    # Row 0 is what the reconstruction cannot be blamed for: the measurements
+    # the arm was given, minus the dense reference, on the voxels it did take.
+    a_err = np.abs(np.where(vols[0]["in_mask"], vols[0]["y_in"], np.nan) - ref)
+    av = _views(a_err)
+    vmax = max(float(np.nanpercentile(e[c], 99.5)) for e in errs for c in ecols)
+    vmax = max(vmax, max(float(np.nanpercentile(av[c], 99.5)) for c in ecols))
     fig, axes = plt.subplots(len(vols) + 1, len(ecols),
                              figsize=(3.2 * len(ecols), 2.6 * (len(vols) + 1)),
                              squeeze=False)
     for r, col in enumerate(ecols):
         ax = axes[0][r]
-        im = ax.imshow(np.zeros_like(views[col]), cmap="magma", vmin=0, vmax=vmax,
-                       aspect="auto")
-        ax.set_title(f"|ref| window ({col})", fontsize=9)
+        im = ax.imshow(av[col], cmap="magma", vmin=0, vmax=vmax,
+                       interpolation="nearest", aspect="auto")
+        im.cmap.set_bad("white")      # white = the arm was never given it
+        ax.set_title(col, fontsize=9)
         ax.set_xticks([]); ax.set_yticks([])
-    axes[0][0].set_ylabel("reference", fontsize=9)
+    axes[0][0].set_ylabel("measurement error\n(given voxels only)", fontsize=8)
     for i, (v, e) in enumerate(zip(vols, errs)):
         for r, col in enumerate(ecols):
             ax = axes[i + 1][r]
@@ -271,7 +320,7 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 150) -> list[Path]:
     fig.colorbar(im, ax=axes, shrink=0.5, label="|pred - reference| (shared scale)")
     fig.suptitle(f"{sample} -- absolute error, one colour scale for every arm",
                  fontsize=10)
-    p2 = out_dir / f"error_{sample}.png"
+    p2 = out_dir / f"error_{sample}{tag}.png"
     fig.savefig(p2, dpi=dpi); plt.close(fig)
     written.append(p2)
 
@@ -298,9 +347,48 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 150) -> list[Path]:
     fig.suptitle(f"{sample} -- input support (the only voxels the arm observed)",
                  fontsize=10)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
-    p3 = out_dir / f"support_{sample}.png"
+    p3 = out_dir / f"support_{sample}{tag}.png"
     fig.savefig(p3, dpi=dpi); plt.close(fig)
     written.append(p3)
+
+    # ---- figure 4: one row-cut, so the missing rows are visible as gaps ------
+    # The 2D views above are the right overview but they cannot show whether a
+    # method *fills* a skipped row or smears its neighbours. A single intensity
+    # cut across y does, and it is the panel to look at first.
+    z_mid = ref.shape[0] // 2
+    var = ref[z_mid].var(axis=0)
+    x_cut = int(np.argmax(var))
+    m_in0 = vols[0]["in_mask"][z_mid]
+    y_given_row = vols[0]["y_in"][z_mid][:, x_cut]
+    fig, axes = plt.subplots(1, 2, figsize=(12.4, 4.0))
+    for ax, ylim in zip(axes, [(0, ref.shape[1]), None]):
+        ax.plot(ref[z_mid][:, x_cut], np.arange(ref.shape[1]), color="k", lw=1.6,
+                label="dense reference", zorder=5)
+        ax.plot(np.where(m_in0[:, x_cut], y_given_row, np.nan),
+                np.arange(ref.shape[1]), "o", ms=3.2, color="#1f6fb4",
+                label=f"measured ({vols[0].get('sampling', '?')})", zorder=6)
+        for v in vols:
+            ax.plot(v["pred"][z_mid][:, x_cut], np.arange(ref.shape[1]), lw=1.0,
+                    alpha=0.9, label=v["arm"])
+        if ylim is not None:
+            ax.set_ylim(ylim[1], ylim[0])
+        else:
+            # zoom on a run of rows that contains both kinds of row
+            start = max(0, int(np.argmax(m_in0[:, x_cut])) - 6)
+            ax.set_ylim(min(start + 34, ref.shape[1]), start)
+        ax.set_xlabel("intensity (normalised)")
+        ax.set_ylabel("row index y")
+        ax.grid(alpha=0.3)
+    axes[0].set_title(f"whole column (z={z_mid}, x={x_cut})", fontsize=9)
+    axes[1].set_title("zoom: measured rows (dots) vs skipped rows (gaps)",
+                      fontsize=9)
+    axes[0].legend(fontsize=7, loc="upper right")
+    fig.suptitle(f"{sample} -- intensity along y; the gaps are rows that were "
+                 f"never measured", fontsize=10)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    p4 = out_dir / f"profile_{sample}{tag}.png"
+    fig.savefig(p4, dpi=dpi); plt.close(fig)
+    written.append(p4)
     return written
 
 
@@ -326,6 +414,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="a.b.c=value overrides, as in evaluate")
     ap.add_argument("--device", default=None)
     ap.add_argument("--dpi", type=int, default=150)
+    ap.add_argument("--tag", default="",
+                    help="appended to every output name, so a second arm set for "
+                         "the same sample does not overwrite the first figure")
     ap.add_argument("--dump", default="f16", choices=["f16", "f32", "off"],
                     help="raw array dump: float16 (default, ~1/2 the size and "
                          "lossless enough for re-rendering), float32, or off")
@@ -344,20 +435,21 @@ def main(argv: list[str] | None = None) -> int:
     test_ids = folds[args.fold]["test"]
     sample = args.sample or test_ids[0]
 
-    arms: list[tuple[str, Path | None]] = [_arm_spec(a) for a in args.arm]
+    arms: list[tuple[str, str, Path | None]] = [_arm_spec(a) for a in args.arm]
     for exp in (args.experiments or []):
         ckpt = Path("runs") / f"{exp}_fold{args.fold}" / "best.pt"
         if not ckpt.exists():
             raise FileNotFoundError(f"{exp}: no checkpoint at {ckpt}")
-        arms.append((exp.split("_", 1)[1], ckpt))
+        arms.append((exp.split("_", 1)[1], exp.split("_", 1)[1], ckpt))
     if not arms:
         raise SystemExit("give at least one --arm or --experiments")
 
     device = torch.device(args.device or
                           ("cuda" if torch.cuda.is_available() else "cpu"))
     vols = []
-    for name, ckpt in arms:
-        v = predict_volume(cfg, sample, name, ckpt, device)
+    for label, arm_name, ckpt in arms:
+        v = predict_volume(cfg, sample, arm_name, ckpt, device)
+        v["arm"] = label
         if vols and (not np.array_equal(v["target"], vols[0]["target"]) or
                      not np.array_equal(v["acq_mask"], vols[0]["acq_mask"]) or
                      not np.array_equal(v["in_mask"], vols[0]["in_mask"])):
@@ -366,13 +458,14 @@ def main(argv: list[str] | None = None) -> int:
                                "the figure would lie")
         v["metrics"] = _metrics(v)
         vols.append(v)
-        print(f"{name:8s} psnr={v['metrics']['psnr']:.4f} "
+        print(f"{label:8s} psnr={v['metrics']['psnr']:.4f} "
               f"dice={v['metrics'].get('dice', float('nan')):.4f} "
               f"e_measured={v['metrics']['e_measured']:.4f} "
               f"e_missing={v['metrics']['e_missing']:.4f}")
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
+    tag = args.tag
     if args.dump != "off":
         # Float16 halves the dump and is well inside the precision of the
         # figures; masks stay boolean so a re-analysis cannot change splits.
@@ -383,14 +476,14 @@ def main(argv: list[str] | None = None) -> int:
             return a.astype(np.float16) if (args.dump == "f16" and
                                             a.dtype == np.float32) else a
         np.savez_compressed(
-            out_dir / f"qualitative_{sample}.npz",
+            out_dir / f"qualitative_{sample}{tag}.npz",
             target=_cast(vols[0]["target"]),
             acq_mask=vols[0]["acq_mask"],
             in_mask=vols[0]["in_mask"],
             z_index=vols[0]["z"],
             arms=np.array([v["arm"] for v in vols]),
             **{f"{v['arm']}_pred": _cast(v["pred"]) for v in vols})
-    (out_dir / f"qualitative_{sample}.json").write_text(json.dumps(
+    (out_dir / f"qualitative_{sample}{tag}.json").write_text(json.dumps(
         {"sample_id": sample, "fold": args.fold,
          "input_support": vols[0]["input_support"],
          "consistency_projection": vols[0]["consistency_projection"],
@@ -398,7 +491,7 @@ def main(argv: list[str] | None = None) -> int:
                    "supervision": v["supervision"],
                    "metrics_on_shown_crop": v["metrics"]} for v in vols]},
         indent=2))
-    for p in render(vols, out_dir, dpi=args.dpi):
+    for p in render(vols, out_dir, dpi=args.dpi, tag=args.tag):
         print("wrote", p)
     print("ALL_DONE")
     return 0

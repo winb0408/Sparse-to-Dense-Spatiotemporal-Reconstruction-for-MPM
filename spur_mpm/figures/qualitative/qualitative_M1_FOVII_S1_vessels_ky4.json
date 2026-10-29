@@ -1,0 +1,92 @@
+{
+  "sample_id": "M1_FOVII_S1_vessels",
+  "fold": 0,
+  "input_support": "full",
+  "consistency_projection": "none",
+  "arms": [
+    {
+      "arm": "A0",
+      "checkpoint": null,
+      "supervision": "none",
+      "metrics_on_shown_crop": {
+        "psnr": 24.899568557739258,
+        "mae": 0.03522118180990219,
+        "ssim": 0.5201532862859197,
+        "e_measured": 0.0,
+        "e_missing": 0.04696157091472408,
+        "dice": 0.8383091847963865,
+        "cl_dice": 0.7907726295260371,
+        "pred_fraction": 0.41234044745416926,
+        "ref_fraction": 0.38676422421294865,
+        "threshold": 0.2830578299278413,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 24.97029702970297,
+        "n_components_ref": 46.89108910891089,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "S1",
+      "checkpoint": "runs/E009_S1_fold0/best.pt",
+      "supervision": "dense",
+      "metrics_on_shown_crop": {
+        "psnr": 26.196788787841797,
+        "mae": 0.03086220473051071,
+        "ssim": 0.6112959901295086,
+        "e_measured": 0.005414969717166249,
+        "e_missing": 0.03934461412268995,
+        "dice": 0.8693957153135344,
+        "cl_dice": 0.8572463862768973,
+        "pred_fraction": 0.45448076606977106,
+        "ref_fraction": 0.38676422421294865,
+        "threshold": 0.2830578299278413,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 28.03960396039604,
+        "n_components_ref": 46.89108910891089,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "SS1",
+      "checkpoint": "runs/E009_SS1_fold0/best.pt",
+      "supervision": "self",
+      "metrics_on_shown_crop": {
+        "psnr": 20.85422706604004,
+        "mae": 0.07288452237844467,
+        "ssim": 0.21999704660755573,
+        "e_measured": 0.1117287789757299,
+        "e_missing": 0.059936441665533746,
+        "dice": 0.6917928981937858,
+        "cl_dice": 0.5850631665135668,
+        "pred_fraction": 0.5336731259185489,
+        "ref_fraction": 0.38676422421294865,
+        "threshold": 0.2830578299278413,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 7.024752475247524,
+        "n_components_ref": 46.89108910891089,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "dc1",
+      "checkpoint": "runs/E009_SS1dc1_fold0/best.pt",
+      "supervision": "self",
+      "metrics_on_shown_crop": {
+        "psnr": 23.499011993408203,
+        "mae": 0.03867211565375328,
+        "ssim": 0.5556003093571946,
+        "e_measured": 0.0028741298535018053,
+        "e_missing": 0.050604780140047025,
+        "dice": 0.8454258687952052,
+        "cl_dice": 0.8007651485498748,
+        "pred_fraction": 0.4441429364799273,
+        "ref_fraction": 0.38676422421294865,
+        "threshold": 0.2830578299278413,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 31.747524752475247,
+        "n_components_ref": 46.89108910891089,
+        "n_empty": 0.0
+      }
+    }
+  ]
+}
