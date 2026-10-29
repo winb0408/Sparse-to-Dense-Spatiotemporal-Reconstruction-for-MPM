@@ -1,0 +1,106 @@
+{
+  "sample_id": "M2_FOVII_S1_vessels",
+  "fold": 1,
+  "sampling": "y_k2",
+  "sampling_fraction": 0.5,
+  "mask_geometry": {
+    "measured_fraction": 0.5,
+    "kept_y_rows": 128,
+    "y_period": 2,
+    "x_dense": true,
+    "z_dense": true,
+    "row_pattern": "10101010"
+  },
+  "input_support": "full",
+  "consistency_projection": "none",
+  "arms": [
+    {
+      "arm": "A0",
+      "checkpoint": null,
+      "supervision": "none",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 26.394126892089844,
+        "mae": 0.025483475998044014,
+        "ssim": 0.688453538958075,
+        "e_measured": 0.0,
+        "e_missing": 0.050966956437074495,
+        "dice": 0.9282514599657451,
+        "cl_dice": 0.8956584324618044,
+        "pred_fraction": 0.628082275390625,
+        "ref_fraction": 0.6056819972146321,
+        "threshold": 0.3560687772595046,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 12.073891625615763,
+        "n_components_ref": 17.334975369458128,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "S1",
+      "checkpoint": "runs/E002_S1_fold1/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 27.419696807861328,
+        "mae": 0.02376166172325611,
+        "ssim": 0.750665257717001,
+        "e_measured": 0.0036839597400855914,
+        "e_missing": 0.0438393654090724,
+        "dice": 0.9348608868622994,
+        "cl_dice": 0.9136201250980448,
+        "pred_fraction": 0.6357340695235529,
+        "ref_fraction": 0.6056819972146321,
+        "threshold": 0.3560687772595046,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 12.334975369458128,
+        "n_components_ref": 17.334975369458128,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "SS1",
+      "checkpoint": "runs/E003_SS1_fold1/best.pt",
+      "supervision": "self",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 22.417705535888672,
+        "mae": 0.053411372005939484,
+        "ssim": 0.40345128724727725,
+        "e_measured": 0.04655913026829071,
+        "e_missing": 0.06026360539379966,
+        "dice": 0.8788016321705063,
+        "cl_dice": 0.8529722216051103,
+        "pred_fraction": 0.6496627882783637,
+        "ref_fraction": 0.6056819972146321,
+        "threshold": 0.3560687772595046,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 7.137931034482759,
+        "n_components_ref": 17.334975369458128,
+        "n_empty": 0.014778325123152709
+      }
+    },
+    {
+      "arm": "SS1c",
+      "checkpoint": "runs/E012_SS1c_fold1/best.pt",
+      "supervision": "self",
+      "input_is_branch_union": true,
+      "metrics_on_shown_crop": {
+        "psnr": 23.02355194091797,
+        "mae": 0.05200478434562683,
+        "ssim": 0.3373825557419819,
+        "e_measured": 0.045788043752092444,
+        "e_missing": 0.058221529563659516,
+        "dice": 0.8589427932708779,
+        "cl_dice": 0.7875650795745567,
+        "pred_fraction": 0.6674790405874769,
+        "ref_fraction": 0.6056819972146321,
+        "threshold": 0.3560687772595046,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 6.059113300492611,
+        "n_components_ref": 17.334975369458128,
+        "n_empty": 0.0
+      }
+    }
+  ]
+}

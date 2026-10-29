@@ -170,10 +170,26 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
             given = batch["in_mask"].bool()
             pred = torch.where(given, batch["y_in"], pred)
         preds.append(pred)
-        y_given.append(batch["y_in"])
+        # What the *pair* was handed. A dual arm splits the acquisition in two
+        # and gives one half to each branch, so neither branch's own support is
+        # the input of the model as a whole; the honest "Input" row for a dual
+        # arm is the union of the two halves, which is exactly the acquisition.
+        # Branch A's support is batch["in_mask"] and branch B's is
+        # batch["hold_mask"]; the union's values are branch A's y_in where A
+        # looked, and the real measurement (hold_target) elsewhere. For a
+        # single-branch arm the union is in_mask itself and this is a no-op.
+        m_a = batch["in_mask"].bool()
+        if arm.dual:
+            m_b = batch["hold_mask"].bool()
+            y_given.append(torch.where(m_a, batch["y_in"],
+                                       torch.where(m_b, batch["hold_target"],
+                                                   torch.zeros_like(batch["y_in"]))))
+            m_in.append(m_a | m_b)
+        else:
+            y_given.append(batch["y_in"])
+            m_in.append(m_a)
         targets.append(batch["target"])
         m_acq.append(batch["acq_mask"].bool())
-        m_in.append(batch["in_mask"].bool())
         zs.append(batch["query_z"])
 
     order = torch.argsort(torch.cat(zs))
@@ -187,6 +203,7 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
         "sampling": sampling.tag,
         "sampling_fraction": float(sampling.ideal_fraction()),
         "consistency_projection": projection,
+        "dual": arm.dual,
         "pred": cat(preds).astype(np.float32),
         # what the arm was handed: zero-filled measurements. Rendered with the
         # unmeasured voxels masked out, so the figure shows the acquisition.
@@ -448,12 +465,15 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
 
     fig.suptitle(sample, fontsize=10, y=0.995)
     cy = spec["y_gap"] if spec["y_gap"] != spec["y_meas"] else None
+    dual = [v["arm"] for v in vols if v.get("dual")]
     fig.text(0.5, 0.001,
              f"magma, one window per column (dense reference, p0.5-p99.5) | "
              f"cyan = never measured | {vols[0].get('sampling', '?')} | "
              f"input support {vols[0]['input_support']}, "
              f"projection {vols[0]['consistency_projection']} | "
-             f"XZ given y={spec['y_meas']}"
+             + (f"{'/'.join(dual)}: Input = union of the two branches "
+                f"(each saw half) | " if dual else "")
+             + f"XZ given y={spec['y_meas']}"
              + (f", XZ gap y={cy}" if cy is not None else "")
              + f" | zoom {spec['n']}x{spec['n']} at "
                f"(z={spec['z']}, y={spec['y0']}, x={spec['x0']})",
@@ -631,7 +651,8 @@ def main(argv: list[str] | None = None) -> int:
         v["arm"] = label
         if vols and (not np.array_equal(v["target"], vols[0]["target"]) or
                      not np.array_equal(v["acq_mask"], vols[0]["acq_mask"]) or
-                     not np.array_equal(v["in_mask"], vols[0]["in_mask"])):
+                     not np.array_equal(v["in_mask"], vols[0]["in_mask"]) or
+                     not np.allclose(v["y_in"], vols[0]["y_in"])):
             raise RuntimeError("arms disagree on the reference volume or the "
                                "support: the items are no longer same-input and "
                                "the figure would lie")
@@ -680,6 +701,9 @@ def main(argv: list[str] | None = None) -> int:
          "consistency_projection": vols[0]["consistency_projection"],
          "arms": [{"arm": v["arm"], "checkpoint": v["checkpoint"],
                    "supervision": v["supervision"],
+                   # A dual arm's Input row is the union of its two branches;
+                   # each branch alone saw half of it.
+                   "input_is_branch_union": v["dual"],
                    "metrics_on_shown_crop": v["metrics"]} for v in vols]},
         indent=2))
     for p in render(vols, out_dir, dpi=args.dpi, tag=args.tag):

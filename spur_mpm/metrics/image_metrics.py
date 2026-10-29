@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import torch
 
-__all__ = ["psnr", "ssim", "mae", "split_errors"]
+__all__ = ["psnr", "ssim", "mae", "split_errors", "split_psnr"]
 
 
 def psnr(pred: torch.Tensor, target: torch.Tensor, dim: tuple | None = None) -> torch.Tensor:
@@ -52,3 +52,26 @@ def split_errors(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor):
     e_meas = ((pred - target).abs() * m).sum() / m.sum().clamp(min=1)
     e_miss = ((pred - target).abs() * ~m).sum() / (~m).sum().clamp(min=1)
     return float(e_meas), float(e_miss)
+
+
+def split_psnr(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor):
+    """PSNR restricted to measured / to missing positions.
+
+    The full-image PSNR is ``-10 log10(mean of squared error over all voxels)``,
+    so it mixes two populations that behave very differently: voxels the model
+    was handed (where a zero-parameter arm can score arbitrarily high by copying
+    its input) and voxels it had to infer.  Splitting the same normaliser over
+    the two populations makes that mixture visible.  Absolute values are *not*
+    comparable to the full-image PSNR; they are comparable between arms, which
+    is the point.
+
+    Returns ``(psnr_measured, psnr_missing)``; either is NaN when that
+    population is empty, which happens for the missing side when the mask covers
+    everything.
+    """
+    m = mask.bool()
+    out = []
+    for sel in (m, ~m):
+        out.append(float(psnr(pred[sel], target[sel])) if bool(sel.any())
+                   else float("nan"))
+    return out[0], out[1]

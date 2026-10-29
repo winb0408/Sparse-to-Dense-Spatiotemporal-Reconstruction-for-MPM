@@ -30,7 +30,8 @@ from spur_mpm.common.config import apply_overrides, load_config
 from spur_mpm.common.tensors import select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.data.split import read_split
-from spur_mpm.metrics.image_metrics import mae, psnr, split_errors, ssim
+from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
+                                           split_psnr, ssim)
 from spur_mpm.metrics.statistics import summarise_by_group
 from spur_mpm.metrics.vessel import vessel_metrics
 from spur_mpm.models.registry import build_model, get_arm
@@ -199,6 +200,13 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                 e_meas, e_miss = split_errors(p, t, m_acq)
                 row["e_measured"] = e_meas
                 row["e_missing"] = e_miss
+                # Same split, in dB. The headline PSNR averages a population the
+                # arm was given with one it had to infer; a zero-parameter arm
+                # that copies its input then looks competitive. These two make
+                # that mixture visible without changing the protocol.
+                ps_m, ps_x = split_psnr(p, t, m_acq)
+                row["psnr_measured"] = ps_m
+                row["psnr_missing"] = ps_x
                 if bool(m_hold.any()):
                     row["e_hold"] = float(((p - t).abs() * m_hold).sum()
                                           / m_hold.sum())
@@ -224,8 +232,8 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         "n_windows": len(rows),
         "metrics": {},
     }
-    for metric in ("psnr", "ssim", "mae", "e_measured", "e_missing", "e_hold",
-                   "dice", "cl_dice"):
+    for metric in ("psnr", "psnr_measured", "psnr_missing", "ssim", "mae",
+                   "e_measured", "e_missing", "e_hold", "dice", "cl_dice"):
         if any(metric in r for r in rows):
             summary["metrics"][metric] = summarise_by_group(rows, metric)
 
