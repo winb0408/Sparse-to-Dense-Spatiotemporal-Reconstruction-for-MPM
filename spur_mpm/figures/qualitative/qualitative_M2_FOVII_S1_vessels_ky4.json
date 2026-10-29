@@ -1,6 +1,16 @@
 {
   "sample_id": "M2_FOVII_S1_vessels",
   "fold": 1,
+  "sampling": "y_k4",
+  "sampling_fraction": 0.25,
+  "mask_geometry": {
+    "measured_fraction": 0.25,
+    "kept_y_rows": 64,
+    "y_period": 4,
+    "x_dense": true,
+    "z_dense": true,
+    "row_pattern": "1000100010001000"
+  },
   "input_support": "full",
   "consistency_projection": "none",
   "arms": [
@@ -88,13 +98,5 @@
         "n_empty": 0.0
       }
     }
-  ],
-  "mask_geometry": {
-    "measured_fraction": 0.25,
-    "kept_y_rows": 64,
-    "y_period": 4,
-    "x_dense": true,
-    "z_dense": true,
-    "row_pattern": "1000100010001000"
-  }
+  ]
 }
