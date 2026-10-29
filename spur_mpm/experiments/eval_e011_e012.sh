@@ -19,6 +19,12 @@
 #
 # S1 and SS1 are re-scored here too, so every row of the table comes from one
 # script and one protocol.
+#
+# Reading the output: S1h is scored with --arm S1 (it *is* the S1 recipe, only
+# the input support differs), so its summary.json says arm=S1. Build the table
+# from the run *directories* -- E011_S1h_*, E012_SS1c_*, E002_S1_*, E003_SS1_* --
+# not from the arm field, or the two S1 rows collide (collect_results keys by
+# arm and would silently drop one).
 set -u
 cd "$(dirname "$0")/../.."
 
