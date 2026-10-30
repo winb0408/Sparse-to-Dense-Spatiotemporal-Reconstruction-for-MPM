@@ -1,0 +1,48 @@
+{
+  "config": {
+    "group_field": "mouse_id",
+    "inner_field": "fov_id",
+    "mode": "holdout",
+    "val_units": 1,
+    "seed": 0,
+    "test_groups": [
+      "mouse_id:2"
+    ]
+  },
+  "folds": [
+    {
+      "fold": 0,
+      "test": [
+        "M2_FOVII_S1_vessels",
+        "M2_FOVII_S2_vessels",
+        "M2_FOVI_S1_vessels",
+        "M2_FOVI_S2_vessels"
+      ],
+      "val": [
+        "M1_FOVI_S1_vessels",
+        "M1_FOVI_S2_vessels"
+      ],
+      "train": [
+        "M1_FOVII_S1_vessels",
+        "M1_FOVII_S2_vessels",
+        "M3_FOVI_S1_vessels",
+        "M3_FOVI_S2_vessels"
+      ],
+      "groups": {
+        "test": [
+          "mouse_id:2"
+        ]
+      },
+      "inner_groups": {
+        "val": [
+          "fov:mouse_id:1/I"
+        ],
+        "train": [
+          "fov:mouse_id:3/I",
+          "fov:mouse_id:1/II"
+        ]
+      }
+    }
+  ],
+  "fingerprint": "98379c298a81502f51cc58db36b1aae1ceb151e68a1bce000223b9d16f3b3453"
+}

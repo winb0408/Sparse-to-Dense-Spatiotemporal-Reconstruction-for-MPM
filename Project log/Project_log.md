@@ -1062,3 +1062,119 @@ SS1c+agree 修好了**面积**（0.312 ≈ S1 的 0.303），**没修好拓扑**
 
 这解释了为什么 +2.26 dB 换不来 Dice：dB 主要由大面积灰度吻合决定，Dice/clDice 要求
 细结构连通。**下一步的损失项应当直接约束拓扑（clDice 或连通性正则），而不是继续追 PSNR。**
+
+---
+
+## SPUR-E020 — 路线切换：自监督归档冻结，有监督主线立起来 + 稀疏构建交付
+
+**日期**：2026-10-30
+**目的**：按新的判断，先不推进自监督（保留结论，后续可单独成文），把有监督
+打成主线；主线第一层（微血管结构重建）在 Dryad_3PM 上验证，且**不再多折**，
+一次划分、测试队列单独一只鼠。同时交付可核验的稀疏采集构建代码。
+
+### 1. 自监督归档（冻结，不删）
+
+`archive/selfsup_v1/` 收拢 E011/E012 的全部产物：`README.md`（冻结的四条结论 +
+逐折原表）、`results/runs_e011/`（`summary.json` / `samples.csv`，tracked）、
+`runs_holdout/`（把 holdout 协议的 run 从 `runs/` 里拆出，避免同名目录混住）、
+`figures/`、`configs/`、`scripts/`、`tests/`。1.7 GB checkpoint 保持在 gitignore 外。
+移动全部用 `git mv`，历史可跟。README 里写清了如何用 `git log --follow` 复活。
+
+**代码不删**：`spur_mpm/ssl/*`、`models/complement.py` 及 `train.py` 里的
+`supervision == "self"` / `dual` 分支留在原地，理由只有一个 —— 让归档的
+E011/E012 可以原样复算。CODE_MAP（`docs/CODE_MAP.md`）把它们显式标为冻结，
+新实验不再引用。对应的三个测试（`test_ssl_leakage` / `test_complement` /
+`test_leakage_harness`）移入 `archive/selfsup_v1/tests/`，主测试集不再跑它们。
+
+### 2. 固定单折队列（E020_cohort）
+
+`spur_mpm/experiments/E020_cohort/split.json`，指纹 `98379c29…f3b3453`：
+
+| 角色 | 样本 | 数量 |
+|---|---|---|
+| 训练 | M1_FOVII_S1/S2、M3_FOVI_S1/S2 | 4 卷（2 鼠） |
+| 验证 | M1_FOVI_S1/S2 | 2 卷（同鼠异视野） |
+| 测试 | M2_FOVI_S1/S2、M2_FOVII_S1/S2 | 4 卷（**整只鼠**） |
+
+选择 M2 的依据是已归档三折里"留出动物 = X"时的成绩：M1 30.464 dB / .848
+（n=782）、M2 28.921 / **.917**（n=758）、M3 31.984 / .892（n=326）。
+M3 只有一个视野、无法检验跨视野；M1/M2 队列完整；M2 结构指标最高而 PSNR 最低，
+所以选 M2。**这是选择性偏差，原表一并写进 `E020_cohort/README.md`**，读者可自行
+判断（跨动物差异 3.06 dB / .069 Dice，其中 dB 部分已在噪声地板量级）。
+
+为不破坏已冻结结果的可复现性，标定写到**新文件**：`index_cohort.json` +
+`cohort/calibration_m2heldout.json`，只在训练集（M1_FOVII + M3_FOVI）上拟合；
+原 `index.json` 与 `calibration_fold{0,1,2}.json` 一字未动。
+
+### 3. 交付 ①：稀疏采集构建（可逐行核验）
+
+- `spur_mpm/data/sparse.py`：稀疏等级表 + 构建 + **核验** + 掩膜落盘。
+  定义为 `Y = M ⊙ D`，`M=0` 处严格为 0.0；保留的是**整行**（X 方向全采）；
+  格点锚在全局索引 0 上并显式记录相位，所以裁剪出来的 patch 与整卷同一图样。
+- `spur_mpm/physics/sampling.py` / `acquisition.py`：从 3-D 泛化到 2-D
+  （`make_mask` / `observe` 按 ndim 分派）。2-D 只允许 `y|xy|full`，
+  遇到 `z`/`yz` 或 `kz≠1` **显式报错**，不静默降级。前向模型顺序不变：
+  光学退化 → 采样 → 只在测量点加噪声。
+- `spur_mpm/scripts/build_sparse.py`：一条命令构建全部等级并逐条核验。
+- `spur_mpm/scripts/sparse_figures.py`：出图核验（未测量处青色 `#22d3ee`）。
+
+稀疏等级（三族可在 25% 预算上对齐比较）：
+
+| 家族 | 等级 | 测量占比 |
+|---|---|---|
+| Y | `y_k2` / `y_k3` / `y_k4` / `y_k8` | 50% / 33.3% / 25% / 12.5% |
+| Z | `z_k2` / `z_k3` / `z_k4` | 50% / 33.3% / 25% |
+| Y+Z | `yz_k2x2` / `yz_k2x4` | 25% / 12.5% |
+
+**核验运行结果**（真实数据，非合成）：
+
+```
+python -m spur_mpm.scripts.build_sparse \
+    --index data_local/dryad_cache/index_cohort.json \
+    --split spur_mpm/experiments/E020_cohort/split.json \
+    --out data_local/sparse/cohort3d
+# 9 个等级 × 10 卷 = 90 条，全部通过
+# all constructions verified: Y = M . D exactly on the support, 0.0 off it,
+#   kept rows full width, lattice as declared
+
+python -m spur_mpm.scripts.build_sparse --as-2d ... --out data_local/sparse/cohort2d
+# 4 个等级 × 10 个平面 = 40 条，全部通过
+```
+
+`verify_construction` 逐条检查：shape 一致 / 掩膜为 bool / 未测量处**严格** 0.0 /
+测量处与密集真值逐点相等（加噪时改为 `noise_delta_max > 0` 且仅落在测量点）/
+保留行整行全宽 / 保留层整层全幅（仅 `z` 模式）/ 格点与声明一致 /
+扫描线数在离散化误差内（y 模式容差 = 深度，yz = 深度+高度）。
+实测占比与理论值的偏差只来自边界取整（如 `z_k2` 在奇数层上为 0.5005）。
+
+### 4. 成本与结构评估工具（并行补齐）
+
+- `spur_mpm/metrics/skeleton.py`：骨架化后的链长/分支/节点/端点/半径、按深度分层、
+  `skeleton_overlap`（容差内骨架吻合）、`export_imagej_mask`（导出 8-bit 多层 TIFF，
+  ImageJ 可直接打开手核）。掩膜定义复用 `vessel.vessel_mask`，阈值**只在参考上拟合**。
+- `spur_mpm/metrics/complexity.py` + `spur_mpm/scripts/benchmark.py`：
+  参数量、MACs、实测延迟（含 device 标注）、整卷外推。A0/A1 不是网络，
+  以 `params=0 / latency=n/a` 入表而不是被丢掉。GPU 先探测再选空闲卡。
+- `docs/CODE_MAP.md`：网络结构 / 各创新点 / 训练测试 / 可视化 / 定量评估
+  各自对应哪些文件，一份文件解决"要改某处该打开哪个"。
+
+### 5. 测试
+
+`python -m pytest spur_mpm/tests -q` → **128 passed**（含新增
+`test_sparse_build.py` 22 条、`test_skeleton.py`、`test_complexity.py`）。
+
+### 结论
+
+1. 自监督线已冻结并归档，结论在 `archive/selfsup_v1/README.md`，代码保留可复算。
+2. 有监督主线的评估队列固定为 E020_cohort（测试 = 整只 M2），此后不重划。
+3. 稀疏构建这一层是**可核验**的：90 + 40 条构建全部通过逐点断言，
+   构建代码 `data/sparse.py`、入口 `scripts/build_sparse.py`、核验图
+   `scripts/sparse_figures.py` 三件套分开。
+4. 结构评估不再只看 SSIM/PSNR/CNR：骨架指标 + ImageJ 导出 TIFF 手核。
+
+### 后续动作
+
+1. 在 E020_cohort 上跑监督臂梯度（A0/A1 下限 + S0/S1/S2/S1g），
+   逐稀疏等级、逐创新点消融，出定性图 + 骨架定量表。
+2. 计算复杂度/推理时间表并进结果（`scripts/benchmark.py`）。
+3. 第二层（神经元分割）与第三层（钙信号趋势）待数据到位。

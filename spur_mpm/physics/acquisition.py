@@ -34,9 +34,23 @@ __all__ = ["NoiseConfig", "AcquisitionConfig", "Observation", "observe", "apply_
 
 
 def apply_otf(x: torch.Tensor, psf: PSFConfig) -> torch.Tensor:
-    """Forward optical operator ``H * x`` via FFT (identity when sigma = 0)."""
+    """Forward optical operator ``H * x`` via FFT (identity when sigma = 0).
+
+    Accepts ``[H, W]``, ``[Z, H, W]`` or batched ``[B, Z, H, W]``. On a 2-D image
+    only the lateral optics can act, so a PSF carrying an axial width is refused
+    instead of quietly dropping it: the caller has to say
+    ``psf.lateral_only()`` out loud.
+    """
     if psf.is_identity:
         return x
+    if x.ndim == 2:
+        if psf.sigma_z_px != 0.0:
+            raise ValueError(
+                f"2-D input but the PSF has sigma_z = {psf.sigma_z_px} px; use "
+                "psf.lateral_only() to state that only the lateral optics apply")
+        xf = torch.fft.fftn(x.float(), dim=(-2, -1))
+        otf = gaussian_otf_2d(tuple(x.shape), psf.sigma_xy_px, device=x.device)
+        return torch.fft.ifftn(otf * xf, dim=(-2, -1)).real
     squeeze = x.ndim == 3
     if squeeze:
         x = x[None]
@@ -82,7 +96,7 @@ class AcquisitionConfig:
 class Observation:
     """Sparse observation on the reconstruction grid.
 
-    ``y``    zero-filled measurement, ``[Z, H, W]`` float
+    ``y``    zero-filled measurement, ``[Z, H, W]`` or ``[H, W]`` float
     ``mask`` bool measurement support, same shape
     """
 
@@ -109,9 +123,14 @@ def _add_noise(x: torch.Tensor, mask: torch.Tensor, noise: NoiseConfig) -> torch
 
 
 def observe(dense: torch.Tensor, cfg: AcquisitionConfig) -> Observation:
-    """Realise ``Y = M . (H * dense) + noise`` on a ``[Z, H, W]`` dense image."""
-    if dense.ndim != 3:
-        raise ValueError(f"expected [Z, H, W], got {tuple(dense.shape)}")
+    """Realise ``Y = M . (H * dense) + noise`` on a ``[Z, H, W]`` or ``[H, W]`` image.
+
+    The stage order is the same in both cases; only the depth stage disappears in
+    2-D. Positions with ``M = 0`` are exactly zero: they were never measured, and
+    filling them here would hand the reconstruction the answer it must infer.
+    """
+    if dense.ndim not in (2, 3):
+        raise ValueError(f"expected [Z, H, W] or [H, W], got {tuple(dense.shape)}")
     shape = tuple(dense.shape)
 
     blurred = apply_otf(dense, cfg.psf)
@@ -123,5 +142,6 @@ def observe(dense: torch.Tensor, cfg: AcquisitionConfig) -> Observation:
         y=y, mask=mask,
         metadata={"acquisition": cfg.to_dict(),
                   "shape": list(shape),
+                  "ndim": len(shape),
                   "sampling_fraction": float(mask.float().mean())},
     )

@@ -29,7 +29,7 @@ from dataclasses import dataclass
 
 import torch
 
-__all__ = ["SamplingSpec", "make_mask"]
+__all__ = ["SamplingSpec", "make_mask", "kept_rows", "kept_planes"]
 
 _MODES = ("y", "z", "yz", "xy", "full")
 
@@ -76,8 +76,8 @@ class SamplingSpec:
                 else 1.0 / (self.ky ** 2)
         return 1.0
 
-    def mask(self, shape: tuple[int, int, int],
-             phase: tuple[int, int, int] = (0, 0, 0)) -> torch.Tensor:
+    def mask(self, shape: tuple[int, ...],
+             phase: tuple[int, ...] = (0, 0, 0)) -> torch.Tensor:
         return make_mask(self, shape, phase)
 
     @property
@@ -126,16 +126,65 @@ def _xy_mask(h: int, w: int, k: int, pattern: str, seed: int,
     raise ValueError(f"unknown xy pattern {pattern!r}")
 
 
-def make_mask(spec: SamplingSpec, shape: tuple[int, int, int],
-              phase: tuple[int, int, int] = (0, 0, 0)) -> torch.Tensor:
-    """Build the measurement support for a ``[Z, H, W]`` volume.
+def _make_mask_2d(spec: SamplingSpec, shape: tuple[int, int],
+                  phase: tuple[int, ...] = (0, 0)) -> torch.Tensor:
+    """Support for one ``[H, W]`` plane. Depth-axis modes are not meaningful."""
+    if spec.mode not in ("y", "xy", "full"):
+        raise ValueError(
+            f"sampling mode {spec.mode!r} needs a depth axis and cannot be applied "
+            f"to a 2-D [H, W] image; use 'y', 'xy' or 'full'")
+    if int(spec.kz) != 1:
+        raise ValueError(f"2-D sampling cannot skip planes (kz={spec.kz}); set kz=1")
+    h, w = shape
+    _, py, px = _as_phase(phase, 2)
+    if spec.mode == "full":
+        return torch.ones(shape, dtype=torch.bool)
+    if spec.mode == "y":
+        return _lattice(h, spec.ky, py).view(h, 1).expand(h, w).clone()
+    return _xy_mask(h, w, spec.ky, spec.pattern, spec.seed, py, px)
 
-    phase : ``(pz, py, px)`` lattice phase in global stack coordinates; patch
-            windows cropped at ``(z0, y0, x0)`` should pass
+
+def _as_phase(phase: tuple[int, ...], ndim: int) -> tuple[int, int, int]:
+    """Normalise ``(py, px)`` / ``(pz, py, px)`` to a 3-tuple."""
+    phase = tuple(int(p) for p in phase)
+    if len(phase) == ndim:
+        return (0,) * (3 - len(phase)) + phase if len(phase) < 3 else phase
+    if len(phase) == 3:
+        return phase
+    raise ValueError(f"phase must have {ndim} or 3 entries, got {phase}")
+
+
+def kept_planes(spec: SamplingSpec, depth: int,
+                phase: int = 0) -> torch.Tensor:
+    """Global Z indices the ``z`` lattice measures (all of them when kz = 1)."""
+    return _lattice(int(depth), int(spec.kz), int(phase))
+
+
+def kept_rows(spec: SamplingSpec, height: int, phase: int = 0) -> torch.Tensor:
+    """Global Y indices the row lattice measures (all of them when ky = 1)."""
+    return _lattice(int(height), int(spec.ky), int(phase))
+
+
+def make_mask(spec: SamplingSpec, shape: tuple[int, ...],
+              phase: tuple[int, ...] = (0, 0, 0)) -> torch.Tensor:
+    """Build the measurement support for a ``[Z, H, W]`` volume or an ``[H, W]`` plane.
+
+    The 2-D form exists because part of the evidence base is 2-D movies with no
+    depth axis (MPM-3P-SQH) and because a single optical plane exported from a
+    stack is still one acquisition: it must obey the *same* Y-row lattice, not a
+    re-invented one. In 2-D only ``y | xy | full`` make sense -- ``z`` and ``yz``
+    are rejected rather than silently degraded to something else.
+
+    phase : ``(pz, py, px)`` (:``(py, px)`` in 2-D) lattice phase in global stack
+            coordinates; patch windows cropped at ``(z0, y0, x0)`` should pass
             ``(z0 % kz, y0 % ky, x0 % ky)`` so the lattice is stack-aligned.
 
     Returns a bool tensor of ``shape``; True = measured.
     """
+    if len(shape) == 2:
+        return _make_mask_2d(spec, tuple(shape), phase)
+    if len(shape) != 3:
+        raise ValueError(f"expected [Z, H, W] or [H, W], got {tuple(shape)}")
     d, h, w = shape
     pz, py, px = phase
 
