@@ -190,7 +190,8 @@ def test_analyse_volume_merges_the_three_layers_on_one_threshold():
     # ``intensity`` path: the vesselness default is about how a *raw* stack is
     # segmented and is covered separately below.
     out = analyse_volume(pred_mask.astype(np.float32), ref_img, voxel_um=VOXEL,
-                         n_slabs=3, tolerance_vox=1, segment="intensity")
+                         n_slabs=3, tolerance_vox=1, segment="intensity",
+                         max_plane_fraction=None)
     for key in ("dice", "cl_dice", "pred_fraction", "ref_fraction",
                 "n_components_pred", "n_components_ref", "precision", "recall", "f1",
                 "length_density_ratio", "depth_profile"):
@@ -213,8 +214,10 @@ def test_analyse_volume_fits_the_threshold_on_the_reference_only():
     good = np.asarray(ref_img, dtype=np.float32)
     broken = good.copy()
     broken[:, :, 12:14] = 0.0
-    a = analyse_volume(good, ref_img, voxel_um=VOXEL, n_slabs=2, segment="intensity")
-    b = analyse_volume(broken, ref_img, voxel_um=VOXEL, n_slabs=2, segment="intensity")
+    a = analyse_volume(good, ref_img, voxel_um=VOXEL, n_slabs=2, segment="intensity",
+                         max_plane_fraction=None)
+    b = analyse_volume(broken, ref_img, voxel_um=VOXEL, n_slabs=2, segment="intensity",
+                         max_plane_fraction=None)
     # Default is per plane, and the reported number is the median of those, which
     # on a brightness-flat synthetic is within a rounding step of the global Otsu.
     assert a["threshold_mode"] == "per_plane"
@@ -229,12 +232,14 @@ def test_analyse_volume_fits_the_threshold_on_the_reference_only():
     assert b["length_density_ratio"] <= 1.0 + 1e-6
     # The global mode must reproduce the classic recipe exactly.
     g = analyse_volume(good, ref_img, voxel_um=VOXEL, n_slabs=2,
-                       threshold_mode="global", segment="intensity")
+                       threshold_mode="global", segment="intensity",
+                         max_plane_fraction=None)
     assert g["threshold"] == pytest.approx(otsu_threshold(ref_img))
     # An explicit threshold must reproduce the mode it stands in for exactly --
     # here the global one, since a single number cannot stand for a per-plane set.
     c = analyse_volume(good, ref_img, threshold=g["threshold"], voxel_um=VOXEL,
-                       n_slabs=2, segment="intensity")
+                       n_slabs=2, segment="intensity",
+                         max_plane_fraction=None)
     assert c["dice"] == g["dice"]
     assert c["ref_total_length_vox"] == g["ref_total_length_vox"]
 
@@ -269,7 +274,8 @@ def test_analyse_volume_reports_nan_ratio_when_a_mask_is_empty():
     _, ref_img = _masks()
     blank = np.zeros_like(ref_img)
     out = analyse_volume(blank, ref_img, threshold=0.5, voxel_um=VOXEL, n_slabs=2,
-                         segment="intensity")
+                         segment="intensity",
+                         max_plane_fraction=None)
     assert out["pred_total_length_vox"] == 0.0
     assert out["pred_fraction"] == 0.0
     assert np.isnan(out["length_density_ratio"])
@@ -282,13 +288,15 @@ def test_depth_profile_slabs_tile_the_stack_and_carry_physical_bounds():
     assert [slab["z_lo_um"] for slab in profile] == [0.0, 15.0]
     assert [slab["z_hi_um"] for slab in profile] == [15.0, 30.0]
     top_level = analyse_volume(ref_img, ref_img, voxel_um=VOXEL, n_slabs=2,
-                               segment="intensity")
+                               segment="intensity",
+                         max_plane_fraction=None)
     # ``threshold_mode`` / ``threshold_p10_p90`` / ``segment_method`` describe
     # the whole-volume choice, and ``threshold`` is the one operating point
     # fitted on the reference, so they belong to the top level and not to a slab.
     expected = (set(top_level)
                 - {"depth_profile", "threshold_mode", "threshold_p10_p90",
-                   "segment_method", "threshold"}
+                   "segment_method", "threshold", "n_planes_gated",
+                   "max_plane_fraction"}
                 | {"z_lo_um", "z_hi_um"})
     assert set(profile[0]) == expected
 
@@ -297,7 +305,8 @@ def test_single_plane_is_one_slab_of_one_axial_sample():
     plane = np.zeros((40, 40), dtype=np.float32)
     plane[18:21, 3:37] = 1.0
     out = analyse_volume(plane, plane, threshold=0.5, voxel_um=VOXEL,
-                         segment="intensity")
+                         segment="intensity",
+                         max_plane_fraction=None)
     assert len(out["depth_profile"]) == 1
     assert out["depth_profile"][0]["z_lo_um"] == 0.0
     assert out["depth_profile"][0]["z_hi_um"] == VOXEL[0]

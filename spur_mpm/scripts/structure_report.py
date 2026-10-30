@@ -181,6 +181,10 @@ def main(argv: list[str] | None = None) -> int:
                                 "ref_n_components": m["ref_n_components"],
                                 "pred_n_components": m["pred_n_components"]}))
     md.append("")
+    md.append(f"Gated planes (reference mask fills > "
+              f"{results[0].get('max_plane_fraction')} of the plane): "
+              f"{', '.join(str(r.get('n_planes_gated')) for r in results)} "
+              f"(one number per volume); those planes are in neither mask.")
     md.append(f"Binarisation: {results[0].get('segment_method', 'vesselness')} "
               f"response, threshold {results[0]['threshold']:.6g} fitted on the "
               f"reference only ({results[0].get('threshold_mode', 'per_plane')}), "

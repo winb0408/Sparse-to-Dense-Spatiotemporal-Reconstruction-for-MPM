@@ -579,6 +579,7 @@ def analyse_volume(pred_img: np.ndarray, ref_img: np.ndarray, *,
                    n_slabs: int = 6, tolerance_vox: float = 1,
                    threshold_mode: str = "per_plane",
                    segment: str = "vesselness",
+                   max_plane_fraction: float | None = 0.15,
                    return_masks: bool = False) -> dict:
     """The full structural verdict for one predicted volume against its reference.
 
@@ -614,6 +615,14 @@ def analyse_volume(pred_img: np.ndarray, ref_img: np.ndarray, *,
         the classic recipe and a reviewer may ask for it, and because on a
         brightness-flat volume the two coincide.
 
+    Planes whose **reference** segmentation covers more than
+    ``max_plane_fraction`` (15 %) are emptied in both masks and counted in
+    ``n_planes_gated`` -- see :func:`spur_mpm.metrics.vessel.segment_pair`. On a
+    real M2 stack those planes are out-of-focus haze and dense bright regions
+    where the threshold stops describing vessels, and they dominate the volume
+    total if they are scored (a 170 um slab contributed 3437 mm of "vessel" where
+    the clean slabs of the same volume contribute 20-40 mm).
+
     ``segment`` chooses what is thresholded: ``vesselness`` (default) applies the
     Sato tubular response to both images and thresholds that, because a raw
     intensity Otsu marks a third of a real plane as vessel (see
@@ -635,13 +644,16 @@ def analyse_volume(pred_img: np.ndarray, ref_img: np.ndarray, *,
         raise ValueError(f"expected a 2-D plane or a 3-D volume, got {p.ndim}-D")
 
     seg = segment_pair(p, r, method=segment, threshold=threshold,
-                       threshold_mode=threshold_mode)
+                       threshold_mode=threshold_mode,
+                       max_fraction=max_plane_fraction)
     pm, rm = seg["pred_mask"], seg["ref_mask"]
     thr = seg["threshold"]
 
     out = _mask_metrics(pm, rm, voxel_um, tolerance_vox)
     out["threshold_mode"] = threshold_mode
     out["segment_method"] = segment
+    out["n_planes_gated"] = seg["n_planes_gated"]
+    out["max_plane_fraction"] = seg["max_plane_fraction"]
     if seg["threshold_p10_p90"] is not None:
         out["threshold_p10_p90"] = seg["threshold_p10_p90"]
     # Fill in the image-level threshold truthfully; every other value already

@@ -89,7 +89,7 @@
 | 文件 | 指标 | 什么时候用它 |
 |---|---|---|
 | `spur_mpm/metrics/image_metrics.py` | MAE / PSNR / SSIM，`split_errors` 把**测到的行**与**缺失的行**分开 | 报告强度吻合度。**不能单独用来声称结构恢复** |
-| `spur_mpm/metrics/vessel.py` | `vesselness`（Sato 管状响应）、`segment_pair`（预测/参考**同一套**分割，阈值只在参考上拟合）、`mask_vessel_metrics`、`dice`、`cl_dice`、连通域数 | 结构重合。默认分割是管状响应而不是原始灰度 Otsu：实测原始 Otsu 会把单帧 37–55% 判成血管，骨架化后 95% 体素是节点（那是"面"不是"线"）；响应阈值下前景≈3–4%，与血管体积分数同量级 |
+| `spur_mpm/metrics/vessel.py` | `vesselness`（Sato 管状响应）、`segment_pair`（预测/参考**同一套**分割，阈值只在参考上拟合）、`mask_vessel_metrics`、`dice`、`cl_dice`、连通域数 | 结构重合。默认分割是管状响应而不是原始灰度 Otsu：实测原始 Otsu 会把单帧 37–55% 判成血管，骨架化后 95% 体素是节点（那是"面"不是"线"）；响应阈值下前景≈3–4%，与血管体积分数同量级。整卷另有一道**参考侧门控**：参考掩膜占该层比例超过 15% 的层面（离焦雾、致密亮区）在两侧同时清空并计数上报，否则一片 170 µm 的层能贡献 3437 mm"血管"（同卷干净层只有 20–40 mm） |
 | `spur_mpm/metrics/skeleton.py` | 骨架化后的链长、分支、节点、端点、半径、按深度分层；`skeleton_overlap` 是容差内的骨架吻合；`export_imagej_mask` 导出 ImageJ 可开的 TIFF | **对应"ImageJ 提骨架后对比"**；回答"网络是否被打断/粘连" |
 | `spur_mpm/metrics/complexity.py` | 参数量、MACs、实测延迟、整卷外推 | 和精度并列报告；延迟必带 device |
 | `spur_mpm/metrics/statistics.py` | bootstrap CI、配对差、分组汇总 | 跨动物方差约 2.8 dB / 0.08 Dice，<1 dB / 0.03 Dice 的差异不构成结论 |
@@ -139,6 +139,16 @@ python -m spur_mpm.train --config spur_mpm/configs/experiments/<exp>.yaml
 python -m spur_mpm.evaluate ...
 python -m spur_mpm.scripts.collect_results ...
 python -m spur_mpm.scripts.benchmark --markdown --arms A0 A1 S0 S1 S2 S1g
+
+# 5) 消融阶梯（固定队列，逐 cell 落盘；--eval-only 只重打分不重训）
+python -m spur_mpm.scripts.run_ladder --stage ablation --devices 2
+python -m spur_mpm.scripts.run_ladder --stage ablation --eval-only --force
+python -m spur_mpm.scripts.ladder_report --root runs/E021_ladder --out runs/E021_ladder/ladder.md
+
+# 6) 结构评估（整卷骨架 + ImageJ 可读掩膜 + 定性图）
+python -m spur_mpm.scripts.structure_report --arm S1 --ckpt runs/E021_ladder/E021_S1_y_k2/best.pt \
+    --out runs/E021_ladder/E021_S1_y_k2/structure --device 2
+python -m spur_mpm.scripts.qualitative_figures --arm S1=runs/E021_ladder/E021_S1_y_k2/best.pt ...
 ```
 
 ---

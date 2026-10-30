@@ -114,7 +114,8 @@ def segment_pair(pred: np.ndarray, ref: np.ndarray, *,
                  sigmas=DEFAULT_SIGMAS,
                  threshold: float | None = None,
                  threshold_mode: str = "per_plane",
-                 low_ratio: float = 1.0) -> dict:
+                 low_ratio: float = 1.0,
+                 max_fraction: float | None = 0.15) -> dict:
     """Segment a prediction and its reference with **one** rule, fitted on the ref.
 
     This is the single place where the "threshold from the reference only" rule
@@ -130,6 +131,18 @@ def segment_pair(pred: np.ndarray, ref: np.ndarray, *,
     "segment_method", "threshold_p10_p90"}``; ``threshold`` is the median of the
     per-plane thresholds, ``threshold_p10_p90`` is their spread and is ``None``
     for a single plane or a global threshold.
+
+    ``max_fraction`` gates planes whose **reference** mask would cover more than
+    that fraction: both masks for such a plane are emptied and the plane is
+    counted in ``n_planes_gated``. It exists because a per-plane Otsu follows the
+    brightness down the stack and, on a real M2 volume, some planes end up with a
+    third of their area above threshold -- out-of-focus haze and dense bright
+    regions are not a vessel tree, and a mask that fills 29 % of a plane turns
+    the skeleton into a surface (measured: 3437 mm of "vessel" in a 170 um slab,
+    against 20-40 mm in the clean mid-depth slabs of the same volume). The gate is
+    decided on the reference alone, so it cannot favour one prediction over
+    another, and the count of gated planes is reported rather than hidden. ``None``
+    disables it.
     """
     p = np.asarray(pred, dtype=np.float32)
     r = np.asarray(ref, dtype=np.float32)
@@ -166,9 +179,37 @@ def segment_pair(pred: np.ndarray, ref: np.ndarray, *,
     else:
         pm = _threshold_plane(pv, thr, low_ratio)
         rm = _threshold_plane(rv, thr, low_ratio)
+    n_gated = 0
+    if max_fraction is not None:
+        pm, rm, n_gated = _gate_flooded_planes(pm, rm, float(max_fraction))
     return {"pred_mask": pm, "ref_mask": rm, "threshold": thr,
             "threshold_mode": threshold_mode, "segment_method": method,
-            "threshold_p10_p90": spread}
+            "threshold_p10_p90": spread, "n_planes_gated": n_gated,
+            "max_plane_fraction": max_fraction}
+
+
+def _gate_flooded_planes(pred_mask: np.ndarray, ref_mask: np.ndarray,
+                         max_fraction: float) -> tuple[np.ndarray, np.ndarray, int]:
+    """Empty both masks on planes where the *reference* mask fills the plane.
+
+    A plane whose reference segmentation covers more than ``max_fraction`` is not
+    a vessel tree under this threshold, whatever the prediction looks like, so
+    scoring it would measure the threshold's failure. The decision uses the
+    reference only, and both masks are emptied together, so the comparison stays
+    like-for-like.
+    """
+    if not (0.0 < max_fraction <= 1.0):
+        raise ValueError(f"max_fraction must be in (0, 1], got {max_fraction}")
+    if ref_mask.ndim != 3:
+        return pred_mask, ref_mask, 0
+    fraction = ref_mask.reshape(ref_mask.shape[0], -1).mean(axis=1)
+    bad = np.flatnonzero(fraction > max_fraction)
+    if bad.size == 0:
+        return pred_mask, ref_mask, 0
+    pm, rm = pred_mask.copy(), ref_mask.copy()
+    pm[bad] = False
+    rm[bad] = False
+    return pm, rm, int(bad.size)
 
 
 def _threshold_plane(values: np.ndarray, threshold: float,

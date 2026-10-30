@@ -137,6 +137,35 @@ def test_segment_pair_never_lets_the_prediction_move_the_threshold():
         segment_pair(good, ref, method="otsu")
 
 
+def test_flood_gate_empties_planes_the_threshold_cannot_describe():
+    """A plane the reference segmentation fills is dropped, not scored.
+
+    On a real M2 volume a third of some planes came out above threshold; those
+    planes then contributed 3437 mm of "vessel" to a 170 um slab where the clean
+    slabs of the same volume contribute 20-40 mm. The gate is decided on the
+    reference, and both masks are emptied together.
+    """
+    ref = np.zeros((6, 40, 40), dtype=np.float32)
+    ref[:, 18:21, 3:37] = 1.0                 # a tube: a few percent of each plane
+    ref[4:] = 1.0                             # two planes are flooded solid
+    pred = ref.copy()
+    pred[:, 18:21, 3:37] = 0.0
+
+    open_gate = segment_pair(pred, ref, method="intensity", max_fraction=None)
+    closed = segment_pair(pred, ref, method="intensity", max_fraction=0.5)
+    assert closed["n_planes_gated"] == 2
+    # The gated planes exist in neither mask now, so they cannot be scored.
+    assert closed["ref_mask"][4:].sum() == 0
+    assert closed["pred_mask"][4:].sum() == 0
+    # Everything below the gate is untouched, so the comparison is like-for-like.
+    for z in range(4):
+        assert np.array_equal(closed["ref_mask"][z], open_gate["ref_mask"][z])
+    assert segment_pair(pred, ref, method="intensity",
+                        max_fraction=0.2)["n_planes_gated"] == 2
+    with pytest.raises(ValueError):
+        segment_pair(pred, ref, method="intensity", max_fraction=0.0)
+
+
 def test_group_statistics():
     values = [1.0, 2.0, 3.0, 10.0]
     groups = ["a", "a", "b", "c"]
