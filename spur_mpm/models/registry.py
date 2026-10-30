@@ -26,7 +26,8 @@ from dataclasses import dataclass, replace
 
 import torch
 
-__all__ = ["Arm", "ARMS", "get_arm", "build_model", "TRAINED_ARMS"]
+__all__ = ["Arm", "ARMS", "get_arm", "build_model", "TRAINED_ARMS",
+           "BASELINE_FEATURES", "eval_features"]
 
 _BASE_FEATURES = ("y", "mask")
 
@@ -130,6 +131,24 @@ def build_model(arm: Arm | str, context_depth: int, base: int = 48,
         return torch.nn.Sequential(
             PriorFusionStem(arm.features, context_depth, base), unet)
     return unet
+
+
+#: Channels a parameter-free arm is scored on. A0/A1 have no network, so their
+#: prediction is the physics warm start itself; the item therefore has to carry
+#: ``x0`` even though the arm's own ``features`` tuple does not list it.
+BASELINE_FEATURES = ("y", "mask", "x0")
+
+
+def eval_features(arm: Arm) -> tuple[str, ...]:
+    """Features an arm needs to produce a prediction, trained or not.
+
+    One definition, used by both ``evaluate.py`` and ``inference.py``: if the two
+    disagreed, a full-volume figure could be drawn from a different input than
+    the table that is supposed to describe it.
+    """
+    if arm.needs_training:
+        return tuple(arm.features)
+    return BASELINE_FEATURES
 
 
 def count_parameters(model: torch.nn.Module) -> int:

@@ -23,6 +23,7 @@ import argparse
 import json
 from pathlib import Path
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
@@ -34,7 +35,7 @@ from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
                                            split_psnr, ssim)
 from spur_mpm.metrics.statistics import summarise_by_group
 from spur_mpm.metrics.vessel import vessel_metrics
-from spur_mpm.models.registry import build_model, get_arm
+from spur_mpm.models.registry import build_model, eval_features, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
 from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.physics.sampling import SamplingSpec
@@ -43,16 +44,6 @@ from spur_mpm.ssl.holdout import HoldoutSpec
 __all__ = ["evaluate", "main"]
 
 DEFAULTS = Path(__file__).parent / "configs" / "base.yaml"
-
-#: Features needed to reconstruct a baseline prediction from the same items.
-_BASELINE_FEATURES = ("y", "mask", "x0")
-
-
-def _eval_features(arm) -> tuple[str, ...]:
-    if arm.needs_training:
-        return tuple(arm.features)
-    return _BASELINE_FEATURES
-
 
 def _feature_slice(features: tuple[str, ...], want: str, context: int) -> slice:
     i = features.index(want)
@@ -84,9 +75,34 @@ def withholds_at_eval(supervision: str, input_support: str,
 
 
 @torch.no_grad()
+def _skeleton_row(pred: np.ndarray, ref: np.ndarray) -> dict:
+    """Skeleton-based structural scores for one centre plane.
+
+    Both images are binarised by :func:`spur_mpm.metrics.vessel.vessel_mask`,
+    whose threshold comes from the reference alone, so the two masks are the
+    same object every arm is scored on. ``skel_overlap`` is skeleton-pixel
+    agreement within one voxel; the length/branch/junction counts say whether
+    the thinning survives -- a prediction that thickens every capillary can keep
+    Dice up while merging vessels, which shows here and nowhere else.
+    """
+    from spur_mpm.metrics.skeleton import skeleton_overlap, skeleton_stats
+    from spur_mpm.metrics.vessel import vessel_mask
+
+    pred_mask = vessel_mask(pred, threshold=None)
+    ref_mask = vessel_mask(ref, threshold=None)
+    out = skeleton_overlap(pred_mask, ref_mask, tolerance_vox=1)
+    pred_stats = skeleton_stats(pred_mask)
+    ref_stats = skeleton_stats(ref_mask)
+    for key in ("n_branches", "n_junctions", "n_endpoints",
+                "total_length_vox", "mean_radius_vox"):
+        out[f"skel_pred_{key}"] = pred_stats.get(key)
+        out[f"skel_ref_{key}"] = ref_stats.get(key)
+    return out
+
+
 def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
              split_name: str = "test", out_dir: Path | None = None,
-             seed: int = 0) -> dict:
+             seed: int = 0, skeleton: bool = False) -> dict:
     device = torch.device(cfg["run"].get("device", "cuda")
                           if torch.cuda.is_available() else "cpu")
     arm = get_arm(arm_name)
@@ -100,7 +116,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     psf = PSFConfig(**cfg["physics"]["psf"])
     noise = NoiseConfig(**cfg.get("noise", {"poisson_photons": 0.0,
                                             "gaussian_sigma": 0.0, "seed": 0}))
-    features = _eval_features(arm)
+    features = eval_features(arm)
     # How much of the acquired data the arm is given at scoring time.
     #
     # "full"     : every acquired measurement (M_acq). A self-supervised arm is
@@ -211,6 +227,12 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                     row["e_hold"] = float(((p - t).abs() * m_hold).sum()
                                           / m_hold.sum())
                 row.update(vessel_metrics(p.numpy(), t.numpy()))
+                # Structural verdict (opt-in): Dice answers "how much vessel",
+                # the skeleton answers "is it still a network". Both are measured
+                # on the same binarisation, with the threshold fitted on the
+                # reference only, so no arm can tune it.
+                if skeleton:
+                    row.update(_skeleton_row(p.numpy(), t.numpy()))
                 row["key"] = f"{row['sample_id']}_z{row['query_z']}"
                 rows.append(row)
 
@@ -233,7 +255,13 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         "metrics": {},
     }
     for metric in ("psnr", "psnr_measured", "psnr_missing", "ssim", "mae",
-                   "e_measured", "e_missing", "e_hold", "dice", "cl_dice"):
+                   "e_measured", "e_missing", "e_hold", "dice", "cl_dice",
+                   "precision", "recall", "f1",
+                   "skel_pred_n_branches", "skel_ref_n_branches",
+                   "skel_pred_n_junctions", "skel_ref_n_junctions",
+                   "skel_pred_n_endpoints", "skel_ref_n_endpoints",
+                   "skel_pred_total_length_vox", "skel_ref_total_length_vox",
+                   "skel_pred_mean_radius_vox", "skel_ref_mean_radius_vox"):
         if any(metric in r for r in rows):
             summary["metrics"][metric] = summarise_by_group(rows, metric)
 
@@ -267,6 +295,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--fold", type=int, default=None)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", type=Path, default=None)
+    p.add_argument("--skeleton", action="store_true",
+                   help="add skeleton-based structural scores per window "
+                        "(slower: one thinning per window)")
     p.add_argument("--set", dest="overrides", action="append", default=[])
     args = p.parse_args(argv)
 
@@ -283,7 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     out = args.out or Path(cfg["run"].get("out_root", "runs")) / \
         f"eval__{args.arm}__{args.split}"
     result = evaluate(cfg, args.arm, args.ckpt, split_name=args.split,
-                      out_dir=out, seed=args.seed)
+                      out_dir=out, seed=args.seed, skeleton=args.skeleton)
     print(json.dumps({k: (v if not isinstance(v, dict) else
                           {kk: vv for kk, vv in v.items() if kk != "group_means"})
                       for k, v in result["summary"]["metrics"].items()},

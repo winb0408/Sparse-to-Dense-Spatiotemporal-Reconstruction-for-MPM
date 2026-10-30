@@ -29,7 +29,7 @@ from torch.utils.data import DataLoader
 from spur_mpm.common.config import apply_overrides, deep_merge, load_config
 from spur_mpm.common.tensors import select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
-from spur_mpm.models.registry import build_model, get_arm
+from spur_mpm.models.registry import build_model, eval_features, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
 from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.ssl.holdout import HoldoutSpec
@@ -61,7 +61,7 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
 
     item_cfg = ItemConfig(
         sampling=sampling, psf=psf, noise=noise, warm_start_kind=arm.warm_start,
-        lam=float(cfg["physics"]["lam"]), features=tuple(arm.features),
+        lam=float(cfg["physics"]["lam"]), features=eval_features(arm),
         supervision="dense", holdout=(
             HoldoutSpec(ratio=float(cfg["selfsupervision"]["ratio"]),
                         geometry=str(cfg["selfsupervision"]["geometry"]),
