@@ -259,3 +259,35 @@ def test_depth_profile_never_returns_empty_slabs():
     assert [slab["z_hi_um"] - slab["z_lo_um"] for slab in profile] == [5.0, 5.0]
     with pytest.raises(ValueError):
         depth_profile(mask, mask, VOXEL, n_slabs=0)
+
+
+def test_branch_lengths_do_not_re_thin_and_stay_exact():
+    """A regression for the cost fix, pinned by the numbers it must not change.
+
+    ``_branch_lengths`` used to rescan the whole array once per branch *and*
+    re-thin each segment; a 200-plane stack took over half an hour. It now takes
+    each segment's bounding box from one ``find_objects`` pass and measures the
+    already-thin segment directly. The lengths must be identical, so this test
+    fixes them with a shape whose answer is worked out by hand: a symmetric
+    cross with 21-voxel arms.
+
+    Why four arms of 9 voxels and not 10: ``_neighbour_counts`` uses the full
+    8-neighbourhood, and next to the centre of a cross the diagonal neighbours
+    are skeleton voxels too, so **five** voxels count as junctions, not one.
+    Each arm is therefore the 9 voxels beyond that blob, and a 9-voxel straight
+    run has chain length 8 (a run of N voxels has N-1 steps).
+    """
+    from spur_mpm.metrics.skeleton import _branch_lengths, _neighbour_counts, skeleton
+
+    thin = np.zeros((21, 21), dtype=bool)
+    thin[10, 0:21] = True
+    thin[0:21, 10] = True
+    junctions = thin & (_neighbour_counts(thin) >= 3)
+    assert junctions.sum() == 5
+    assert sorted(_branch_lengths(thin, junctions)) == pytest.approx([8.0] * 4)
+
+    # A diagonal line has no junction, so it is one branch, and the diagonal
+    # step costs sqrt(2) rather than 1: 39 steps, 40 voxels.
+    line = skeleton(np.eye(40, dtype=bool))
+    assert _branch_lengths(line, np.zeros_like(line)) == pytest.approx(
+        [39 * np.sqrt(2)])

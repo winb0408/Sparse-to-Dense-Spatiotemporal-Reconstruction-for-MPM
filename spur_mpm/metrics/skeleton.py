@@ -196,10 +196,18 @@ def _branch_lengths(thin: np.ndarray, junctions: np.ndarray) -> list[float]:
     a full stack has thousands of branches.
     """
     segments = _label(thin & ~junctions, connectivity=thin.ndim)
+    # ``find_objects`` returns each label's bounding box in one C pass. The
+    # obvious loop (``segments == index`` then a bounding box of that) rescans
+    # the whole array once per branch, which is quadratic in practice: a full
+    # 200-plane stack has thousands of branches, and that version took over
+    # half an hour per volume, while this one is seconds.
+    # The segments are cut out of an already-thin skeleton, so measuring them
+    # needs no second thinning: ``_chain_length`` is the whole job.
     lengths = []
-    for index in range(1, int(segments.max()) + 1):
-        seg = segments == index
-        lengths.append(skeleton_length_vox(seg[_bbox_slices(seg)]))
+    for index, box in enumerate(ndi.find_objects(segments), start=1):
+        if box is None:                      # label dropped by find_objects
+            continue
+        lengths.append(_chain_length(segments[box] == index))
     return lengths
 
 
