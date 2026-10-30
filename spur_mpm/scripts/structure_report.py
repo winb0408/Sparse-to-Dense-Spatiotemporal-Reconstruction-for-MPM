@@ -49,7 +49,8 @@ DEFAULTS = Path(__file__).resolve().parent.parent / "configs" / "base.yaml"
 
 def structure_for_sample(cfg: dict, arm: str, ckpt: Path | None, sample_id: str,
                          out_dir: Path, *, n_slabs: int = 6,
-                         device: str | None = None) -> dict:
+                         device: str | None = None,
+                         keep_recon: bool = False) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     recon = out_dir / f"{arm}_{sample_id}_recon.npy"
     meta = reconstruct_volume(cfg, arm, ckpt, sample_id, recon, device=device)
@@ -77,6 +78,15 @@ def structure_for_sample(cfg: dict, arm: str, ckpt: Path | None, sample_id: str,
     result.update({"sample_id": sample_id, "arm": arm, "ckpt": str(ckpt),
                    "sampling": cfg["sampling"], "recon": str(recon),
                    "recon_meta": meta})
+    if not keep_recon:
+        # A 200-plane float32 stack plus its warm start is ~450 MB per volume per
+        # arm; keeping those for two dozen cells would fill the disk to hold data
+        # that the TIFF masks and the JSON already summarise. Rerun with
+        # --keep-recon when a figure needs the raw volume.
+        for path in (recon, Path(str(recon).replace(".npy", ".mask.npy")),
+                     Path(str(recon).replace(".npy", ".warmstart.npy"))):
+            Path(path).unlink(missing_ok=True)
+        result["recon"] = None
     return result
 
 
@@ -100,6 +110,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--n-slabs", type=int, default=6)
     p.add_argument("--device", default=None)
+    p.add_argument("--keep-recon", action="store_true",
+                   help="keep the ~450 MB per-volume .npy dumps (default: delete "
+                        "them, the TIFF masks and JSON already carry the result)")
     p.add_argument("--set", dest="overrides", action="append", default=[])
     args = p.parse_args(argv)
 
@@ -118,7 +131,8 @@ def main(argv: list[str] | None = None) -> int:
     results = []
     for sid in samples:
         r = structure_for_sample(cfg, args.arm, args.ckpt, sid, args.out,
-                                 n_slabs=args.n_slabs, device=args.device)
+                                 n_slabs=args.n_slabs, device=args.device,
+                                 keep_recon=args.keep_recon)
         results.append(r)
         print(f"{sid}: dice={r['dice']:.4f} clDice={r['cl_dice']:.4f} "
               f"skelF1={r['f1']:.4f} "

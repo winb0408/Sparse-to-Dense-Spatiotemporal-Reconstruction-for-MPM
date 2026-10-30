@@ -80,6 +80,7 @@
 | `spur_mpm/common/*` | 配置加载、随机种子、日志、provenance（每个 run 记录 git 状态） |
 | `spur_mpm/configs/base.yaml` | 全局预算（步数、batch、patch、主干宽度），**任何表里的成本数字都从这里取** |
 | `spur_mpm/configs/experiments/*.yaml` | 每个实验一个文件；换臂/换稀疏等级 = 换 YAML |
+| `spur_mpm/scripts/run_ladder.py` | 在固定队列上跑"臂 × 稀疏等级"整个阶梯，阶段 = 问题（ablation / sweep / matched），逐 cell 写进度 | 消融与稀疏曲线的主入口 |
 
 ---
 
@@ -94,6 +95,9 @@
 | `spur_mpm/metrics/statistics.py` | bootstrap CI、配对差、分组汇总 | 跨动物方差约 2.8 dB / 0.08 Dice，<1 dB / 0.03 Dice 的差异不构成结论 |
 | `spur_mpm/evaluate.py` | 逐样本评估，写 `samples.csv` + `summary.json` | 所有表格的数据源 |
 | `spur_mpm/scripts/collect_results.py` | 汇总多个 run 成一张表 | 出论文表格 |
+| `spur_mpm/scripts/ladder_report.py` | 从各 run 的 `summary.json` 生成阶梯表 + 创新点归因，并把无学习下限摆在训练臂下面 | 出表；小于 1 dB / 0.03 Dice 的差异自动标为"不可主张" |
+| `spur_mpm/scripts/structure_report.py` | **整卷** `analyse_volume`（含按深度分层）+ 导出 ImageJ 可读 TIFF | 骨架层面的结构结论、人工核验 |
+| `spur_mpm/scripts/verify_dataset_masks.py` | 训练代码路径重建的掩膜 vs 已核验 manifest 掩膜，逐点比对 | 证明"训练用的就是核验过的那份稀疏数据" |
 
 为什么不用 PSNR 下按深度分层的结论：PSNR 受噪声主导，深层的信号弱、噪声占比高，
 PSNR 会系统性偏低而与结构好坏无关。分层结论一律用 `dice`/`cl_dice`/骨架指标。
