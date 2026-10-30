@@ -170,7 +170,8 @@ def _run(cmd: list[str], env: dict, log: Path) -> tuple[int, float]:
 
 
 def _cell(arm: str, level: str, *, out_root: Path, steps: int | None,
-          device: str, state: State, dry: bool) -> dict:
+          device: str, state: State, dry: bool,
+          eval_only: bool = False) -> dict:
     name = f"E021_{arm}_{level}"
     run_dir = out_root / name
     env = dict(os.environ, CUDA_VISIBLE_DEVICES=device,
@@ -185,7 +186,9 @@ def _cell(arm: str, level: str, *, out_root: Path, steps: int | None,
         return {**row, "status": "dry"}
 
     rc = 0
-    if arm in TRAINED_ARMS:
+    if eval_only and arm in TRAINED_ARMS and not (run_dir / "best.pt").exists():
+        return {**row, "status": "no_checkpoint"}
+    if arm in TRAINED_ARMS and not eval_only:
         cmd = [sys.executable, "-m", "spur_mpm.train",
                "--arm", arm, "--name", name, "--out-root", str(out_root),
                "--set", "experiment=" + name]
@@ -233,6 +236,10 @@ def main(argv: list[str] | None = None) -> int:
                    help="override train.steps (smoke runs)")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--force", action="store_true", help="redo finished cells")
+    p.add_argument("--eval-only", action="store_true",
+                   help="skip training and re-score the existing best.pt files "
+                        "(use after a metric or segmentation change: the "
+                        "checkpoints do not depend on either)")
     args = p.parse_args(argv)
 
     stages = args.stage or ["ablation"]
@@ -260,7 +267,8 @@ def main(argv: list[str] | None = None) -> int:
         i, (arm, level) = item
         device = devices[i % len(devices)]
         row = _cell(arm, level, out_root=args.out_root, steps=args.steps,
-                    device=device, state=state, dry=args.dry_run)
+                    device=device, state=state, dry=args.dry_run,
+                    eval_only=args.eval_only)
         if not args.dry_run:
             state.add(row)
         tag = row["status"]

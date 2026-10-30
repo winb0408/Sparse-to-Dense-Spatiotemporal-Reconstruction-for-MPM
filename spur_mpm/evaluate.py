@@ -34,7 +34,7 @@ from spur_mpm.data.split import read_split
 from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
                                            split_psnr, ssim)
 from spur_mpm.metrics.statistics import summarise_by_group
-from spur_mpm.metrics.vessel import vessel_metrics
+from spur_mpm.metrics.vessel import mask_vessel_metrics, segment_pair
 from spur_mpm.models.registry import build_model, eval_features, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
 from spur_mpm.physics.psf import PSFConfig
@@ -75,21 +75,21 @@ def withholds_at_eval(supervision: str, input_support: str,
 
 
 @torch.no_grad()
-def _skeleton_row(pred: np.ndarray, ref: np.ndarray) -> dict:
+def _skeleton_row(pred_mask: np.ndarray, ref_mask: np.ndarray) -> dict:
     """Skeleton-based structural scores for one centre plane.
 
-    Both images are binarised by :func:`spur_mpm.metrics.vessel.vessel_mask`,
-    whose threshold comes from the reference alone, so the two masks are the
-    same object every arm is scored on. ``skel_overlap`` is skeleton-pixel
-    agreement within one voxel; the length/branch/junction counts say whether
-    the thinning survives -- a prediction that thickens every capillary can keep
-    Dice up while merging vessels, which shows here and nowhere else.
+    Takes the masks segmented by :func:`spur_mpm.evaluate.evaluate` -- on the
+    plane's Sato vesselness, threshold from the reference only -- so the
+    skeleton of a plane is measured on the same object as its Dice. On a raw MPM
+    plane an intensity Otsu marks 37-55 % of the pixels as vessel, and a skeleton
+    of that is a surface rather than centrelines. ``skel_overlap`` is
+    skeleton-pixel agreement within one voxel; the length/branch/junction counts
+    say whether the thinning survives -- a prediction that thickens every
+    capillary can keep Dice up while merging vessels, which shows here and
+    nowhere else.
     """
     from spur_mpm.metrics.skeleton import skeleton_overlap, skeleton_stats
-    from spur_mpm.metrics.vessel import vessel_mask
 
-    pred_mask = vessel_mask(pred, threshold=None)
-    ref_mask = vessel_mask(ref, threshold=None)
     out = skeleton_overlap(pred_mask, ref_mask, tolerance_vox=1)
     pred_stats = skeleton_stats(pred_mask)
     ref_stats = skeleton_stats(ref_mask)
@@ -226,13 +226,20 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                 if bool(m_hold.any()):
                     row["e_hold"] = float(((p - t).abs() * m_hold).sum()
                                           / m_hold.sum())
-                row.update(vessel_metrics(p.numpy(), t.numpy()))
+                # One segmentation per plane, shared by the overlap numbers and
+                # the skeleton: the response is the plane's Sato vesselness and
+                # the threshold comes from the reference only, so no arm can
+                # tune the operating point and the two tables agree by
+                # construction.
+                seg = segment_pair(p.numpy(), t.numpy(), method="vesselness",
+                                   threshold_mode="global")
+                row.update(mask_vessel_metrics(seg["pred_mask"], seg["ref_mask"]))
+                row["vessel_threshold"] = seg["threshold"]
+                row["vessel_method"] = seg["segment_method"]
                 # Structural verdict (opt-in): Dice answers "how much vessel",
-                # the skeleton answers "is it still a network". Both are measured
-                # on the same binarisation, with the threshold fitted on the
-                # reference only, so no arm can tune it.
+                # the skeleton answers "is it still a network".
                 if skeleton:
-                    row.update(_skeleton_row(p.numpy(), t.numpy()))
+                    row.update(_skeleton_row(seg["pred_mask"], seg["ref_mask"]))
                 row["key"] = f"{row['sample_id']}_z{row['query_z']}"
                 rows.append(row)
 
@@ -256,6 +263,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     }
     for metric in ("psnr", "psnr_measured", "psnr_missing", "ssim", "mae",
                    "e_measured", "e_missing", "e_hold", "dice", "cl_dice",
+                   "pred_fraction", "ref_fraction", "vessel_threshold",
                    "precision", "recall", "f1",
                    "skel_pred_n_branches", "skel_ref_n_branches",
                    "skel_pred_n_junctions", "skel_ref_n_junctions",

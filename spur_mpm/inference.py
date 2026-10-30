@@ -44,8 +44,11 @@ DEFAULTS = Path(__file__).parent / "configs" / "base.yaml"
 def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
                        sample_id: str, out_path: str | Path,
                        device: str | None = None) -> dict:
-    device = torch.device(device or (cfg["run"].get("device", "cuda")
-                                     if torch.cuda.is_available() else "cpu"))
+    # A bare index ("2") means "cuda:2", as in ``evaluate`` and ``benchmark``;
+    # torch itself only accepts the "cuda:N" form and raises on a bare digit.
+    dev = device or (cfg["run"].get("device", "cuda")
+                     if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{dev}" if str(dev).isdigit() else dev)
     arm = get_arm(arm_name)
     cache = VolumeCache.load(cfg["data"]["index"],
                               fold=int(cfg["data"].get("fold", 0)))

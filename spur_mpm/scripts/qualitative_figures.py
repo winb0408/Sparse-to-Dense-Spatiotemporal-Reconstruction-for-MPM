@@ -69,9 +69,10 @@ from spur_mpm.common.config import load_config
 from spur_mpm.common.tensors import select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.data.split import read_split
-from spur_mpm.evaluate import _eval_features, _feature_slice, withholds_at_eval
+from spur_mpm.evaluate import _feature_slice, withholds_at_eval
+from spur_mpm.models.registry import eval_features
 from spur_mpm.metrics.image_metrics import mae, psnr, split_errors, ssim
-from spur_mpm.metrics.vessel import vessel_metrics
+from spur_mpm.metrics.vessel import mask_vessel_metrics, segment_pair
 from spur_mpm.models.registry import build_model, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
 from spur_mpm.physics.psf import PSFConfig
@@ -114,7 +115,7 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
     psf = PSFConfig(**cfg["physics"]["psf"])
     noise = NoiseConfig(**cfg.get("noise", {"poisson_photons": 0.0,
                                             "gaussian_sigma": 0.0, "seed": 0}))
-    features = _eval_features(arm)
+    features = eval_features(arm)
 
     input_support = str(cfg.get("eval", {}).get("input_support", "full"))
     withhold = withholds_at_eval(arm.supervision, input_support,
@@ -231,7 +232,11 @@ def _metrics(vol: dict) -> dict:
         em, ex = split_errors(p[i], t[i], acq[i])
         e.setdefault("e_measured", []).append(em)
         e.setdefault("e_missing", []).append(ex)
-        for k, v in vessel_metrics(p[i].numpy(), t[i].numpy()).items():
+        # Same segmentation rule as ``evaluate``: the plane's Sato vesselness,
+        # threshold fitted on the reference plane only.
+        seg = segment_pair(p[i].numpy(), t[i].numpy(), method="vesselness",
+                           threshold_mode="global")
+        for k, v in mask_vessel_metrics(seg["pred_mask"], seg["ref_mask"]).items():
             e.setdefault(k, []).append(v)
     for k, v in e.items():
         out[k] = float(np.nanmean(v)) if v else float("nan")
@@ -397,7 +402,10 @@ def _panel_metrics(pred: np.ndarray, ref: np.ndarray) -> dict | None:
     out = {"psnr": p, "dice": float("nan"), "cover": float(m.mean())}
     if m.all():
         try:
-            out["dice"] = float(vessel_metrics(pred, ref).get("dice", np.nan))
+            seg = segment_pair(pred, ref, method="vesselness",
+                               threshold_mode="global")
+            out["dice"] = float(mask_vessel_metrics(seg["pred_mask"],
+                                                    seg["ref_mask"])["dice"])
         except Exception:                        # tiny crops can break the mask
             pass
     return out
@@ -643,8 +651,10 @@ def main(argv: list[str] | None = None) -> int:
     if not arms:
         raise SystemExit("give at least one --arm or --experiments")
 
-    device = torch.device(args.device or
-                          ("cuda" if torch.cuda.is_available() else "cpu"))
+    # A bare index ("2") means "cuda:2", as in evaluate / benchmark; a device
+    # string ("cuda:2", "cpu") is taken as given.
+    dev = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{dev}" if str(dev).isdigit() else dev)
     vols = []
     for label, arm_name, ckpt in arms:
         v = predict_volume(cfg, sample, arm_name, ckpt, device)

@@ -6,7 +6,8 @@ import torch
 
 from spur_mpm.metrics.image_metrics import mae, psnr, split_errors, ssim
 from spur_mpm.metrics.statistics import bootstrap_ci, group_mean, paired_delta
-from spur_mpm.metrics.vessel import cl_dice, dice, vessel_metrics
+from spur_mpm.metrics.vessel import (cl_dice, dice, mask_vessel_metrics,
+                                    segment_pair, vessel_metrics)
 from spur_mpm.models.registry import ARMS, build_model, get_arm
 from spur_mpm.models.uncertainty import (
     geometric_uncertainty,
@@ -106,6 +107,34 @@ def test_vessel_metrics_identical_is_perfect():
     assert m["cl_dice"] == pytest.approx(1.0)
     assert dice(np.ones((4, 4)), np.ones((4, 4))) == 1.0
     assert cl_dice(np.zeros((4, 4), bool), np.ones((4, 4), bool)) == 0.0
+
+
+def test_segment_pair_never_lets_the_prediction_move_the_threshold():
+    """The operating point comes from the reference; a blank prediction must not
+    be able to redefine "vessel" so that it agrees with itself."""
+    from scipy.ndimage import uniform_filter
+    rng = np.random.default_rng(1)
+    # Correlated background rather than pixel white noise: the Sato response is
+    # a second-derivative filter, so uncorrelated noise produces a ridge-like
+    # response everywhere and would make the fraction assertion meaningless.
+    ref = uniform_filter(rng.normal(0.4, 0.05, (6, 48, 48)), size=(1, 3, 3)
+                         ).astype(np.float32)
+    ref[:, 20:23, :] = 1.0
+    good = ref + rng.normal(0, 0.01, ref.shape).astype(np.float32)
+    blank = np.zeros_like(ref)
+
+    a = segment_pair(good, ref, method="vesselness", threshold_mode="per_plane")
+    b = segment_pair(blank, ref, method="vesselness", threshold_mode="per_plane")
+    assert a["threshold"] == pytest.approx(b["threshold"])
+    assert b["pred_mask"].sum() == 0                  # all-zero response, empty mask
+    assert a["ref_mask"].sum() == b["ref_mask"].sum()  # reference mask is untouched
+    # And the response is what gets thresholded, so a bright hollow background
+    # does not become vessel: the tube is a few percent of the volume.
+    assert 0.0 < float(a["ref_mask"].mean()) < 0.15
+    m = mask_vessel_metrics(a["pred_mask"], a["ref_mask"])
+    assert m["dice"] > 0.5
+    with pytest.raises(ValueError):
+        segment_pair(good, ref, method="otsu")
 
 
 def test_group_statistics():

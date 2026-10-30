@@ -80,7 +80,7 @@
 | `spur_mpm/common/*` | 配置加载、随机种子、日志、provenance（每个 run 记录 git 状态） |
 | `spur_mpm/configs/base.yaml` | 全局预算（步数、batch、patch、主干宽度），**任何表里的成本数字都从这里取** |
 | `spur_mpm/configs/experiments/*.yaml` | 每个实验一个文件；换臂/换稀疏等级 = 换 YAML |
-| `spur_mpm/scripts/run_ladder.py` | 在固定队列上跑"臂 × 稀疏等级"整个阶梯，阶段 = 问题（ablation / sweep / matched），逐 cell 写进度 | 消融与稀疏曲线的主入口 |
+| `spur_mpm/scripts/run_ladder.py` | 在固定队列上跑"臂 × 稀疏等级"整个阶梯，阶段 = 问题（ablation / sweep / matched），逐 cell 写进度；`--eval-only` 只重打分不重训（换了指标/分割规则后用，检查点与这些无关） | 消融与稀疏曲线的主入口 |
 
 ---
 
@@ -89,14 +89,14 @@
 | 文件 | 指标 | 什么时候用它 |
 |---|---|---|
 | `spur_mpm/metrics/image_metrics.py` | MAE / PSNR / SSIM，`split_errors` 把**测到的行**与**缺失的行**分开 | 报告强度吻合度。**不能单独用来声称结构恢复** |
-| `spur_mpm/metrics/vessel.py` | Otsu + 滞回得到血管掩膜；`dice`、`cl_dice`、连通域数 | 结构重合。阈值只在**参考**上拟合，不在预测上 |
+| `spur_mpm/metrics/vessel.py` | `vesselness`（Sato 管状响应）、`segment_pair`（预测/参考**同一套**分割，阈值只在参考上拟合）、`mask_vessel_metrics`、`dice`、`cl_dice`、连通域数 | 结构重合。默认分割是管状响应而不是原始灰度 Otsu：实测原始 Otsu 会把单帧 37–55% 判成血管，骨架化后 95% 体素是节点（那是"面"不是"线"）；响应阈值下前景≈3–4%，与血管体积分数同量级 |
 | `spur_mpm/metrics/skeleton.py` | 骨架化后的链长、分支、节点、端点、半径、按深度分层；`skeleton_overlap` 是容差内的骨架吻合；`export_imagej_mask` 导出 ImageJ 可开的 TIFF | **对应"ImageJ 提骨架后对比"**；回答"网络是否被打断/粘连" |
 | `spur_mpm/metrics/complexity.py` | 参数量、MACs、实测延迟、整卷外推 | 和精度并列报告；延迟必带 device |
 | `spur_mpm/metrics/statistics.py` | bootstrap CI、配对差、分组汇总 | 跨动物方差约 2.8 dB / 0.08 Dice，<1 dB / 0.03 Dice 的差异不构成结论 |
 | `spur_mpm/evaluate.py` | 逐样本评估，写 `samples.csv` + `summary.json` | 所有表格的数据源 |
 | `spur_mpm/scripts/collect_results.py` | 汇总多个 run 成一张表 | 出论文表格 |
 | `spur_mpm/scripts/ladder_report.py` | 从各 run 的 `summary.json` 生成阶梯表 + 创新点归因，并把无学习下限摆在训练臂下面 | 出表；小于 1 dB / 0.03 Dice 的差异自动标为"不可主张" |
-| `spur_mpm/scripts/structure_report.py` | **整卷** `analyse_volume`（含按深度分层）+ 导出 ImageJ 可读 TIFF | 骨架层面的结构结论、人工核验 |
+| `spur_mpm/scripts/structure_report.py` | **整卷** `analyse_volume`（含按深度分层）+ 导出 ImageJ 可读 TIFF；`--segment` 选分割方式、`--max-planes` 调试裁切 | 骨架层面的结构结论、人工核验。`analyse_volume(return_masks=True)` 让导出的 TIFF 就是算数字用的那两张掩膜 |
 | `spur_mpm/scripts/verify_dataset_masks.py` | 训练代码路径重建的掩膜 vs 已核验 manifest 掩膜，逐点比对 | 证明"训练用的就是核验过的那份稀疏数据" |
 
 为什么不用 PSNR 下按深度分层的结论：PSNR 受噪声主导，深层的信号弱、噪声占比高，

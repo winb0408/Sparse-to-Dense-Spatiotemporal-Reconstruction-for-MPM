@@ -71,4 +71,11 @@ python -m spur_mpm.scripts.make_split \
   深层信号弱，PSNR 系统性偏低与结构无关。
 - 结构结论看 `metrics/skeleton.py` 的链长 / 分支 / 节点 / 端点，
   对照 `export_imagej_mask` 导出的 TIFF 在 ImageJ 里手核。
+- **分割规则固定为管状响应（Sato vesselness）+ 参考侧阈值**，见
+  `metrics/vessel.py:segment_pair`。不用原始灰度 Otsu：实测它把单帧
+  37–55% 判成血管，骨架化后 95% 体素是节点（那是"面"不是"线"），
+  每根血管的拓扑统计全部失真。两条查表的区别要记住：
+  逐**帧**评估（`evaluate`）用 2-D 响应（前景约 19%），
+  逐**卷**评估（`structure_report`）用 3-D 响应（前景约 2–4%）——
+  两种表各自内部可比，不要跨表比较绝对 Dice。
 - `E_measured` / `E_missing` / `E_hold` 没有标定地板，只作相对比较。

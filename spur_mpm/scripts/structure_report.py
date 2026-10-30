@@ -40,7 +40,6 @@ from spur_mpm.data.datasets import VolumeCache
 from spur_mpm.data.split import read_split
 from spur_mpm.inference import reconstruct_volume
 from spur_mpm.metrics.skeleton import analyse_volume, export_imagej_mask
-from spur_mpm.metrics.vessel import vessel_mask
 
 __all__ = ["structure_for_sample", "main"]
 
@@ -50,7 +49,9 @@ DEFAULTS = Path(__file__).resolve().parent.parent / "configs" / "base.yaml"
 def structure_for_sample(cfg: dict, arm: str, ckpt: Path | None, sample_id: str,
                          out_dir: Path, *, n_slabs: int = 6,
                          device: str | None = None,
-                         keep_recon: bool = False) -> dict:
+                         keep_recon: bool = False,
+                         segment: str = "vesselness",
+                         max_planes: int | None = None) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     recon = out_dir / f"{arm}_{sample_id}_recon.npy"
     meta = reconstruct_volume(cfg, arm, ckpt, sample_id, recon, device=device)
@@ -64,14 +65,19 @@ def structure_for_sample(cfg: dict, arm: str, ckpt: Path | None, sample_id: str,
         raise RuntimeError(f"{sample_id}: reconstruction {pred.shape} does not "
                            f"match the reference {ref.shape}")
     geom = cache.geometry(sample_id)
+    if max_planes:
+        # Vesselness costs ~2 s per plane at 5 sigma-scale, so a full 203-plane
+        # volume is minutes per image. ``--max-planes`` keeps the report cheap
+        # while a setup is being debugged; the headline table uses full volumes.
+        pred, ref = pred[:max_planes], ref[:max_planes]
 
     result = analyse_volume(pred, ref, voxel_um=(geom.z_step_um, geom.voxel_xy_um,
                                                  geom.voxel_xy_um),
-                            n_slabs=n_slabs)
-    # Export the very masks the numbers came from -- not a re-thresholded pair.
-    threshold = result["threshold"]
-    for name, img in (("pred", pred), ("ref", ref)):
-        mask = vessel_mask(img, threshold=threshold)
+                            n_slabs=n_slabs, segment=segment,
+                            return_masks=True)
+    # Export the very masks the numbers came from, not a re-thresholded pair.
+    for name in ("pred", "ref"):
+        mask = result.pop(f"{name}_mask")
         path = out_dir / f"{arm}_{sample_id}_{name}_mask.tif"
         export_imagej_mask(mask, path)
         result[f"{name}_mask_path"] = str(path)
@@ -113,6 +119,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--keep-recon", action="store_true",
                    help="keep the ~450 MB per-volume .npy dumps (default: delete "
                         "them, the TIFF masks and JSON already carry the result)")
+    p.add_argument("--segment", choices=("vesselness", "intensity"),
+                   default="vesselness",
+                   help="what gets thresholded (default: Sato vesselness, which "
+                        "marks ~4%% of a real volume vs ~37%% for raw intensity)")
+    p.add_argument("--max-planes", type=int, default=None,
+                   help="analyse only the first N planes (debug runs)")
     p.add_argument("--set", dest="overrides", action="append", default=[])
     args = p.parse_args(argv)
 
@@ -132,7 +144,9 @@ def main(argv: list[str] | None = None) -> int:
     for sid in samples:
         r = structure_for_sample(cfg, args.arm, args.ckpt, sid, args.out,
                                  n_slabs=args.n_slabs, device=args.device,
-                                 keep_recon=args.keep_recon)
+                                 keep_recon=args.keep_recon,
+                                 segment=args.segment,
+                                 max_planes=args.max_planes)
         results.append(r)
         print(f"{sid}: dice={r['dice']:.4f} clDice={r['cl_dice']:.4f} "
               f"skelF1={r['f1']:.4f} "
@@ -167,8 +181,11 @@ def main(argv: list[str] | None = None) -> int:
                                 "ref_n_components": m["ref_n_components"],
                                 "pred_n_components": m["pred_n_components"]}))
     md.append("")
-    md.append(f"Binarisation: Otsu on the reference only, hysteresis 0.6 "
-              f"(threshold {results[0]['threshold']:.6g}). "
+    md.append(f"Binarisation: {results[0].get('segment_method', 'vesselness')} "
+              f"response, threshold {results[0]['threshold']:.6g} fitted on the "
+              f"reference only ({results[0].get('threshold_mode', 'per_plane')}), "
+              f"foreground ref {results[0]['ref_fraction']:.1%} / "
+              f"pred {results[0]['pred_fraction']:.1%}. "
               f"Skeleton overlap tolerance 1 voxel.")
     text = "\n".join(md)
     (args.out / "structure_summary.md").write_text(text + "\n")

@@ -211,9 +211,15 @@ def default_arms() -> list[str]:
 
 
 def _resolve_device(requested: str | None) -> str:
-    """Honour ``--device``; otherwise take a free GPU, else fall back to cpu."""
+    """Honour ``--device``; otherwise take a free GPU, else fall back to cpu.
+
+    A bare index (``--device 2``) is accepted like everywhere else in the repo
+    and means ``cuda:2``. It used to be passed through verbatim, and torch then
+    rejected it with "Invalid device string: '2'" *per arm*, which the table
+    reported as "could not build/benchmark" for every network.
+    """
     if requested:
-        return requested
+        return f"cuda:{requested}" if str(requested).isdigit() else str(requested)
     if not torch.cuda.is_available():
         print("[benchmark] no CUDA device visible: benchmarking on cpu "
               "(latency will NOT be the deployment inference time)")
