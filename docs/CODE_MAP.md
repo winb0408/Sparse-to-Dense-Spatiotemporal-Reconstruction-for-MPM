@@ -95,7 +95,7 @@
 | `spur_mpm/metrics/statistics.py` | bootstrap CI、配对差、分组汇总 | 跨动物方差约 2.8 dB / 0.08 Dice，<1 dB / 0.03 Dice 的差异不构成结论 |
 | `spur_mpm/evaluate.py` | 逐样本评估，写 `samples.csv` + `summary.json` | 所有表格的数据源 |
 | `spur_mpm/scripts/collect_results.py` | 汇总多个 run 成一张表 | 出论文表格 |
-| `spur_mpm/scripts/ladder_report.py` | 从各 run 的 `summary.json` 生成阶梯表 + 创新点归因，并把无学习下限摆在训练臂下面 | 出表；小于 1 dB / 0.03 Dice 的差异自动标为"不可主张" |
+| `spur_mpm/scripts/ladder_report.py` | 从各 run 的 `summary.json` 生成阶梯表 + 创新点归因 + **预算曲线**（单个臂按测量比例从密到疏，看从哪里饱和）+ **同预算换轴对比**（`y_k4/z_k4/yz_k2x2` 都是 25%，看稀疏轴本身是否构成差异），并把无学习下限摆在训练臂下面 | 出表；小于 1 dB / 0.03 Dice 的差异自动标为"不可主张"；缺测的指标打印为 `–` 而不是 `nan` |
 | `spur_mpm/scripts/structure_report.py` | **整卷** `analyse_volume`（含按深度分层）+ 导出 ImageJ 可读 TIFF；`--segment` 选分割方式、`--max-planes` 调试裁切 | 骨架层面的结构结论、人工核验。`analyse_volume(return_masks=True)` 让导出的 TIFF 就是算数字用的那两张掩膜 |
 | `spur_mpm/scripts/verify_dataset_masks.py` | 训练代码路径重建的掩膜 vs 已核验 manifest 掩膜，逐点比对 | 证明"训练用的就是核验过的那份稀疏数据" |
 
@@ -166,5 +166,6 @@ python -m spur_mpm.scripts.qualitative_figures --arm S1=runs/E021_ladder/E021_S1
 | `test_skeleton.py` | 骨架指标的退化用例 |
 | `test_complexity.py` | MACs/参数量在已知结构上的正确性 |
 | `test_models_metrics.py` | 各臂前向形状、Dice/clDice 边界 |
+| `test_ladder_report.py` | 出表的**口径**：差异小于 1 dB / 0.03 Dice 必须打印"不可主张"、同预算换轴不足 0.03 Dice 不得写成"轴有影响"、缺测指标打印为 `–` 而不是 `nan` |
 
 冻结的自监督测试移到了 `archive/selfsup_v1/tests/`，不在主测试集里跑。

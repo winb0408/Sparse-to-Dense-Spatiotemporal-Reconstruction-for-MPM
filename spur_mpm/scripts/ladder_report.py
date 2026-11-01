@@ -29,11 +29,16 @@ import csv
 import json
 from pathlib import Path
 
-__all__ = ["collect", "render", "main"]
+__all__ = ["collect", "render", "innovations", "budget_curve", "axis_comparison",
+           "main"]
 
 #: The resolution below which a difference is not claimed (see Project_log).
 PSNR_FLOOR_DB = 1.0
 DICE_FLOOR = 0.03
+
+#: The three levels that spend the same 25 % of the voxels on a different axis,
+#: so "does the axis of the sparsity matter" is asked at a constant budget.
+MATCHED_LEVELS = ("y_k4", "z_k4", "yz_k2x2")
 
 ARMS = ("A0", "A1", "S0", "S1", "S2", "S1g", "S2g")
 #: metric key -> column label; ``None`` means "not in summary.json" when the
@@ -111,12 +116,90 @@ def innovations(cells: dict[tuple[str, str], dict], level: str) -> str:
     return "\n".join(out)
 
 
+def _num(value, spec: str = ".4f") -> str:
+    """Format a metric, or ``–`` when the run did not produce it."""
+    return format(value, spec) if isinstance(value, (int, float)) and value == value else "–"
+
+
+def _fraction(level: str) -> float:
+    """Measured-voxel fraction the protocol promises, straight from the spec."""
+    from spur_mpm.data.sparse import LEVELS_3D
+    spec = LEVELS_3D.get(level)
+    return spec.ideal_fraction() if spec is not None else float("nan")
+
+
+def budget_curve(cells: dict[tuple[str, str], dict], arm: str = "S1") -> str:
+    """One arm across the ladder, ordered by the budget each level spends.
+
+    A row per level, densest first, with the deltas against the densest level
+    that ran. This is the table that says where the method saturates: a metric
+    that stops moving between two rows is a budget the method no longer uses.
+    """
+    levels = [lvl for a, lvl in cells if a == arm]
+    if not levels:
+        return ""
+    levels.sort(key=lambda s: (-_fraction(s), s))
+    ref = levels[0]
+    base = cells[(arm, ref)]
+    out = [f"\n### Budget curve for ``{arm}``\n",
+           "| level | measured % | PSNR | Dice | clDice | skelF1 | ΔDice vs "
+           f"{ref} | claim |",
+           "|---|---|---|---|---|---|---|---|"]
+    for lvl in levels:
+        m = cells[(arm, lvl)]
+        d_dice = m.get("dice", float("nan")) - base.get("dice", float("nan"))
+        verdict = "—" if lvl == ref else (
+            "yes" if abs(d_dice) >= DICE_FLOOR else "no (< .03 Dice)")
+        out.append(f"| {lvl} | {_fraction(lvl) * 100:.1f} | "
+                   f"{_num(m.get('psnr'), '.2f')} | "
+                   f"{_num(m.get('dice'))} | {_num(m.get('cl_dice'))} | "
+                   f"{_num(m.get('f1'))} | {d_dice:+.4f} | {verdict} |")
+    return "\n".join(out)
+
+
+def axis_comparison(cells: dict[tuple[str, str], dict],
+                    levels: tuple[str, ...] = MATCHED_LEVELS) -> str:
+    """At one budget, is the axis the sparsity sits on worth a claim?
+
+    ``y_k4`` / ``z_k4`` / ``yz_k2x2`` all measure 25 % of the voxels. If the
+    spread across those three is under the floor for every arm, then the axis
+    does not matter at this budget and no "Z-skipping is better" sentence may be
+    written -- which is the sentence this table exists to police.
+    """
+    arms = [a for a in ARMS if sum((a, lvl) in cells for lvl in levels) >= 2]
+    if not arms:
+        return ""
+    out = ["\n### Axis of the sparsity at a matched 25 % budget\n",
+           "| arm | " + " | ".join(f"{k} {lvl}" for lvl in levels
+                                   for k in ("Dice",)) + " | ΔDice | ΔclDice | claim |",
+           "|---" * (len(levels) + 3) + "|"]
+    for arm in arms:
+        dice = [cells.get((arm, lvl), {}).get("dice", float("nan")) for lvl in levels]
+        cl = [cells.get((arm, lvl), {}).get("cl_dice", float("nan")) for lvl in levels]
+        span_dice = _span(dice)
+        span_cl = _span(cl)
+        claimed = span_dice >= DICE_FLOOR or span_cl >= DICE_FLOOR
+        verdict = ("axis matters" if claimed else
+                   "no claim (spread < .03)")
+        out.append(f"| {arm} | " + " | ".join(f"{d:.4f}" for d in dice) +
+                   f" | {span_dice:.4f} | {span_cl:.4f} | {verdict} |")
+    return "\n".join(out)
+
+
+def _span(values: list[float]) -> float:
+    """Max minus min over the values that exist; ``nan`` when fewer than two."""
+    real = [v for v in values if v == v]
+    return max(real) - min(real) if len(real) >= 2 else float("nan")
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--root", type=Path, default=Path("runs/E021_ladder"))
     p.add_argument("--levels", nargs="+", default=None)
     p.add_argument("--ablation-level", default="y_k2")
+    p.add_argument("--curve-arm", default="S1",
+                   help="arm whose budget curve is printed ('' to skip)")
     p.add_argument("--out", type=Path, default=None, help="write markdown here")
     p.add_argument("--csv", type=Path, default=None)
     args = p.parse_args(argv)
@@ -124,12 +207,16 @@ def main(argv: list[str] | None = None) -> int:
     cells = collect(args.root)
     if not cells:
         raise SystemExit(f"no finished cells under {args.root}")
-    text = render(cells, args.levels)
+    blocks = [render(cells, args.levels)]
     if args.ablation_level:
-        text += innovations(cells, args.ablation_level)
-    text += (f"\n\nFloors: a difference is only claimed above {PSNR_FLOOR_DB:g} dB "
-             f"or {DICE_FLOOR:g} Dice. Source: {len(cells)} cells under "
-             f"`{args.root}`.")
+        blocks.append(innovations(cells, args.ablation_level))
+    if args.curve_arm:
+        blocks.append(budget_curve(cells, args.curve_arm))
+    blocks.append(axis_comparison(cells))
+    blocks.append(f"Floors: a difference is only claimed above {PSNR_FLOOR_DB:g} dB "
+                  f"or {DICE_FLOOR:g} Dice. Source: {len(cells)} cells under "
+                  f"`{args.root}`.")
+    text = "\n\n".join(b.strip("\n") for b in blocks if b)
     print(text)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
