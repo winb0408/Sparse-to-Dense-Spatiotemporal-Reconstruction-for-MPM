@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 import torch
 
-from spur_mpm.metrics.image_metrics import mae, psnr, split_errors, ssim
+from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
+                                           split_psnr, ssim)
 from spur_mpm.metrics.statistics import bootstrap_ci, group_mean, paired_delta
 from spur_mpm.metrics.vessel import (cl_dice, dice, mask_vessel_metrics,
                                     segment_pair, vessel_metrics)
@@ -238,3 +239,33 @@ def _tube(h: int, w: int, width: int = 3) -> np.ndarray:
     img = np.zeros((h, w), dtype=np.float32)
     img[:, w // 2 - width // 2:w // 2 + width // 2 + 1] = 1.0
     return img
+
+
+def test_split_errors_is_undefined_not_zero_on_an_empty_population():
+    """Plane-skipping makes every window fully measured or fully missing.
+
+    With the old ``clamp(min=1)`` the empty side scored 0.0, so half the windows
+    fed a zero error into the other half's mean; on a real z_k4 cell that halved
+    E_missing from 0.075 to 0.035 -- the protocol with the most to infer looked
+    like the one with the least error.
+    """
+    pred = torch.zeros(4, 4, 4)
+    target = torch.ones(4, 4, 4)
+    full = torch.ones(4, 4, 4, dtype=torch.bool)
+    e_meas, e_miss = split_errors(pred, target, full)
+    assert e_meas == 1.0
+    assert np.isnan(e_miss)
+
+    empty = torch.zeros(4, 4, 4, dtype=torch.bool)
+    e_meas, e_miss = split_errors(pred, target, empty)
+    assert np.isnan(e_meas)
+    assert e_miss == 1.0
+
+
+def test_split_psnr_is_undefined_on_an_empty_population():
+    pred = torch.zeros(4, 4, 4)
+    target = torch.ones(4, 4, 4)
+    full = torch.ones(4, 4, 4, dtype=torch.bool)
+    ps_m, ps_x = split_psnr(pred, target, full)
+    assert np.isfinite(ps_m)
+    assert np.isnan(ps_x)

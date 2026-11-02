@@ -212,17 +212,31 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                     "psnr": float(psnr(p, t)),
                     "ssim": float(ssim(p[None, None], t[None, None])),
                     "mae": float(mae(p, t)),
+                    # A window with no missing voxel is a window the arm was
+                    # handed in full: its error is ~0, so on a plane-skipping
+                    # protocol a quarter of the test windows are copies scoring
+                    # 120 dB and the headline PSNR is an average of copies and
+                    # reconstructions. Counted, reported, and marked in the
+                    # table -- the number to read there is PSNRmiss.
+                    "fully_measured": bool(bool(m_acq.all())),
                 }
                 e_meas, e_miss = split_errors(p, t, m_acq)
-                row["e_measured"] = e_meas
-                row["e_missing"] = e_miss
+                # A window with nothing on one side of the split leaves that key
+                # absent rather than NaN, so the summary averages the windows
+                # that actually have that population and reports how many did.
+                if np.isfinite(e_meas):
+                    row["e_measured"] = e_meas
+                if np.isfinite(e_miss):
+                    row["e_missing"] = e_miss
                 # Same split, in dB. The headline PSNR averages a population the
                 # arm was given with one it had to infer; a zero-parameter arm
                 # that copies its input then looks competitive. These two make
                 # that mixture visible without changing the protocol.
                 ps_m, ps_x = split_psnr(p, t, m_acq)
-                row["psnr_measured"] = ps_m
-                row["psnr_missing"] = ps_x
+                if np.isfinite(ps_m):
+                    row["psnr_measured"] = ps_m
+                if np.isfinite(ps_x):
+                    row["psnr_missing"] = ps_x
                 if bool(m_hold.any()):
                     row["e_hold"] = float(((p - t).abs() * m_hold).sum()
                                           / m_hold.sum())
@@ -266,6 +280,8 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         "input_support": input_support,
         "consistency_projection": projection,
         "n_windows": len(rows),
+        "n_windows_fully_measured": int(sum(bool(r.get("fully_measured"))
+                                            for r in rows)),
         "metrics": {},
     }
     for metric in ("psnr", "psnr_measured", "psnr_missing", "ssim", "mae",

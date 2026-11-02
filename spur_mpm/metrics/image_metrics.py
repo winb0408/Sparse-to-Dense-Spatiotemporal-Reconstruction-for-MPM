@@ -49,9 +49,17 @@ def split_errors(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor):
     Tensors are [T, H, W] (or [B, T, H, W] with mask aligned).
     """
     m = mask.bool()
-    e_meas = ((pred - target).abs() * m).sum() / m.sum().clamp(min=1)
-    e_miss = ((pred - target).abs() * ~m).sum() / (~m).sum().clamp(min=1)
-    return float(e_meas), float(e_miss)
+    out = []
+    for sel in (m, ~m):
+        # An empty population is *undefined*, not zero. It used to be divided by
+        # ``clamp(min=1)``, which returned 0.0 -- and under plane skipping every
+        # window is either fully measured or fully missing, so half the windows
+        # contributed a zero error to the other half's mean. On a real z_k4 cell
+        # that turned E_missing 0.075 into 0.035, i.e. it halved the reported
+        # error of the hardest protocol in the ladder.
+        out.append(float(((pred - target).abs() * sel).sum() / sel.sum())
+                   if bool(sel.any()) else float("nan"))
+    return out[0], out[1]
 
 
 def split_psnr(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor):

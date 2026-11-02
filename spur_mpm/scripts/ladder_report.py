@@ -66,13 +66,17 @@ def collect(root: Path) -> dict[tuple[str, str], dict]:
         means = {k: v.get("mean_of_group_means", v.get("mean"))
                  for k, v in blob["metrics"].items() if isinstance(v, dict)}
         means["_n"] = blob.get("n_windows")
+        means["_n_exact"] = blob.get("n_windows_fully_measured")
         means["_path"] = str(summary)
         cells[(arm, level)] = means
     return cells
 
 
-def _fmt(value, width: int = 8) -> str:
-    return f"{value:{width}.4f}" if isinstance(value, (int, float)) else " " * (width - 2) + "– "
+def _fmt(value, width: int = 8, mark: bool = False) -> str:
+    """One metric cell; ``mark`` appends a dagger to a PSNR that is diluted."""
+    if not isinstance(value, (int, float)) or value != value:
+        return " " * (width - 2) + "– "
+    return f"{value:{width}.4f}" + ("†" if mark else "")
 
 
 def render(cells: dict[tuple[str, str], dict], levels: list[str] | None = None) -> str:
@@ -87,10 +91,15 @@ def render(cells: dict[tuple[str, str], dict], levels: list[str] | None = None) 
         out.append("| level | " + " | ".join(arms) + " |")
         out.append("|---" * (len(arms) + 1) + "|")
         for lvl in levels:
-            row = [lvl] + [_fmt(cells.get((a, lvl), {}).get(metric)) for a in arms]
+            row = [lvl] + [_fmt(cells.get((a, lvl), {}).get(metric),
+                                mark=metric == "psnr" and
+                                bool(cells.get((a, lvl), {}).get("_n_exact")))
+                            for a in arms]
             out.append("| " + " | ".join(row) + " |")
         if metric == "psnr":
-            out.append("\n(dB; ``–`` = not run)\n")
+            out.append("\n(dB; ``–`` = not run; † = some test windows were fully "
+                       "measured, so this average mixes copies that score 120 dB "
+                       "with reconstructions -- read PSNRmiss for those cells)\n")
     return "\n".join(out)
 
 
