@@ -306,15 +306,29 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
 
 
 def _write_csv(rows: list[dict], path: Path) -> None:
+    """Write the per-window rows, taking the columns from the whole set.
+
+    The column set cannot come from the first row: a metric that is undefined
+    for one window is *absent*, not NaN (see the split-error note above), and
+    under plane skipping the first window is usually a fully measured one with
+    no ``psnr_missing``. Taking fieldnames from row 0 then dropped the column,
+    and DictWriter rejected the later rows that did have it -- which is how the
+    z-family re-score failed halfway through.
+    """
     import csv
     if not rows:
         path.write_text("")
         return
+    fields: list[str] = []
+    for r in rows:
+        for key in r:
+            if key not in fields:
+                fields.append(key)
     with open(path, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+        w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
         for r in rows:
-            w.writerow(r)
+            w.writerow({k: r.get(k, "") for k in fields})
 
 
 def main(argv: list[str] | None = None) -> int:

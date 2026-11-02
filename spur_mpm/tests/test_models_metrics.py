@@ -269,3 +269,23 @@ def test_split_psnr_is_undefined_on_an_empty_population():
     ps_m, ps_x = split_psnr(pred, target, full)
     assert np.isfinite(ps_m)
     assert np.isnan(ps_x)
+
+
+def test_samples_csv_keeps_a_column_that_is_absent_from_the_first_row(tmp_path):
+    """The z-family re-score died here: row 0 had no ``psnr_missing``.
+
+    A metric that is undefined for one window is absent rather than NaN, so the
+    column set has to be the union over rows. Taking it from row 0 silently
+    dropped the column and DictWriter then refused every later row that had it.
+    """
+    import csv
+    from spur_mpm.evaluate import _write_csv
+
+    rows = [{"key": "a", "psnr": 30.0}, {"key": "b", "psnr": 29.0,
+                                         "psnr_missing": 27.5}]
+    path = tmp_path / "samples.csv"
+    _write_csv(rows, path)
+    back = list(csv.DictReader(path.open()))
+    assert list(back[0]) == ["key", "psnr", "psnr_missing"]
+    assert back[0]["psnr_missing"] == ""          # absent, not a fabricated 0
+    assert float(back[1]["psnr_missing"]) == 27.5
