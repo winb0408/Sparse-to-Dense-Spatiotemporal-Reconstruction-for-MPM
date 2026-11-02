@@ -115,7 +115,8 @@ def segment_pair(pred: np.ndarray, ref: np.ndarray, *,
                  threshold: float | None = None,
                  threshold_mode: str = "per_plane",
                  low_ratio: float = 1.0,
-                 max_fraction: float | None = 0.15) -> dict:
+                 max_fraction: float | None = 0.15,
+                 match_area: bool = False) -> dict:
     """Segment a prediction and its reference with **one** rule, fitted on the ref.
 
     This is the single place where the "threshold from the reference only" rule
@@ -130,7 +131,10 @@ def segment_pair(pred: np.ndarray, ref: np.ndarray, *,
     Returns ``{"pred_mask", "ref_mask", "threshold", "threshold_mode",
     "segment_method", "threshold_p10_p90"}``; ``threshold`` is the median of the
     per-plane thresholds, ``threshold_p10_p90`` is their spread and is ``None``
-    for a single plane or a global threshold.
+    for a single plane or a global threshold. With ``match_area=True`` the result
+    also carries ``pred_mask_area``: the same prediction segmented at a second,
+    equal-area operating point (see :func:`match_foreground`), for reporting
+    beside the reference-fitted mask and never instead of it.
 
     ``max_fraction`` gates planes whose **reference** mask would cover more than
     that fraction: both masks for such a plane are emptied and the plane is
@@ -182,10 +186,71 @@ def segment_pair(pred: np.ndarray, ref: np.ndarray, *,
     n_gated = 0
     if max_fraction is not None:
         pm, rm, n_gated = _gate_flooded_planes(pm, rm, float(max_fraction))
-    return {"pred_mask": pm, "ref_mask": rm, "threshold": thr,
-            "threshold_mode": threshold_mode, "segment_method": method,
-            "threshold_p10_p90": spread, "n_planes_gated": n_gated,
-            "max_plane_fraction": max_fraction}
+    out = {"pred_mask": pm, "ref_mask": rm, "threshold": thr,
+           "threshold_mode": threshold_mode, "segment_method": method,
+           "threshold_p10_p90": spread, "n_planes_gated": n_gated,
+           "max_plane_fraction": max_fraction}
+    if match_area:
+        out["pred_mask_area"] = match_foreground(pv, rm)
+    return out
+
+
+def match_foreground(response: np.ndarray, ref_mask: np.ndarray) -> np.ndarray:
+    """Threshold ``response`` so it fills as many voxels as ``ref_mask``.
+
+    A second operating point, not a better one. The reference-fitted threshold
+    answers "would this prediction be segmented the way the truth is, by the same
+    rule?" -- and it punishes a prediction whose vessel *response* has drifted in
+    scale even when its vessels are in the right places: on a real 25 %-budget
+    cell the reference mask covered 18.65 % of the frame, bilinear interpolation
+    covered 18.69 %, and the trained arm covered 7.2 %, so Dice fell by 0.05 while
+    MAE improved. That gap is a calibration difference showing up inside a
+    structure metric.
+
+    Taking the top ``|ref_mask|`` voxels of the response per plane removes the
+    calibration and leaves shape: same area, and the question becomes "does the
+    prediction put its area where the reference put its own?". It is **not** a
+    replacement for the reference-fitted number and must not be reported alone:
+    equal-area scoring can only flatter a prediction that fills the frame with a
+    blob, since the area is granted by construction. Report the pair; a large
+    distance between them is a calibration finding, not a structural one.
+
+    The area is **capped by the response's positive support**: a prediction whose
+    Sato response is exactly zero over most of the plane (a very smooth output, or
+    a band where the response never rises) cannot be given the reference's area
+    without marking voxels the rule says are not tubular. Taking the cut value
+    from the whole plane would do exactly that -- measured on a dimmed tube the
+    cut fell at 0.0 and the mask became the entire frame -- so the quantile is
+    taken over ``response > 0`` and the mask never exceeds that support. The
+    consequence is honest and visible in the reported ``pred_fraction``: an
+    equal-area mask that falls short of the reference's area says the prediction
+    does not have that much tubular structure anywhere.
+    Ties at the cut value can still push the mask slightly above ``k``; that is
+    left uncorrected so the function stays a pure threshold and does not break
+    connectivity by truncation.
+    """
+    r = np.asarray(ref_mask, dtype=bool)
+    v = np.asarray(response, dtype=np.float32)
+    if v.shape != r.shape:
+        raise ValueError(f"response {v.shape} and ref_mask {r.shape} differ")
+    out = np.zeros(r.shape, dtype=bool)
+    planes = [v] if v.ndim == 2 else [v[z] for z in range(v.shape[0])]
+    refs = [r] if r.ndim == 2 else [r[z] for z in range(r.shape[0])]
+    for i, (plane, ref_plane) in enumerate(zip(planes, refs)):
+        k = int(ref_plane.sum())
+        if k == 0:
+            continue
+        pos = plane.ravel()[plane.ravel() > 0]
+        if pos.size == 0:
+            continue
+        k = min(k, pos.size)
+        cut = np.partition(pos, pos.size - k)[pos.size - k]
+        mask = plane >= cut
+        if v.ndim == 2:
+            out = mask
+        else:
+            out[i] = mask
+    return out
 
 
 def _gate_flooded_planes(pred_mask: np.ndarray, ref_mask: np.ndarray,

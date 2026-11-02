@@ -45,7 +45,10 @@ ARMS = ("A0", "A1", "S0", "S1", "S2", "S1g", "S2g")
 #: evaluation ran without --skeleton.
 COLUMNS = (("psnr", "PSNR↑"), ("psnr_measured", "PSNRmeas↑"),
            ("psnr_missing", "PSNRmiss↑"), ("dice", "Dice↑"),
-           ("cl_dice", "clDice↑"), ("f1", "skelF1↑"))
+           ("cl_dice", "clDice↑"), ("f1", "skelF1↑"),
+           # same prediction, equal-area operating point: Dice without the
+           # calibration term. Read the pair, never this row alone.
+           ("dice_area", "Dice★↑"), ("cl_dice_area", "clDice★↑"))
 
 
 def collect(root: Path) -> dict[tuple[str, str], dict]:
@@ -122,9 +125,14 @@ def _num(value, spec: str = ".4f") -> str:
 
 
 def _fraction(level: str) -> float:
-    """Measured-voxel fraction the protocol promises, straight from the spec."""
+    """Measured-voxel fraction the protocol promises, straight from the spec.
+
+    A forced-context cell is named ``<level>_c<N>``; its budget is the level's
+    budget, so the suffix is stripped before the lookup.
+    """
     from spur_mpm.data.sparse import LEVELS_3D
-    spec = LEVELS_3D.get(level)
+    base = level.rsplit("_c", 1)[0]
+    spec = LEVELS_3D.get(base)
     return spec.ideal_fraction() if spec is not None else float("nan")
 
 
@@ -215,7 +223,10 @@ def main(argv: list[str] | None = None) -> int:
     blocks.append(axis_comparison(cells))
     blocks.append(f"Floors: a difference is only claimed above {PSNR_FLOOR_DB:g} dB "
                   f"or {DICE_FLOOR:g} Dice. Source: {len(cells)} cells under "
-                  f"`{args.root}`.")
+                  f"`{args.root}`. ★ = same prediction segmented at an "
+                  "equal-area operating point (`match_foreground`); it removes "
+                  "the prediction's contrast drift and must be read beside the "
+                  "column without a star, not instead of it.")
     text = "\n\n".join(b.strip("\n") for b in blocks if b)
     print(text)
     if args.out:

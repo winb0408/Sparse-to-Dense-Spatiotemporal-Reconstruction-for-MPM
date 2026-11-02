@@ -181,3 +181,60 @@ def test_paired_delta_matches_on_key():
     d = paired_delta(a, b, "m")
     assert d["n"] == 2
     assert d["delta"] == pytest.approx(0.25, abs=1e-6)
+
+
+def test_match_foreground_fills_the_reference_area_on_every_plane():
+    """Equal-area scoring must be equal-area *per plane*, not per volume.
+
+    A volume whose planes carry different amounts of vessel is the normal case;
+    matching the total would let one crowded plane pay for a sparse one.
+    """
+    from spur_mpm.metrics.vessel import match_foreground
+
+    rng = np.random.default_rng(0)
+    resp = rng.random((4, 8, 8), dtype=np.float32)
+    ref = np.zeros((4, 8, 8), dtype=bool)
+    wants = (0, 1, 4, 16)                      # per-plane areas, one of them empty
+    for z, k in enumerate(wants):
+        ref[z].reshape(-1)[:k] = True
+    got = match_foreground(resp, ref)
+    assert got.shape == ref.shape
+    assert [int(got[z].sum()) for z in range(4)] == list(wants)
+
+
+def test_match_foreground_keeps_the_brightest_voxels():
+    from spur_mpm.metrics.vessel import match_foreground
+
+    resp = np.zeros((6, 6), dtype=np.float32)
+    resp[2, 3] = 0.9
+    resp[4, 4] = 0.7
+    ref = np.zeros((6, 6), dtype=bool)
+    ref[1, 1] = ref[5, 5] = True               # area 2, in the wrong places
+    got = match_foreground(resp, ref)
+    assert got[2, 3] and got[4, 4]
+    assert int(got.sum()) == 2
+
+
+def test_segment_pair_reports_the_area_matched_mask_beside_the_fitted_one():
+    rng = np.random.default_rng(1)
+    ref = rng.random((32, 32), dtype=np.float32)
+    dim = _tube(32, 32) * 0.3                  # same structure, weaker response
+    seg = segment_pair(dim, ref, method="vesselness", threshold_mode="global",
+                       max_fraction=None, match_area=True)
+    assert "pred_mask_area" in seg
+    fitted, matched = int(seg["pred_mask"].sum()), int(seg["pred_mask_area"].sum())
+    want = int(seg["ref_mask"].sum())
+    # the reference-fitted mask under-segments the dim prediction; the
+    # equal-area one recovers what the response supports ...
+    assert fitted <= matched
+    # ... and never invents area the response does not have (the dim tube has a
+    # positive response only where the tube is, so the area is capped there)
+    assert matched <= want
+    assert matched >= fitted
+
+
+def _tube(h: int, w: int, width: int = 3) -> np.ndarray:
+    """A bright vertical band on a dark frame: something Sato calls a vessel."""
+    img = np.zeros((h, w), dtype=np.float32)
+    img[:, w // 2 - width // 2:w // 2 + width // 2 + 1] = 1.0
+    return img

@@ -70,3 +70,22 @@ def test_budget_curve_measures_each_level_against_the_densest_that_ran():
     assert "| — |" in text
     assert "-0.0200" in text         # y_k8 loses 0.02 Dice, under the floor
     assert "no (< .03 Dice)" in text
+
+
+def test_forced_context_gets_its_own_cell_name():
+    from spur_mpm.scripts.run_ladder import cell_name
+
+    # the same level trained at its own minimum context and at a fixed context
+    # are different experiments; one must not overwrite the other
+    assert cell_name("S1", "y_k4") == "E021_S1_y_k4"
+    assert cell_name("S1", "y_k4", 7) == "E021_S1_y_k4_c7"
+
+
+def test_level_context_is_the_minimum_the_protocol_needs():
+    from spur_mpm.scripts.run_ladder import level_context
+
+    assert level_context("y_k4") == 1        # z is never skipped
+    assert level_context("z_k2") == 3        # 2*(2-1)+1
+    assert level_context("z_k4") == 7        # 2*(4-1)+1
+    assert level_context("yz_k2x2") == 3
+    assert level_context("yz_k2x4") == 7     # the plane spacing decides

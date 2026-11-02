@@ -86,9 +86,21 @@ def _spec(level: str) -> dict:
     return LEVELS_3D[level].to_dict()
 
 
-def _overrides(level: str) -> list[str]:
+def level_context(level: str) -> int:
+    """Z context a level needs, or 1 when it skips no planes.
+
+    Plan §3.3 forbids letting a ``kz`` setting quietly see more planes than its
+    neighbour, so this is the *minimum* a protocol needs (``2kz-1``), not a
+    tuned value, and the cell name does not hide it: the number goes into
+    ``data.context_slices`` and the run's ``config.yaml``.
+    """
+    from spur_mpm.data.datasets import required_context_depth
+    return required_context_depth(_spec(level)["kz"])
+
+
+def _overrides(level: str, context: int | None = None) -> list[str]:
     spec = _spec(level)
-    return [
+    ov = [
         f"data.index={COHORT_INDEX}",
         f"data.split={COHORT_SPLIT}",
         "data.fold=0",
@@ -98,6 +110,22 @@ def _overrides(level: str) -> list[str]:
         f"sampling.pattern={spec.get('pattern', 'grid')}",
         f"sampling.seed={spec.get('seed', 0)}",
     ]
+    ctx = level_context(level) if context is None else int(context)
+    if ctx > 1:
+        ov.append(f"data.context_slices={ctx}")
+    return ov
+
+
+def cell_name(arm: str, level: str, context: int | None = None) -> str:
+    """``E021_<arm>_<level>``, plus ``_c<N>`` when the context is forced.
+
+    A forced context is a *different experiment* -- it fixes the usable depth so
+    that two protocols can be compared at equal context instead of at equal
+    ``kz`` -- so it must not overwrite the cell that trained at the level's own
+    minimum. The suffix keeps both cells, and the report can pair them.
+    """
+    name = f"E021_{arm}_{level}"
+    return name if context is None else f"{name}_c{int(context)}"
 
 
 def _free_gpus() -> list[str]:
@@ -152,9 +180,16 @@ class State:
             tmp.write_text(json.dumps({"cells": self.rows}, indent=2))
             tmp.replace(self.path)
 
-    def done(self, arm: str, level: str) -> dict | None:
+    def done(self, arm: str, level: str, name: str | None = None) -> dict | None:
+        """Finished row for this exact cell.
+
+        Keyed on the directory name rather than on ``(arm, level)`` so that a
+        forced-context rerun of the same level is a separate cell and is not
+        mistaken for its minimum-context sibling.
+        """
+        want = name or f"E021_{arm}_{level}"
         for r in self.rows:
-            if (r["arm"], r["level"]) == (arm, level) and r["status"] == "ok":
+            if r.get("name", want) == want and r["status"] == "ok":
                 return r
         return None
 
@@ -171,15 +206,16 @@ def _run(cmd: list[str], env: dict, log: Path) -> tuple[int, float]:
 
 def _cell(arm: str, level: str, *, out_root: Path, steps: int | None,
           device: str, state: State, dry: bool,
-          eval_only: bool = False) -> dict:
-    name = f"E021_{arm}_{level}"
+          eval_only: bool = False, context: int | None = None) -> dict:
+    name = cell_name(arm, level, context)
     run_dir = out_root / name
     env = dict(os.environ, CUDA_VISIBLE_DEVICES=device,
                PYTHONUNBUFFERED="1")
     started = time.time()
     row = {"arm": arm, "level": level, "name": name, "device": device,
+           "context": level_context(level) if context is None else int(context),
            "started": time.strftime("%Y-%m-%d %H:%M:%S")}
-    ov = _overrides(level)
+    ov = _overrides(level, context)
     if dry:
         print(f"[{device}] {name}: "
               + " ".join(f"--set {o}" for o in ov))
@@ -240,6 +276,11 @@ def main(argv: list[str] | None = None) -> int:
                    help="skip training and re-score the existing best.pt files "
                         "(use after a metric or segmentation change: the "
                         "checkpoints do not depend on either)")
+    p.add_argument("--context-slices", type=int, default=None,
+                   help="force one Z context for every cell (plan §3.3 control: "
+                        "protocols compared at equal context, not equal kz). "
+                        "Cells are suffixed _c<N> so they never overwrite the "
+                        "cells trained at their own minimum context.")
     args = p.parse_args(argv)
 
     stages = args.stage or ["ablation"]
@@ -253,7 +294,9 @@ def main(argv: list[str] | None = None) -> int:
     jobs = args.jobs or len(devices)
 
     state = State(args.out_root / "ladder.json")
-    todo = [pr for pr in pairs if args.force or state.done(*pr) is None]
+    todo = [pr for pr in pairs
+            if args.force or state.done(pr[0], pr[1],
+                                        cell_name(pr[0], pr[1], args.context_slices)) is None]
     print(f"stages={stages} cells={len(pairs)} todo={len(todo)} "
           f"devices={devices} jobs={jobs}")
     if not todo:
@@ -268,7 +311,8 @@ def main(argv: list[str] | None = None) -> int:
         device = devices[i % len(devices)]
         row = _cell(arm, level, out_root=args.out_root, steps=args.steps,
                     device=device, state=state, dry=args.dry_run,
-                    eval_only=args.eval_only)
+                    eval_only=args.eval_only,
+                    context=args.context_slices)
         if not args.dry_run:
             state.add(row)
         tag = row["status"]

@@ -94,6 +94,7 @@
 | `spur_mpm/metrics/complexity.py` | 参数量、MACs、实测延迟、整卷外推 | 和精度并列报告；延迟必带 device |
 | `spur_mpm/metrics/statistics.py` | bootstrap CI、配对差、分组汇总 | 跨动物方差约 2.8 dB / 0.08 Dice，<1 dB / 0.03 Dice 的差异不构成结论 |
 | `spur_mpm/evaluate.py` | 逐样本评估，写 `samples.csv` + `summary.json` | 所有表格的数据源 |
+| `spur_mpm/metrics/vessel.py` `match_foreground` | 同一预测在**等面积工作点**再切一次（按参考前景面积取分位），只用于出 `dice_area` / `cl_dice_area` | 分离"形状对不对"与"对比度标定漂了"：参考阈值定的 Dice 下降可能只是预测响应变弱 |
 | `spur_mpm/scripts/collect_results.py` | 汇总多个 run 成一张表 | 出论文表格 |
 | `spur_mpm/scripts/ladder_report.py` | 从各 run 的 `summary.json` 生成阶梯表 + 创新点归因 + **预算曲线**（单个臂按测量比例从密到疏，看从哪里饱和）+ **同预算换轴对比**（`y_k4/z_k4/yz_k2x2` 都是 25%，看稀疏轴本身是否构成差异），并把无学习下限摆在训练臂下面 | 出表；小于 1 dB / 0.03 Dice 的差异自动标为"不可主张"；缺测的指标打印为 `–` 而不是 `nan` |
 | `spur_mpm/scripts/structure_report.py` | **整卷** `analyse_volume`（含按深度分层）+ 导出 ImageJ 可读 TIFF；`--segment` 选分割方式、`--max-planes` 调试裁切 | 骨架层面的结构结论、人工核验。`analyse_volume(return_masks=True)` 让导出的 TIFF 就是算数字用的那两张掩膜 |

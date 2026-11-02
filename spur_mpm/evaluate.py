@@ -232,10 +232,17 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                 # tune the operating point and the two tables agree by
                 # construction.
                 seg = segment_pair(p.numpy(), t.numpy(), method="vesselness",
-                                   threshold_mode="global")
+                                   threshold_mode="global", match_area=True)
                 row.update(mask_vessel_metrics(seg["pred_mask"], seg["ref_mask"]))
                 row["vessel_threshold"] = seg["threshold"]
                 row["vessel_method"] = seg["segment_method"]
+                # The same prediction at an equal-area operating point. Kept in
+                # its own columns because it answers a different question: the
+                # reference-fitted numbers above include "did the prediction's
+                # vessel response keep the reference's scale", these do not.
+                area = mask_vessel_metrics(seg["pred_mask_area"], seg["ref_mask"])
+                row["dice_area"] = area["dice"]
+                row["cl_dice_area"] = area["cl_dice"]
                 # Structural verdict (opt-in): Dice answers "how much vessel",
                 # the skeleton answers "is it still a network".
                 if skeleton:
@@ -263,6 +270,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     }
     for metric in ("psnr", "psnr_measured", "psnr_missing", "ssim", "mae",
                    "e_measured", "e_missing", "e_hold", "dice", "cl_dice",
+                   "dice_area", "cl_dice_area",
                    "pred_fraction", "ref_fraction", "vessel_threshold",
                    "precision", "recall", "f1",
                    "skel_pred_n_branches", "skel_ref_n_branches",
