@@ -206,7 +206,8 @@ def _run(cmd: list[str], env: dict, log: Path) -> tuple[int, float]:
 
 def _cell(arm: str, level: str, *, out_root: Path, steps: int | None,
           device: str, state: State, dry: bool,
-          eval_only: bool = False, context: int | None = None) -> dict:
+          eval_only: bool = False, context: int | None = None,
+          skeleton: bool = False) -> dict:
     name = cell_name(arm, level, context)
     run_dir = out_root / name
     env = dict(os.environ, CUDA_VISIBLE_DEVICES=device,
@@ -242,6 +243,8 @@ def _cell(arm: str, level: str, *, out_root: Path, steps: int | None,
     cmd = [sys.executable, "-m", "spur_mpm.evaluate",
            "--arm", arm, "--split", "test", "--out", str(run_dir / "eval_test")]
     cmd += ck
+    if skeleton:
+        cmd.append("--skeleton")
     for o in ov:
         cmd += ["--set", o]
     rc, secs = _run(cmd, env, out_root / "_logs" / f"{name}.eval.log")
@@ -281,6 +284,9 @@ def main(argv: list[str] | None = None) -> int:
                         "protocols compared at equal context, not equal kz). "
                         "Cells are suffixed _c<N> so they never overwrite the "
                         "cells trained at their own minimum context.")
+    p.add_argument("--skeleton", action="store_true",
+                   help="also score the skeleton per window (slower; adds "
+                        "skelF1 and the skeleton counts to summary.json)")
     args = p.parse_args(argv)
 
     stages = args.stage or ["ablation"]
@@ -312,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
         row = _cell(arm, level, out_root=args.out_root, steps=args.steps,
                     device=device, state=state, dry=args.dry_run,
                     eval_only=args.eval_only,
-                    context=args.context_slices)
+                    context=args.context_slices, skeleton=args.skeleton)
         if not args.dry_run:
             state.add(row)
         tag = row["status"]
