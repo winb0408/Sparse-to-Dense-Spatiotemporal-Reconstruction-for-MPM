@@ -48,7 +48,8 @@ COLUMNS = (("psnr", "PSNR↑"), ("psnr_measured", "PSNRmeas↑"),
            ("cl_dice", "clDice↑"), ("f1", "skelF1↑"),
            # same prediction, equal-area operating point: Dice without the
            # calibration term. Read the pair, never this row alone.
-           ("dice_area", "Dice★↑"), ("cl_dice_area", "clDice★↑"))
+           ("dice_area", "Dice★↑"), ("cl_dice_area", "clDice★↑"),
+           ("f1_area", "skelF1★↑"))
 
 
 def collect(root: Path) -> dict[tuple[str, str], dict]:

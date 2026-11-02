@@ -75,7 +75,8 @@ def withholds_at_eval(supervision: str, input_support: str,
 
 
 @torch.no_grad()
-def _skeleton_row(pred_mask: np.ndarray, ref_mask: np.ndarray) -> dict:
+def _skeleton_row(pred_mask: np.ndarray, ref_mask: np.ndarray, *,
+                  stats: bool = True, suffix: str = "") -> dict:
     """Skeleton-based structural scores for one centre plane.
 
     Takes the masks segmented by :func:`spur_mpm.evaluate.evaluate` -- on the
@@ -87,10 +88,18 @@ def _skeleton_row(pred_mask: np.ndarray, ref_mask: np.ndarray) -> dict:
     say whether the thinning survives -- a prediction that thickens every
     capillary can keep Dice up while merging vessels, which shows here and
     nowhere else.
+
+    ``suffix="_area"`` on the equal-area mask carries the same caveat as the
+    starred Dice columns: the reference-fitted skeleton F1 inherits the
+    prediction's contrast drift, and at a 25 % budget that is worth 0.09 of F1.
+    The counts are not repeated for the second mask -- they describe the
+    prediction, and the reference side is identical -- so ``stats=False``.
     """
     from spur_mpm.metrics.skeleton import skeleton_overlap, skeleton_stats
 
     out = skeleton_overlap(pred_mask, ref_mask, tolerance_vox=1)
+    if not stats:
+        return {f"{k}{suffix}": v for k, v in out.items()}
     pred_stats = skeleton_stats(pred_mask)
     ref_stats = skeleton_stats(ref_mask)
     for key in ("n_branches", "n_junctions", "n_endpoints",
@@ -261,6 +270,8 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                 # the skeleton answers "is it still a network".
                 if skeleton:
                     row.update(_skeleton_row(seg["pred_mask"], seg["ref_mask"]))
+                    row.update(_skeleton_row(seg["pred_mask_area"], seg["ref_mask"],
+                                             stats=False, suffix="_area"))
                 row["key"] = f"{row['sample_id']}_z{row['query_z']}"
                 rows.append(row)
 
@@ -289,6 +300,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                    "dice_area", "cl_dice_area",
                    "pred_fraction", "ref_fraction", "vessel_threshold",
                    "precision", "recall", "f1",
+                   "precision_area", "recall_area", "f1_area",
                    "skel_pred_n_branches", "skel_ref_n_branches",
                    "skel_pred_n_junctions", "skel_ref_n_junctions",
                    "skel_pred_n_endpoints", "skel_ref_n_endpoints",
