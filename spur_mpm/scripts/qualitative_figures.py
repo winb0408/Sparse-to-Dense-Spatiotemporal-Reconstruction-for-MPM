@@ -235,9 +235,14 @@ def _metrics(vol: dict) -> dict:
         # Same segmentation rule as ``evaluate``: the plane's Sato vesselness,
         # threshold fitted on the reference plane only.
         seg = segment_pair(p[i].numpy(), t[i].numpy(), method="vesselness",
-                           threshold_mode="global")
+                           threshold_mode="global", match_area=True)
         for k, v in mask_vessel_metrics(seg["pred_mask"], seg["ref_mask"]).items():
             e.setdefault(k, []).append(v)
+        # The equal-area operating point, so the panel can show both numbers:
+        # at a sparse budget the reference-fitted Dice mostly reports how far
+        # the prediction's contrast moved, which is not a structural claim.
+        area = mask_vessel_metrics(seg["pred_mask_area"], seg["ref_mask"])
+        e.setdefault("dice_area", []).append(area["dice"])
     for k, v in e.items():
         out[k] = float(np.nanmean(v)) if v else float("nan")
     return out
@@ -399,13 +404,16 @@ def _panel_metrics(pred: np.ndarray, ref: np.ndarray) -> dict | None:
     d = pred[m] - ref[m]
     mse = float(np.mean(d * d))
     p = 99.0 if mse <= 1e-12 else min(99.0, float(-10.0 * np.log10(mse)))
-    out = {"psnr": p, "dice": float("nan"), "cover": float(m.mean())}
+    out = {"psnr": p, "dice": float("nan"), "dice_area": float("nan"),
+           "cover": float(m.mean())}
     if m.all():
         try:
             seg = segment_pair(pred, ref, method="vesselness",
-                               threshold_mode="global")
+                               threshold_mode="global", match_area=True)
             out["dice"] = float(mask_vessel_metrics(seg["pred_mask"],
                                                     seg["ref_mask"])["dice"])
+            out["dice_area"] = float(mask_vessel_metrics(seg["pred_mask_area"],
+                                                         seg["ref_mask"])["dice"])
         except Exception:                        # tiny crops can break the mask
             pass
     return out
@@ -464,8 +472,11 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
             _show(axes[i + 2][c], vv[col], rng[col])
             m = _panel_metrics(vv[col], views[col])
             if m is not None:
+                # Both operating points, so a reader can see whether a low Dice
+                # is missing structure or a prediction that came back dimmer.
                 _note(axes[i + 2][c], f"PSNR {m['psnr']:.2f}\n"
-                                      f"Dice {m['dice']:.3f}")
+                                      f"Dice {m['dice']:.3f}\n"
+                                      f"Dice★ {m['dice_area']:.3f}")
 
     for r, lab in enumerate(labels):
         axes[r][0].text(-0.05, 0.5, lab, transform=axes[r][0].transAxes,
