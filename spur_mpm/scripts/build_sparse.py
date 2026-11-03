@@ -125,6 +125,7 @@ def build(index_path: Path, split_path: Path | None, out_dir: Path, *,
         for name, spec in table.items():
             built = build_sparse(dense, spec, psf=psf, noise=noise)
             verdict = verify_construction(dense, built["y"], built["mask"], spec,
+                                          psf=psf,
                                           noisy=(noise.poisson_photons > 0
                                                  or noise.gaussian_sigma > 0))
             entry = write_entry(out_dir, label, name, built, write_y=dump_y)
