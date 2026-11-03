@@ -113,3 +113,53 @@ def test_calibration_is_invertible(prepared):
     assert c.saturated_fraction(bright) == 1.0
     assert not np.allclose(c.inverse(c.apply(bright)), bright)
     assert c.saturated_fraction(c.offset + 0.5 * c.scale) == 0.0
+
+
+@pytest.mark.parametrize("mode,ky,kz", [
+    ("y", 2, 1), ("z", 1, 2), ("yz", 2, 2),
+])
+def test_z_boundary_windows_always_query_trained_centre(prepared, mode, ky, kz):
+    """At both Z borders, the label must use the TRAINED central output.
+
+    In the old implementation the first/last query planes were assigned to
+    untrained output channels 0 and context-1 after clamping the window.
+    """
+    from spur_mpm.data.datasets import VolumeWindowDataset
+    cache = VolumeCache.load(prepared["index"], fold=0)
+    split = json.loads(Path(prepared["split"]).read_text())
+    sid = split["folds"][0]["test"][0]
+    cfg = ItemConfig(sampling=SamplingSpec(mode=mode, ky=ky, kz=kz),
+                     psf=PSFConfig(), features=("y", "mask"),
+                     supervision="dense")
+    ds = VolumeWindowDataset(cache, [sid], cfg, patch_hw=(32, 32),
+                             context_depth=3, z_stride=1)
+    first, last = ds[0], ds[len(ds)-1]
+    for item, z in ((first, 0), (last, cache.array(sid).shape[0]-1)):
+        assert int(item["query_z"]) == z
+        assert int(item["center_index"]) == 1
+        assert item["inputs"].shape == (6, 32, 32)
+        assert item["warmstart_center"].shape == (32, 32)
+        # The centre is the real query plane, never a padding plane.
+        assert bool(item["acq_mask"].any()) or mode == "z"
+        assert torch.isfinite(item["warmstart_center"]).all()
+    # No padded virtual Z plane may appear as a measured input channel.
+    first_input_mask = first["inputs"][3:6].bool()  # feature-major 3 mask slices
+    last_input_mask = last["inputs"][3:6].bool()
+    assert not first_input_mask[0].any()
+    assert not last_input_mask[-1].any()
+
+
+def test_direct_arm_item_exposes_warmstart_without_x0_feature(prepared):
+    """S0 input remains only Y+M while a diagnostic prior can be exported."""
+    from spur_mpm.data.datasets import VolumeWindowDataset
+    cache = VolumeCache.load(prepared["index"], fold=0)
+    split = json.loads(Path(prepared["split"]).read_text())
+    sid = split["folds"][0]["test"][0]
+    cfg = ItemConfig(sampling=SamplingSpec(mode="y", ky=2),
+                     psf=PSFConfig(), features=("y", "mask"),
+                     supervision="dense")
+    item = VolumeWindowDataset(cache, [sid], cfg, patch_hw=(32, 32),
+                               context_depth=1)[0]
+    assert item["inputs"].shape == (2, 32, 32)
+    assert item["warmstart_center"].shape == (32, 32)
+    assert torch.isfinite(item["warmstart_center"]).all()
