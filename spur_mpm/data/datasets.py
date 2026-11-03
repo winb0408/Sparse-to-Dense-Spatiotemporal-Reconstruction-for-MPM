@@ -213,7 +213,8 @@ class ItemConfig:
 
 def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
                z0: int, y0: int, x0: int, holdout_seed: int,
-               center: int | None = None) -> dict:
+               center: int | None = None,
+               valid_z: np.ndarray | None = None) -> dict:
     """Build one (inputs, centre-plane targets) item from a dense patch.
 
     ``center`` is the index of the query plane inside the window; it defaults to
@@ -234,6 +235,15 @@ def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
         torch.from_numpy(dense),
         AcquisitionConfig(sampling=spec, psf=cfg.psf, noise=cfg.noise, phase=phase),
     )
+    # Centred boundary windows have padding outside the physical Z extent.
+    # Padding is never a measurement, regardless of the lattice phase.
+    if valid_z is not None:
+        valid = torch.as_tensor(valid_z, dtype=torch.bool)
+        if valid.shape != (depth,):
+            raise ValueError(f"valid_z shape {tuple(valid.shape)} != ({depth},)")
+        acq.mask[~valid] = False
+        acq.y[~valid] = 0.0
+        acq.metadata["sampling_fraction"] = float(acq.mask.float().mean())
 
     hold_mask = torch.zeros_like(acq.mask)
     obs = dict(psf=cfg.psf, lam=cfg.lam, warm_start_kind=cfg.warm_start_kind,
@@ -283,6 +293,8 @@ def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
     item = {
         "inputs": inputs,
         "target": target,                                   # dense reference
+        # The baseline prior exists even for Direct S0 with no x0 input feature.
+        "warmstart_center": mi.x0[center],
         "hold_target": acq.y[center],                       # real measurement
         # The input support and the values behind it, centre plane, exposed so
         # a data-consistency term can reach them. Without this the DC weight
@@ -425,12 +437,21 @@ class VolumeWindowDataset(Dataset):
         geom = self.cache.geometry(sid)
         arr = self.cache.array(sid)
         half = self.depth // 2
-        z0 = min(max(0, zq - half), max(0, arr.shape[0] - self.depth))
+        # The supervised loss only trains the central output channel. Always
+        # keep the query at that position, including the first and last planes.
+        z0 = zq - half
+        if self.depth > arr.shape[0]:
+            raise ValueError(f"{sid}: context_depth {self.depth} exceeds "
+                             f"physical Z depth {arr.shape[0]}")
+        z_indices = np.arange(z0, z0 + self.depth)
+        valid_z = (z_indices >= 0) & (z_indices < arr.shape[0])
+        z_src = np.clip(z_indices, 0, arr.shape[0] - 1)
         w = self.patch_hw[1] if self.patch_hw else arr.shape[2]
         h = self.patch_hw[0] if self.patch_hw else arr.shape[1]
 
-        raw = stack_patch(arr, z0, y0, x0, self.depth, h, w)
+        raw = np.asarray(arr[z_src, y0:y0 + h, x0:x0 + w], dtype=np.float32)
         dense = self.cache.calibration.apply(raw).astype(np.float32)
+        dense[~valid_z] = 0.0
 
         # Deterministic holdout seed; inference uses no holdout at all.
         seed = int(np.random.SeedSequence([zq, y0, x0]).generate_state(1)[0])
@@ -438,8 +459,9 @@ class VolumeWindowDataset(Dataset):
         if cfg.supervision == "self" and cfg.holdout is None:
             raise ValueError("validation of a self-supervised arm must define a "
                              "HoldoutSpec to score held-out measurements")
-        centre = zq - z0
-        item = _make_item(dense, geom, cfg, z0, y0, x0, seed, center=centre)
+        centre = half
+        item = _make_item(dense, geom, cfg, z0, y0, x0, seed,
+                          center=centre, valid_z=valid_z)
         item["sample_id"] = sid
         item["query_z"] = torch.tensor(zq, dtype=torch.long)
         item["window_z0"] = torch.tensor(z0, dtype=torch.long)
