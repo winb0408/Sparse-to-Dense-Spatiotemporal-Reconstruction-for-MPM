@@ -1,0 +1,4 @@
+=== M2_FOVII_S2_vessels ===
+A0       psnr=29.2269 dice=0.7122 e_measured=0.0000 e_missing=0.0365
+S0       psnr=30.6596 dice=0.7024 e_measured=0.0017 e_missing=0.0306
+Terminated

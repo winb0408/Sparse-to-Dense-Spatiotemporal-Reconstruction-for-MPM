@@ -1,0 +1,9 @@
+=== ablation + sweep + floors (new: S2g y_k2) 2026-11-03 18:41
+rc=0 2026-11-03 19:21
+=== matched at one 7-plane context, all seven arms 2026-11-03 19:21
+rc=0 2026-11-03 23:41
+=== full re-score of every cell (Z-border fix changed the predictions) 2026-11-03 23:41
+rc=1 2026-11-04 01:39
+FULL_RESCORE_DONE
+report rc=0 2026-11-04 01:39
+ALL_DONE

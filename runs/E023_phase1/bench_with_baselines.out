@@ -1,0 +1,17 @@
+| arm | params(M) | MACs/slice(G) | MACs/volume(T) | latency ms/slice | s/volume |
+|---|---|---|---|---|---|
+| A0 | 0.000 | n/a | n/a | 0.009 | 0.002 |
+| A1 | 0.000 | n/a | n/a | 0.009 | 0.002 |
+| S0 | 2.552 | 23.64 | 4.728 | 28.280 | 5.656 |
+| S1 | 2.552 | 23.67 | 4.734 | 28.810 | 5.762 |
+| S2 | 2.553 | 23.7 | 4.739 | 29.720 | 5.943 |
+| S1g | 2.615 | 27.75 | 5.549 | 30.910 | 6.182 |
+| S2g | 2.615 | 27.77 | 5.555 | 31.070 | 6.214 |
+
+Device: `cuda:2`. Tiles of 256x256 px, 200 per volume, so MACs/volume = 200 x MACs/slice: the network is 2-D and applied slice-wise.
+
+The parameter-free floors have no MACs, but they are not free: their latency column is the measured warm-start operator over the same volume shape (A0, A1).
+
+- `A0`: no network (bilinear): params 0, MACs not applicable; the latency column is the measured warm-start operator on the same [Z,H,W] volume, not zero
+- `A1`: no network (wiener_fill_first): params 0, MACs not applicable; the latency column is the measured warm-start operator on the same [Z,H,W] volume, not zero
+wrote runs/E021_ladder/benchmark_supervised.json (7 arms, device cuda:2)

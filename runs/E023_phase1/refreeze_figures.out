@@ -1,0 +1,11 @@
+=== compare_y_z_yz_25pct.png 04:13
+compare rc=0
+consistency ok: dense reference and fixed views identical across 3 protocols
+ALL_DONE
+=== y_k4 04:14
+y_k4 rc=0
+=== z_k4 04:16
+z_k4 rc=0
+=== yz_k2x2 04:21
+yz_k2x2 rc=0
+REFREEZE_DONE

@@ -1,0 +1,11 @@
+| arm | params(M) | MACs/slice(G) | MACs/volume(T) | latency ms/slice | s/volume |
+|---|---|---|---|---|---|
+| S0 | 2.552 | 23.64 | 4.728 | 28.140 | 5.629 |
+| S1 | 2.552 | 23.67 | 4.734 | 28.310 | 5.662 |
+| S2 | 2.553 | 23.7 | 4.739 | 28.950 | 5.790 |
+| S1g | 2.615 | 27.75 | 5.549 | 29.830 | 5.966 |
+| S2g | 2.615 | 27.77 | 5.555 | 30.190 | 6.038 |
+
+Device: `cuda:2`. Tiles of 256x256 px, 200 per volume, so MACs/volume = 200 x MACs/slice: the network is 2-D and applied slice-wise.
+
+wrote runs/E021_ladder/benchmark_supervised.json (5 arms, device cuda:2)

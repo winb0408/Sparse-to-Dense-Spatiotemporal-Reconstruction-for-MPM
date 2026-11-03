@@ -1,0 +1,42 @@
+stages=['ablation', 'sweep', 'matched', 'floors', 'control'] cells=38 todo=38 devices=['2'] jobs=2
+[2] A1   y_k2     ok  psnr=28.042  dice=0.7279  cl_dice=0.7095
+[2] S0   y_k2     no_checkpoint
+[2] S1   y_k2     no_checkpoint
+[2] S2   y_k2     no_checkpoint
+[2] S1g  y_k2     no_checkpoint
+[2] S2g  y_k2     no_checkpoint
+[2] S1   y_k3     no_checkpoint
+[2] A0   y_k2     ok  psnr=28.042  dice=0.7279  cl_dice=0.7095
+[2] S1   y_k8     no_checkpoint
+[2] S1   z_k2     no_checkpoint
+[2] S1   z_k3     no_checkpoint
+[2] S1   y_k4     ok  psnr=27.562  dice=0.5586  cl_dice=0.5278
+[2] S1   z_k4     ok  psnr=31.107  dice=0.5297  cl_dice=0.5045
+[2] S1   yz_k2x2  ok  psnr=27.950  dice=0.5829  cl_dice=0.5542
+[2] S1   yz_k2x4  ok  psnr=26.941  dice=0.4634  cl_dice=0.4354
+[2] A0   y_k4     ok  psnr=26.016  dice=0.5979  cl_dice=0.5614
+[2] A1   y_k4     ok  psnr=26.016  dice=0.5979  cl_dice=0.5614
+[2] S2   y_k4     ok  psnr=27.597  dice=0.5533  cl_dice=0.5223
+[2] S0   y_k4     ok  psnr=27.416  dice=0.5521  cl_dice=0.5221
+[2] S1g  y_k4     ok  psnr=27.680  dice=0.5568  cl_dice=0.5257
+[2] S2g  y_k4     ok  psnr=27.669  dice=0.5566  cl_dice=0.5255
+[2] A0   z_k4     ok  psnr=48.678  dice=0.6105  cl_dice=0.5898
+[2] A1   z_k4     ok  psnr=48.678  dice=0.6105  cl_dice=0.5898
+[2] S0   z_k4     ok  psnr=30.623  dice=0.5210  cl_dice=0.4960
+[2] S2   z_k4     ok  psnr=31.518  dice=0.5312  cl_dice=0.5067
+[2] S1g  z_k4     ok  psnr=31.185  dice=0.5397  cl_dice=0.5147
+[2] S2g  z_k4     ok  psnr=31.211  dice=0.5378  cl_dice=0.5125
+[2] A0   yz_k2x2  ok  psnr=26.734  dice=0.6256  cl_dice=0.6003
+[2] A1   yz_k2x2  ok  psnr=26.734  dice=0.6256  cl_dice=0.6003
+[2] S0   yz_k2x2  ok  psnr=27.912  dice=0.5757  cl_dice=0.5479
+[2] S2   yz_k2x2  ok  psnr=27.965  dice=0.5804  cl_dice=0.5519
+[2] S1g  yz_k2x2  ok  psnr=28.050  dice=0.5823  cl_dice=0.5542
+[2] S2g  yz_k2x2  ok  psnr=28.051  dice=0.5823  cl_dice=0.5542
+[2] A0   y_k8     ok  psnr=24.725  dice=0.4493  cl_dice=0.4149
+[2] A0   y_k3     ok  psnr=26.725  dice=0.6605  cl_dice=0.6236
+[2] A0   z_k2     ok  psnr=72.724  dice=0.7656  cl_dice=0.7470
+[2] A0   z_k3     ok  psnr=56.770  dice=0.6748  cl_dice=0.6539
+[2] A0   yz_k2x4  ok  psnr=25.721  dice=0.5398  cl_dice=0.5151
+
+finished 38 cells in 1.96 h; state -> runs/E021_ladder/ladder.json
+FAILED: S0/y_k2, S1/y_k2, S2/y_k2, S1g/y_k2, S2g/y_k2, S1/y_k3, S1/y_k8, S1/z_k2, S1/z_k3  (logs in runs/E021_ladder/_logs)

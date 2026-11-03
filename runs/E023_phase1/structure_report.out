@@ -1,0 +1,16 @@
+M2_FOVII_S1_vessels: dice=0.9337 clDice=0.9574 skelF1=0.8892 components 1580->1130
+M2_FOVII_S2_vessels: dice=0.8705 clDice=0.7739 skelF1=0.7272 components 11664->7654
+M2_FOVI_S1_vessels: dice=0.9007 clDice=0.8063 skelF1=0.7597 components 17833->10475
+M2_FOVI_S2_vessels: dice=0.7488 clDice=0.5527 skelF1=0.5731 components 31094->19882
+| volume | Dice | clDice | skelF1 | components ref→pred | junctions ref→pred | length µm ref→pred | radius µm ref→pred |
+|---|---|---|---|---|---|---|---|
+| M2_FOVII_S1_vessels | 0.9337 | 0.9574 | 0.8892 | 1580 → 1130 | 1703 → 1503 | 143348 → 135125 | 2.295 → 2.349 |
+| M2_FOVII_S2_vessels | 0.8705 | 0.7739 | 0.7272 | 11664 → 7654 | 2725 → 2138 | 136925 → 107633 | 1.759 → 1.921 |
+| M2_FOVI_S1_vessels | 0.9007 | 0.8063 | 0.7597 | 17833 → 10475 | 3402 → 2738 | 188305 → 160394 | 1.887 → 2.053 |
+| M2_FOVI_S2_vessels | 0.7488 | 0.5527 | 0.5731 | 31094 → 19882 | 3271 → 2547 | 155620 → 113274 | 1.240 → 1.324 |
+| **mean** | 0.8634 | 0.7725 | 0.7373 | 15542.75 → 9785.25 | 2775.25 → 2231.5 | 156049 → 129107 | 1.795 → 1.912 |
+
+Gated planes (reference mask fills > 0.15 of the plane): 57, 68, 82, 101 (one number per volume); those planes are in neither mask.
+Binarisation: vesselness response, threshold 0.0413627 fitted on the reference only (per_plane), foreground ref 2.2% / pred 2.1%. Skeleton overlap tolerance 1 voxel.
+
+wrote runs/E021_ladder/E021_S1_y_k2/structure

@@ -1,0 +1,18 @@
+stages=['matched'] cells=21 todo=15 devices=['2'] jobs=2
+[2] A0   y_k4     ok  psnr=26.016  dice=0.5979  cl_dice=0.5614
+[2] A1   y_k4     ok  psnr=26.016  dice=0.5979  cl_dice=0.5614
+[2] S0   y_k4     ok  psnr=27.416  dice=0.5521  cl_dice=0.5221
+[2] S2   y_k4     ok  psnr=27.597  dice=0.5533  cl_dice=0.5223
+[2] S1g  y_k4     ok  psnr=27.680  dice=0.5568  cl_dice=0.5257
+[2] S2g  y_k4     ok  psnr=27.669  dice=0.5566  cl_dice=0.5255
+[2] S0   z_k4     ok  psnr=30.623  dice=0.5210  cl_dice=0.4960
+[2] S1g  z_k4     ok  psnr=31.185  dice=0.5397  cl_dice=0.5147
+[2] A0   yz_k2x2  ok  psnr=26.734  dice=0.6256  cl_dice=0.6003
+[2] A1   yz_k2x2  ok  psnr=26.734  dice=0.6256  cl_dice=0.6003
+[2] S2g  z_k4     ok  psnr=31.211  dice=0.5378  cl_dice=0.5125
+[2] S0   yz_k2x2  ok  psnr=27.912  dice=0.5757  cl_dice=0.5479
+[2] S2   yz_k2x2  ok  psnr=27.965  dice=0.5804  cl_dice=0.5519
+[2] S1g  yz_k2x2  ok  psnr=28.050  dice=0.5823  cl_dice=0.5542
+[2] S2g  yz_k2x2  ok  psnr=28.051  dice=0.5823  cl_dice=0.5542
+
+finished 15 cells in 4.33 h; state -> runs/E021_ladder/ladder.json

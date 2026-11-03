@@ -1,0 +1,24 @@
+{
+ "what": "§4.4.1 D acceptance run: one frozen ViewSpec, three 25 % protocols, fixed XY panel at z = 100 (measured by all three)",
+ "when": "2026-11-04T04:36:57",
+ "python": "3.10.19",
+ "torch": "2.6.0+cu124",
+ "numpy": "2.2.6",
+ "host": "amax",
+ "gpu": "NVIDIA RTX A6000",
+ "commands": {
+  "figures": "runs/E023_phase1/refreeze_figures.sh (compare + y_k4/z_k4/yz_k2x2; --z-view 100, --view-spec 冻结 spec, --save-view-spec, --set data.context_slices=7, --dump f32)",
+  "per_level_logs": "runs/E023_phase1/refreeze_qual_{y_k4,z_k4,yz_k2x2}.out",
+  "consistency": "runs/E023_phase1/refreeze_compare2.out (rc=0)",
+  "volumes": "runs/E023_phase1/qual_one_volume.sh ×4 → runs/E021_ladder/figures/qual_y_k2/"
+ },
+ "verdict": "consistency ok: dense reference and fixed views identical across 3 protocols; window_diff = 0.0, mask_semantics 与 geometry 逐协议全 True (see consistency_report.json)",
+ "known_limitation": "the fixed XY panel is a configured coordinate, not one chosen from any mask; the legacy z=101 set (where 2 of 3 protocols skip that plane) is kept locally in figures_fixed/M2_FOVII_S1_vessels_z101/ and is not the figure to publish",
+ "code_version": {
+  "note": "本文件在渲染之后手写更新。这批图跨两次运行：04:14–04:30 的 per-level 图与四卷图由 9e3e2cf 产出；04:32 的 compare 重跑用的是工作树里尚未提交的 consistency_fields 修复（即 65aa19a）。两次的 compare PNG 逐字节相同。",
+  "per_level_and_volume_figures": "9e3e2cf",
+  "compare_report": "65aa19a (working tree at render time)",
+  "logged_at_commit": "65aa19a"
+ },
+ "pixels_unchanged": "重绘前后 compare_y_z_yz_25pct.png 均为 6,080,722 B，所有 qualitative_/support_/error_/profile_ PNG 在 git 里无改动；只有 JSON 元数据变化"
+}

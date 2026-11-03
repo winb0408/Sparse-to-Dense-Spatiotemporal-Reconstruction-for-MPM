@@ -1,0 +1,6 @@
+y_k2       windows=  270  ok
+y_k4       windows=  270  ok
+z_k3       windows=  270  ok
+yz_k2x2    windows=  270  ok
+wrote data_local/sparse/mask_crosscheck.json
+the training input equals the verified construction at every window checked

@@ -1,0 +1,4 @@
+stages=['ablation', 'sweep', 'floors'] cells=23 todo=1 devices=['2'] jobs=2
+[2] S2g  y_k2     ok  psnr=29.456  dice=0.7216  cl_dice=0.7049
+
+finished 1 cells in 0.67 h; state -> runs/E021_ladder/ladder.json
