@@ -392,9 +392,12 @@ def main(argv: list[str] | None = None) -> int:
     devices = ([d.strip() for d in args.devices.split(",")] if args.devices
                else _free_gpus())
     if not devices:
-        devices = ["0"]
-        print("warning: no free GPU found by probe; defaulting to device 0",
-              file=sys.stderr)
+        if args.dry_run:
+            devices = ["dry-run"]
+        else:
+            raise SystemExit("No free GPU detected. Refusing to silently use GPU 0 "
+                             "on a shared server. Supply --devices N after checking "
+                             "the selected device is available.")
     jobs = args.jobs or len(devices)
 
     state = State(args.out_root / "ladder.json")
