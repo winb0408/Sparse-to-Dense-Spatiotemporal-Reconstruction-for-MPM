@@ -97,8 +97,7 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
                 pred = pred[0].cpu().numpy()
             else:
                 # Baseline arm: the physics warm start for the centre plane.
-                f = list(item_cfg.features).index("x0")
-                pred = batch["inputs"][0, f * context + context // 2].numpy()
+                pred = batch["warmstart_center"][0].numpy()
 
             zq = int(batch["query_z"][0])
             if volume is None:
@@ -108,8 +107,7 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
                 x0s = np.zeros((geom.depth, h, w), dtype=np.float32)
             volume[zq] = pred
             masks[zq] = batch["acq_mask"][0].numpy().astype(bool)
-            f_x0 = list(item_cfg.features).index("x0")
-            x0s[zq] = batch["inputs"][0, f_x0 * context + context // 2].numpy()
+            x0s[zq] = batch["warmstart_center"][0].numpy()
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
