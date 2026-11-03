@@ -185,3 +185,36 @@ def test_mask_round_trips_through_the_manifest(tmp_path):
     assert entry["n_measured"] == int(built["mask"].sum())
     assert len(entry["mask_sha1"]) == 40
     np.testing.assert_array_equal(load_mask(entry), built["mask"])
+
+
+def test_verifier_rejects_numeric_mask_even_if_values_are_zero_one():
+    """A float mask cannot silently pass the 'mask_is_boolean' assertion."""
+    img = _image((4, 8, 8))
+    spec = SamplingSpec("y", ky=2)
+    built = build_sparse(img, spec)
+    result = verify_construction(img, built["y"], built["mask"].astype(np.float32), spec)
+    assert result["mask_is_boolean"] is False
+    assert result["ok"] is False
+
+
+def test_verifier_reports_shape_mismatch_without_indexing_crash():
+    img = _image((4, 8, 8))
+    spec = SamplingSpec("y", ky=2)
+    built = build_sparse(img, spec)
+    result = verify_construction(img, built["y"][:, :-1], built["mask"], spec)
+    assert result["shape_matches"] is False
+    assert result["ok"] is False
+
+
+def test_verifier_uses_optically_degraded_measurement_reference():
+    """An explicitly enabled non-identity PSF must not always fail the audit."""
+    from spur_mpm.physics.psf import PSFConfig
+    img = _image((4, 8, 8))
+    spec = SamplingSpec("y", ky=2)
+    psf = PSFConfig(sigma_xy_um=1.0, sigma_z_um=0.0,
+                    voxel_xy_um=1.0, voxel_z_um=1.0)
+    built = build_sparse(img, spec, psf=psf)
+    correct = verify_construction(img, built["y"], built["mask"], spec, psf=psf)
+    wrong = verify_construction(img, built["y"], built["mask"], spec)
+    assert correct["ok"] is True
+    assert wrong["measured_equals_dense"] is False
