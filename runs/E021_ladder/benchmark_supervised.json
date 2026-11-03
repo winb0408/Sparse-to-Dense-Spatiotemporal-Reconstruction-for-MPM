@@ -1,0 +1,197 @@
+{
+ "generated": "2026-11-04T03:40:24",
+ "device": "cuda:2",
+ "on_cpu": false,
+ "device_note": "latency measured on cuda:2",
+ "patch": 256,
+ "n_slices": 200,
+ "context_depth": 1,
+ "model": {
+  "base": 48,
+  "window": 8,
+  "depths": [
+   2,
+   2,
+   2
+  ],
+  "heads": [
+   4,
+   8,
+   16
+  ]
+ },
+ "arms": [
+  {
+   "arm": "S0",
+   "features": [
+    "y",
+    "mask"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 2,
+   "params": 2551873,
+   "params_m": 2.552,
+   "macs_per_slice": 23640145920,
+   "macs_per_volume": 4728029184000,
+   "latency_ms_per_slice": 28.14,
+   "sec_per_volume": 5.629,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 356.0,
+   "by_module": {
+    "Conv2d": 1292894208,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 28.14,
+    "p10_ms": 27.95,
+    "p90_ms": 28.39,
+    "mean_ms": 28.18,
+    "fps": 35.53,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  },
+  {
+   "arm": "S1",
+   "features": [
+    "y",
+    "mask",
+    "x0"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 3,
+   "params": 2552305,
+   "params_m": 2.552,
+   "macs_per_slice": 23668457472,
+   "macs_per_volume": 4733691494400,
+   "latency_ms_per_slice": 28.31,
+   "sec_per_volume": 5.662,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 356.0,
+   "by_module": {
+    "Conv2d": 1321205760,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 28.31,
+    "p10_ms": 28.26,
+    "p90_ms": 28.43,
+    "mean_ms": 28.33,
+    "fps": 35.32,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  },
+  {
+   "arm": "S2",
+   "features": [
+    "y",
+    "mask",
+    "x0",
+    "uncertainty"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 4,
+   "params": 2552737,
+   "params_m": 2.553,
+   "macs_per_slice": 23696769024,
+   "macs_per_volume": 4739353804800,
+   "latency_ms_per_slice": 28.95,
+   "sec_per_volume": 5.79,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 356.0,
+   "by_module": {
+    "Conv2d": 1349517312,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 28.95,
+    "p10_ms": 28.89,
+    "p90_ms": 29.09,
+    "mean_ms": 28.97,
+    "fps": 34.54,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  },
+  {
+   "arm": "S1g",
+   "features": [
+    "y",
+    "mask",
+    "x0"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 3,
+   "params": 2614705,
+   "params_m": 2.615,
+   "macs_per_slice": 27745320960,
+   "macs_per_volume": 5549064192000,
+   "latency_ms_per_slice": 29.83,
+   "sec_per_volume": 5.966,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 368.0,
+   "by_module": {
+    "Conv2d": 5398069248,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 29.83,
+    "p10_ms": 29.68,
+    "p90_ms": 29.9,
+    "mean_ms": 29.82,
+    "fps": 33.52,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  },
+  {
+   "arm": "S2g",
+   "features": [
+    "y",
+    "mask",
+    "x0",
+    "uncertainty"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 4,
+   "params": 2615137,
+   "params_m": 2.615,
+   "macs_per_slice": 27773632512,
+   "macs_per_volume": 5554726502400,
+   "latency_ms_per_slice": 30.19,
+   "sec_per_volume": 6.038,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 368.0,
+   "by_module": {
+    "Conv2d": 5426380800,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 30.19,
+    "p10_ms": 30.0,
+    "p90_ms": 30.4,
+    "mean_ms": 30.19,
+    "fps": 33.12,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  }
+ ],
+ "out": "runs/E021_ladder/benchmark_supervised.json"
+}

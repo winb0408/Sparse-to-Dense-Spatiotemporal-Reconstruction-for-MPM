@@ -1,0 +1,64 @@
+{
+  "sample_id": "M2_FOVI_S1_vessels",
+  "shape": [
+    201,
+    256,
+    256
+  ],
+  "voxel_um": [
+    5.0,
+    0.98,
+    0.98
+  ],
+  "z_view": 100,
+  "y_view": 128,
+  "x_view": 128,
+  "roi": [
+    0,
+    114,
+    96
+  ],
+  "mip_z": [
+    0,
+    201
+  ],
+  "zoom": 96,
+  "windows": {
+    "XY primary": [
+      0.0414351224899292,
+      0.7861397430300711
+    ],
+    "XZ": [
+      0.02294757589697838,
+      1.0
+    ],
+    "YZ": [
+      0.02496178448200226,
+      1.0
+    ],
+    "Zoom": [
+      0.041899109538644556,
+      0.7645157709717741
+    ],
+    "MIP-z": [
+      0.4325528346002102,
+      1.0
+    ]
+  },
+  "fingerprint": {
+    "files": {
+      "index": {
+        "path": "data_local/dryad_cache/index_cohort.json",
+        "bytes": 8060,
+        "mtime": 1793370347
+      },
+      "split": {
+        "path": "spur_mpm/experiments/E020_cohort/split.json",
+        "bytes": 949,
+        "mtime": 1793370331
+      }
+    },
+    "config_sha256": "6627ebc075676a2ad2ba2bb653f92191afcf87ca16b6246c40e8a0eb318d84f4"
+  },
+  "projection": "none (single XY/XZ/YZ slices; mip_z kept for a future projection)"
+}

@@ -1,47 +1,84 @@
-# 本分支的结果快照（E020 队列 / E021 阶梯 / E022 稀疏轴）
+# 本分支的结果快照（E020 队列 / E021 阶梯 / E023 手册执行）
 
 这个仓库的正常规则是**结果不入库**（`.gitignore` 里 `runs/` 整目录忽略）。这一批是
 强行加入的只读快照，为了在没有数据、没有 GPU 的机器上也能审阅：所有数字都能在
 `runs/E021_ladder/` 里回查到产生它的 `summary.json`，不用相信任何一处抄写。
 
+`docs/PHASE1_SUPERVISED_AUDIT_AND_RUNBOOK.md` 的 §4.1–§4.5 已全部执行完毕；执行记录、
+踩到的坑和被推翻的旧数字见 [`Project log/Project_log.md`](../Project%20log/Project_log.md)
+的 SPUR-E023 一节。
+
 ## 该看什么
 
 | 想看什么 | 文件 |
 |---|---|
-| 主表：30 个 cell × 10 个指标 + 归因 + 预算曲线 + 换轴表 | [`runs/E021_ladder/ladder.md`](../runs/E021_ladder/ladder.md) |
+| 主表：52 个 cell × 10 个指标 + 归因 + 预算曲线 | [`runs/E021_ladder/ladder.md`](../runs/E021_ladder/ladder.md) |
 | 同一批数字的机器可读版 | `runs/E021_ladder/ladder.csv`、`ladder.json` |
-| 参数量 / MACs / 延迟 | `runs/E021_ladder/complexity.md` |
-| 定性图（稀疏输入 / A0 / A1 / S1 / S2 / 密集真值 + 误差 + 支撑 + 深度剖面） | `runs/E021_ladder/figures/*.png` |
-| 每张定性图的逐臂数字（PSNR / Dice / Dice★）与几何 | `runs/E021_ladder/figures/*.json` |
+| **等上下文 25 % 换轴表**（`y_k4_c7 / z_k4 / yz_k2x2_c7`，七臂齐全） | `ladder.md` 末尾 "Axis at a matched 25 % budget, one seven-plane context" |
+| 参数量 / MACs / 延迟（含 S1g、S2g） | [`runs/E021_ladder/complexity.md`](../runs/E021_ladder/complexity.md)、`benchmark_supervised.json` |
+| **整卷 3D 血管结构**（Dice / clDice / skelF1 + 计分层占比） | `runs/E021_ladder/E021_S1_y_k2/structure/structure_summary.md`；用 `--from-summary` 可从 JSON 重排版 |
+| 固定视图的三协议对照（§4.4.1 D） | `runs/E021_ladder/figures_fixed/M2_FOVII_S1_vessels/compare_y_z_yz_25pct.png` |
+| 同一批图的**逐像素一致性报告** | 同级 `consistency_report.json`（`target_diff = fixed_view_diff = input_diff = 0`） |
+| 冻结的视图定义（切面、物理间距、统一窗宽、数据/配置指纹） | 同级 `view_spec.json` |
+| 单协议定性图（输入 / A0 / S1 / 密集真值 + 误差 + 支撑 + 深度剖面） | `figures_fixed/M2_FOVII_S1_vessels/qualitative_*_{y_k4,z_k4,yz_k2x2}.png` |
+| 五臂同输入对比（A0 / S0 / S1 / S2 / S2g，`y_k2`） | `runs/E021_ladder/figures/qual_y_k2/` |
+| 稀疏采集构建自检图（掩膜、2D 阶梯、覆盖率） | `spur_mpm/figures/sparse/` |
+| 每张定性图的逐臂数字（PSNR / Dice / Dice★）与几何 | 同级 `*.json` |
 | 每个 cell 的完整评估（逐窗 `samples.csv` + 汇总 `summary.json`） | `runs/E021_ladder/E021_*/eval_test/` |
 | 每个 cell 的实际配置（稀疏参数、上下文层数、训练超参） | `runs/E021_ladder/E021_*/config.yaml` |
-| 方法学与结论（含每处失败模式的测量） | [`Project log/Project_log.md`](../Project%20log/Project_log.md) 的 E020 / E021 / E022 |
-| 代码地图 | [`docs/CODE_MAP.md`](CODE_MAP.md) |
+| 代码地图与三个硬性图形约束 | [`docs/CODE_MAP.md`](CODE_MAP.md) |
 
 ## 一句话结论
 
 - **可主张**：Y 方向行稀疏在 25 % / 12.5 % 预算上，监督重建的血管结构优于双线性
-  （Dice★ +0.040 / +0.059，clDice★ +0.067 / +0.097）；灰度 PSNRmiss 全部九级涨 1.0–1.5 dB。
+  （等面积 Dice★ +0.040 / +0.059，clDice★ +0.067 / +0.097）；灰度 PSNRmiss 全部九级涨 1.0–1.5 dB。
+- **可主张**：插值的质量依赖稀疏轴（A0 三轴极差 0.0405 Dice），监督臂把三轴拉平到
+  0.015–0.020——收益是"消除轴间差异"，不是"某个轴更好"。
+- **可主张**：新增的门控融合臂 S2g（X0 + U + Gate）**没有**可测量增益（vs S1g +0.08 dB /
+  +0.0001 Dice），却把 MACs 抬 17 %、延迟抬 6 %。这是本轮唯一一条"成本涨、收益没到"的净结论。
 - **不可主张**：Z 轴与 Y+Z 轴的结构增益；50 % / 33 % 预算上的结构增益；三个创新点
-  （X0 / U / 门控融合）的任何独立贡献。
+  （X0 / U / 门控融合）的任何独立贡献；任何"某个稀疏轴更好"。
 - 门槛：跨动物方差约 2.8 dB / 0.08 Dice，所以 < 1 dB 与 < 0.03 Dice 的差异不写结论。
+
+## 引用整卷结构分数时必须一起引用的东西
+
+§4.3 的血管门控会剔掉参考前景占比 > 15 % 的层，实测占比：
+
+| volume | 被门控层 / 总层 | 参与评分 |
+|---|---|---|
+| M2_FOVII_S1 | 57/203 | 72 % |
+| M2_FOVII_S2 | 68/202 | 66 % |
+| M2_FOVI_S1 | 82/201 | 59 % |
+| M2_FOVI_S2 | 101/152 | **34 %** |
+
+均值 Dice 0.8634 / clDice 0.7725 / skelF1 0.7373 是**"幸存层上的分数"**，不是整卷分数；
+四卷占比差一倍，跨卷比较也因此受限。`structure_summary.md` 现在逐卷打印
+`gated/total (scored %)`。被门控清空的 slab 原实现记 `dice = 1.0`（两个空掩膜"完全一致"），
+已改为 NaN，否则对 slab 求平均等于给最难深度发奖励。
 
 ## 没有入库的东西
 
 | 没有 | 大小 | 怎么重建 |
 |---|---|---|
 | 检查点 `best.pt` / `last.pt` / `resume.pt` | 每 cell ≈ 10 / 30 / 30 MB | `python -m spur_mpm.scripts.run_ladder --stage …`（见 CODE_MAP §6） |
-| 定性图的 `.npz` 体数据转储 | 单张 ≈ 350 MB | `python -m spur_mpm.scripts.qualitative_figures …` |
+| 定性图的 float32 `.npz` 体数据转储 | 单目录 ≈ 370 MB | `python -m spur_mpm.scripts.qualitative_figures …` |
+| `figures_fixed/M2_FOVII_S1_vessels_z101/`（z=101 旧图，该层在 2/3 协议里被跳过） | ≈ 370 MB | 保留在本地做对照，未推送 |
 | Dryad 3PM 原始数据与缓存 | 数十 GB | 见 `spur_mpm/scripts/prepare_data.py` 与日志 E000 |
 
 ## 环境
 
 conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -q`
-（149 项，全绿；本轮新增的有 `test_run_ladder_state.py` 与 `test_ladder_report.py`）。
+（**178 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
+`test_ladder_report.py`、`test_skeleton.py` 的扩充，以及 `test_run_ladder_state.py`）。
 
-## 一个必须知道的口径陷阱
+## 两个必须知道的口径陷阱
 
-参考阈值拟合出的 `Dice` 与等面积重取阈的 `Dice★` 在**同一批预测**上方向相反。差别全部
-来自预测的对比度漂移，不是结构差异。看表时以 ★ 列为准，但 ★ 必须与不带星的列并读
-（`metrics/vessel.py::match_foreground` 的 docstring 记了它自己的局限，以及一个随机
-重叠基线 ≈ 0.19 作为量级自检）。
+1. **`Dice` 与 `Dice★` 方向相反。** 参考阈值拟合出的 `Dice` 与等面积重取阈的 `Dice★` 在
+   同一批预测上方向相反；差别全部来自预测的对比度漂移，不是结构差异。看表以 ★ 列为准，
+   但 ★ 必须与不带星的列并读（`metrics/vessel.py::match_foreground` 的 docstring 记了它
+   自己的局限，以及一个随机重叠基线 ≈ 0.19 作为量级自检）。
+2. **cell 名会随上下文变。** `cell_name(arm, level, context)` 在"强制上下文等于层级自身
+   上下文"时返回**不带** `_cN` 的裸名。对自身上下文 ≠ 7 的层级加 `--context-slices 7`
+   重打分，会去找一个从未训练过的 `_c7` 兄弟目录、报 `no_checkpoint` 并把**修复前的旧
+   分数**留在表里。全量重打分不要带 `--context-slices`（见
+   `runs/E023_phase1/rescore_own_context.sh` 头部的说明）。
