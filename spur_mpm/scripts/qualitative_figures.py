@@ -79,9 +79,9 @@ from spur_mpm.physics.acquisition import NoiseConfig
 from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.physics.sampling import SamplingSpec
 from spur_mpm.scripts.viewspec import (
-    build_view_spec, check_group, check_protocols, load_view_spec,
-    mask_geometry, protocol_columns, ref_windows, save_view_spec, take,
-    validate_view_spec,
+    annotate, build_view_spec, check_group, check_protocols, fingerprint,
+    load_view_spec, mask_geometry, protocol_columns, ref_windows,
+    save_view_spec, take, validate_view_spec,
 )
 from spur_mpm.ssl.holdout import HoldoutSpec
 
@@ -671,6 +671,21 @@ def render_comparison(groups: list[dict], out_dir: Path, spec: dict,
     return [png]
 
 
+def _freeze(spec: dict, ref: np.ndarray, mask: np.ndarray, cfg: dict) -> dict:
+    """Attach the reference-derived windows and the provenance to a view spec.
+
+    Only the *fixed* panels' windows go in: a protocol diagnostic panel exists
+    in one protocol only, so freezing its window would make the spec look
+    protocol-dependent when the geometry is not.
+    """
+    fixed = [c for c in protocol_columns(spec, mask) if c["role"] == "fixed"]
+    return annotate(
+        spec,
+        windows=ref_windows(ref, fixed, spec),
+        provenance=fingerprint({"index": cfg["data"]["index"],
+                                "split": cfg["data"]["split"]}, cfg))
+
+
 def slug(text: str) -> str:
     """A group label reduced to what a filename can carry."""
     return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
@@ -771,6 +786,7 @@ def main(argv: list[str] | None = None) -> int:
                                                                  (1.0, 1.0, 1.0)),
                                 zoom=args.zoom))
         out_dir = Path(args.out)
+        spec = _freeze(spec, ref, groups[0]["vols"][0]["in_mask"], cfg)
         if args.save_view_spec:
             save_view_spec(spec, args.save_view_spec)
         written = render_comparison(groups, out_dir, spec, dpi=args.dpi,
@@ -833,6 +849,9 @@ def main(argv: list[str] | None = None) -> int:
             build_view_spec(ref, sample_id=sample,
                             voxel_um=vols[0].get("voxel_um", (1.0, 1.0, 1.0)),
                             zoom=args.zoom))
+    spec = {k: v for k, v in spec.items()
+            if k not in ("windows", "fingerprint", "projection")}
+    spec = _freeze(spec, ref, vols[0]["in_mask"], cfg)
     if args.save_view_spec:
         save_view_spec(spec, args.save_view_spec)
     tag = args.tag

@@ -223,3 +223,35 @@ def test_group_labels_become_filename_safe():
     assert slug("y_k4") == "y_k4"
     assert slug("y_k4, c7") == "y_k4_c7"
     assert slug("yz_k2x2 (25%)") == "yz_k2x2_25"
+
+
+def test_a_frozen_spec_carries_its_windows_and_provenance(tmp_path):
+    """§4.4.1 D: one file per sample states the cuts, the windows and the source."""
+    import json
+    from spur_mpm.scripts.qualitative_figures import _freeze
+    from spur_mpm.scripts.viewspec import load_view_spec, save_view_spec
+    ref = _ref()
+    mask = _masks()["y_k2"]
+    spec = build_view_spec(ref, sample_id="s", zoom=16)
+    cfg = {"data": {"index": str(tmp_path / "index.json"),
+                    "split": str(tmp_path / "split.json")},
+           "sampling": {"mode": "y", "ky": 2, "kz": 1}}
+    (tmp_path / "index.json").write_text("{}")
+    (tmp_path / "split.json").write_text("{}")
+    for f in ("index.json", "split.json"):
+        p = tmp_path / f
+        p.write_text(p.read_text() + " ")
+    frozen = _freeze(spec, ref, mask, cfg)
+    # the windows are the reference's, one per fixed panel -- not per diagnostic
+    assert set(frozen["windows"]) <= {c["key"] for c in
+                                      protocol_columns(spec, mask)}
+    assert all(len(v) == 2 and v[0] < v[1] for v in frozen["windows"].values())
+    assert frozen["fingerprint"]["config_sha256"]
+    # a loaded frozen spec still validates against the same volume
+    out = save_view_spec(frozen, tmp_path / "view_spec.json")
+    again = validate_view_spec(load_view_spec(out), ref.shape)
+    assert again["roi"] == frozen["roi"] and again["z_view"] == frozen["z_view"]
+    # and the hash tracks the config, so a changed input cannot reuse a spec
+    other = _freeze(spec, ref, mask, {**cfg, "sampling": {"mode": "z", "kz": 4}})
+    assert (other["fingerprint"]["config_sha256"]
+            != frozen["fingerprint"]["config_sha256"])

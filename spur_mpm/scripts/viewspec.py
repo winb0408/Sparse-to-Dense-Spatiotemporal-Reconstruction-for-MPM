@@ -29,6 +29,7 @@ without loading a volume cache or a model.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -105,6 +106,48 @@ def validate_view_spec(spec: dict, shape: tuple[int, int, int]) -> dict:
     if not (0 <= mz0 < mz1 <= z):
         raise ValueError(f"view spec MIP range {spec['mip_z']} outside {z}")
     return spec
+
+
+def fingerprint(files: dict, cfg: dict) -> dict:
+    """What the figure was derived from: the files' identity, and the config.
+
+    A view spec without its provenance is not reproducible -- the same cuts on a
+    rebuilt cache are a different experiment.  The hash is over the merged
+    config, so any setting that changes the input (sampling, PSF, noise,
+    normalisation) changes the fingerprint.
+    """
+    out: dict[str, dict | None] = {}
+    for name, p in files.items():
+        p = Path(p)
+        if not p.exists():
+            out[name] = None
+            continue
+        st = p.stat()
+        out[name] = {"path": str(p), "bytes": int(st.st_size),
+                     "mtime": int(st.st_mtime)}
+    blob = json.dumps(cfg, sort_keys=True, default=str).encode()
+    return {"files": out,
+            "config_sha256": hashlib.sha256(blob).hexdigest()}
+
+
+def annotate(spec: dict, *, windows: dict | None = None,
+             provenance: dict | None = None) -> dict:
+    """Return a copy of ``spec`` carrying the windows and provenance it was used with.
+
+    Kept inside the spec (rather than in a sidecar next to it) because §4.4.1 D
+    asks for one file per sample that says *both* where the cuts are and what
+    display window every protocol must reuse.
+    """
+    out = dict(spec)
+    if windows is not None:
+        out["windows"] = {k: [float(v[0]), float(v[1])] for k, v in windows.items()}
+    if provenance is not None:
+        out["fingerprint"] = provenance
+    # No projection is drawn: every panel is a single slice.  Recorded so nobody
+    # reads ``mip_z`` and assumes a maximum-intensity projection was shown.
+    out.setdefault("projection", "none (single XY/XZ/YZ slices; mip_z kept "
+                                "for a future projection)")
+    return out
 
 
 def save_view_spec(spec: dict, path: Path) -> Path:
