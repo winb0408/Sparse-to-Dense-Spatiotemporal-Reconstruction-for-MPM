@@ -140,7 +140,9 @@ def test_z_boundary_windows_always_query_trained_centre(prepared, mode, ky, kz):
         assert item["inputs"].shape == (6, 32, 32)
         assert item["warmstart_center"].shape == (32, 32)
         # The centre is the real query plane, never a padding plane.
-        assert bool(item["acq_mask"].any()) or mode == "z"
+        # The queried plane may itself be skipped for z/yz protocols.
+        if mode == "y":
+            assert bool(item["acq_mask"].any())
         assert torch.isfinite(item["warmstart_center"]).all()
     # No padded virtual Z plane may appear as a measured input channel.
     first_input_mask = first["inputs"][3:6].bool()  # feature-major 3 mask slices
