@@ -196,8 +196,9 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                 pred = select_centre(model(x).float(), batch["center_index"])
                 pred = pred.cpu()
             else:
-                x0 = batch["inputs"][:, _feature_slice(features, "x0", context)]
-                pred = x0[:, context // 2]
+                # Use the same query-centred prior as inference. This also
+                # works at Z borders and is independent of input feature order.
+                pred = batch["warmstart_center"]
 
             target = batch["target"]
             acq = batch["acq_mask"].bool()
