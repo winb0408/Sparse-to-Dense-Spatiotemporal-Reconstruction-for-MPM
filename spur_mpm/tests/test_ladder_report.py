@@ -120,3 +120,22 @@ def test_attribution_ladder_reaches_the_complete_arm():
     # the one line that has a real delta must be the one that claims it
     rows = [ln for ln in text.splitlines() if "S2g over S1g" in ln]
     assert rows and "yes" in rows[0]
+
+
+def test_the_equal_context_table_uses_the_c7_cells():
+    """plan §3.3: the axis verdict must survive at one fixed Z context."""
+    from spur_mpm.scripts.ladder_report import CONTROL_LEVELS, axis_comparison
+    cells = {}
+    for lvl, dice in zip(CONTROL_LEVELS, (0.55, 0.53, 0.58)):
+        for arm in ("S0", "S1", "S2", "S1g", "S2g"):
+            cells[(arm, lvl)] = {"dice": dice, "cl_dice": dice,
+                                 "dice_area": dice, "cl_dice_area": dice}
+    text = axis_comparison(cells, levels=CONTROL_LEVELS,
+                           title="Axis at a matched 25 % budget, one "
+                                 "seven-plane context (plan §3.3)")
+    assert "one seven-plane context" in text
+    for lvl in CONTROL_LEVELS:
+        assert lvl in text
+    # S2g is in this table; the non-forced one cannot show it (it has no
+    # plain y_k4 cell), so the equal-context table is where its axis verdict lives
+    assert "| S2g |" in text

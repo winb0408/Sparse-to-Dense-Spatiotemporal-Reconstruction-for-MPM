@@ -40,6 +40,11 @@ DICE_FLOOR = 0.03
 #: so "does the axis of the sparsity matter" is asked at a constant budget.
 MATCHED_LEVELS = ("y_k4", "z_k4", "yz_k2x2")
 
+#: The same three budgets with the Z context forced to seven planes, so every
+#: arm is asked the "does the axis matter" question at equal usable depth.
+#: ``z_k4`` needs seven planes natively, so its cell is shared with MATCHED_LEVELS.
+CONTROL_LEVELS = ("y_k4_c7", "z_k4", "yz_k2x2_c7")
+
 ARMS = ("A0", "A1", "S0", "S1", "S2", "S1g", "S2g")
 #: metric key -> column label; ``None`` means "not in summary.json" when the
 #: evaluation ran without --skeleton.
@@ -182,7 +187,9 @@ def budget_curve(cells: dict[tuple[str, str], dict], arm: str = "S1") -> str:
 
 
 def axis_comparison(cells: dict[tuple[str, str], dict],
-                    levels: tuple[str, ...] = MATCHED_LEVELS) -> str:
+                    levels: tuple[str, ...] = MATCHED_LEVELS,
+                    title: str = "Axis of the sparsity at a matched 25 % budget"
+                    ) -> str:
     """At one budget, is the axis the sparsity sits on worth a claim?
 
     ``y_k4`` / ``z_k4`` / ``yz_k2x2`` all measure 25 % of the voxels. If the
@@ -203,7 +210,7 @@ def axis_comparison(cells: dict[tuple[str, str], dict],
     # every level's Dice★. Building it by interleaving gives a table whose
     # numbers sit under the wrong labels -- the failure mode these tables exist
     # to prevent, so the two orders are written out rather than derived.
-    out = ["\n### Axis of the sparsity at a matched 25 % budget\n",
+    out = [f"\n### {title}\n",
            "| arm | " + " | ".join(f"Dice {lvl}" for lvl in levels) + " | " +
            " | ".join(f"Dice★ {lvl}" for lvl in levels) +
            " | ΔDice | ΔclDice | ΔDice★ | ΔclDice★ | claim (on ★) |",
@@ -254,6 +261,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.curve_arm:
         blocks.append(budget_curve(cells, args.curve_arm))
     blocks.append(axis_comparison(cells))
+    # The same question with the Z context forced to seven planes for all three
+    # protocols (plan §3.3): if the axis verdict is an artefact of each protocol
+    # seeing a different number of neighbouring planes, it moves here.
+    control = axis_comparison(
+        cells, levels=CONTROL_LEVELS,
+        title="Axis at a matched 25 % budget, one seven-plane context "
+              "(plan §3.3)")
+    if control:
+        blocks.append(control)
     blocks.append(f"Floors: a difference is only claimed above {PSNR_FLOOR_DB:g} dB "
                   f"or {DICE_FLOOR:g} Dice. Source: {len(cells)} cells under "
                   f"`{args.root}`. ★ = same prediction segmented at an "

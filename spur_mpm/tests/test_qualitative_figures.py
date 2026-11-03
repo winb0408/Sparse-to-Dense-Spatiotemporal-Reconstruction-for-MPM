@@ -255,3 +255,14 @@ def test_a_frozen_spec_carries_its_windows_and_provenance(tmp_path):
     other = _freeze(spec, ref, mask, {**cfg, "sampling": {"mode": "z", "kz": 4}})
     assert (other["fingerprint"]["config_sha256"]
             != frozen["fingerprint"]["config_sha256"])
+
+
+def test_the_fixed_xy_panel_can_be_named_explicitly():
+    """§4.4.1 B: the shared XY column should be a plane every protocol measured."""
+    ref = _ref()
+    spec = build_view_spec(ref, sample_id="s", zoom=16, z_view=4)
+    assert spec["z_view"] == 4
+    # and a coordinate outside the volume is refused, not clipped
+    import pytest
+    with pytest.raises(ValueError, match="outside the volume"):
+        build_view_spec(ref, sample_id="s", zoom=16, z_view=ref.shape[0])

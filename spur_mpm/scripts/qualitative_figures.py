@@ -742,6 +742,16 @@ def main(argv: list[str] | None = None) -> int:
                          "protocol can reuse exactly it")
     ap.add_argument("--zoom", type=int, default=96,
                     help="side of the square zoom panel, in voxels")
+    ap.add_argument("--z-view", type=int, default=None,
+                    help="explicit Z coordinate of the fixed XY panel and zoom "
+                         "box; default: the middle plane. Cross-protocol "
+                         "figures should name a plane every compared protocol "
+                         "measured, so the shared column is informative in "
+                         "every row")
+    ap.add_argument("--y-view", type=int, default=None,
+                    help="explicit Y coordinate of the fixed XZ panel")
+    ap.add_argument("--x-view", type=int, default=None,
+                    help="explicit X coordinate of the fixed YZ panel")
     ap.add_argument("--compare", type=Path, default=None,
                     help="JSON manifest of protocol groups; writes "
                          "compare_<sample>_<levels>.png and a consistency "
@@ -784,7 +794,8 @@ def main(argv: list[str] | None = None) -> int:
                 build_view_spec(ref, sample_id=sample,
                                 voxel_um=groups[0]["vols"][0].get("voxel_um",
                                                                  (1.0, 1.0, 1.0)),
-                                zoom=args.zoom))
+                                zoom=args.zoom, z_view=args.z_view,
+                                y_view=args.y_view, x_view=args.x_view))
         out_dir = Path(args.out)
         spec = _freeze(spec, ref, groups[0]["vols"][0]["in_mask"], cfg)
         if args.save_view_spec:
@@ -848,7 +859,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.view_spec else
             build_view_spec(ref, sample_id=sample,
                             voxel_um=vols[0].get("voxel_um", (1.0, 1.0, 1.0)),
-                            zoom=args.zoom))
+                            zoom=args.zoom, z_view=args.z_view,
+                            y_view=args.y_view, x_view=args.x_view))
     spec = {k: v for k, v in spec.items()
             if k not in ("windows", "fingerprint", "projection")}
     spec = _freeze(spec, ref, vols[0]["in_mask"], cfg)

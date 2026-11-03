@@ -65,6 +65,11 @@ def build_view_spec(ref: np.ndarray, *, sample_id: str = "",
     zc = int(0.5 * z) if z_view is None else int(z_view)
     yc = h // 2 if y_view is None else int(y_view)
     xc = w // 2 if x_view is None else int(x_view)
+    # Check the named cuts before using them: an explicit coordinate outside the
+    # volume would otherwise fail deep inside the ROI search with an IndexError.
+    if not (0 <= zc < z and 0 <= yc < h and 0 <= xc < w):
+        raise ValueError(f"view cuts (z={zc}, y={yc}, x={xc}) outside the "
+                         f"volume {(z, h, w)}")
     n = int(min(zoom, h, w))
     if roi is None:
         from scipy.ndimage import uniform_filter
