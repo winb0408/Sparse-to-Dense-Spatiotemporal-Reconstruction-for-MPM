@@ -357,3 +357,14 @@ def test_branch_lengths_do_not_re_thin_and_stay_exact():
     line = skeleton(np.eye(40, dtype=bool))
     assert _branch_lengths(line, np.zeros_like(line)) == pytest.approx(
         [39 * np.sqrt(2)])
+
+
+def test_mean_radius_um_uses_anisotropic_distance_not_voxel_geometric_mean():
+    """Dryad Z 5um / XY .98um needs physical EDT, not geometric-mean scaling."""
+    from scipy.ndimage import distance_transform_edt
+    mask = np.zeros((7, 25, 25), dtype=bool)
+    mask[3, 8:17, 8:17] = True
+    thin = skeleton(mask)
+    expected = distance_transform_edt(mask, sampling=VOXEL)[thin].mean()
+    measured = skeleton_stats(mask, voxel_um=VOXEL)["mean_radius_um"]
+    assert measured == pytest.approx(float(expected), rel=1e-6)
