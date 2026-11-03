@@ -73,6 +73,9 @@ ARMS: dict[str, Arm] = {
                 fusion=True, description="SS2 with gated prior fusion"),
     "S1g": Arm("S1g", _BASE_FEATURES + ("x0",), "wiener", "dense", fusion=True,
                description="supervised + warm-start, gated fusion"),
+    "S2g": Arm("S2g", _BASE_FEATURES + ("x0", "uncertainty"),
+                "wiener", "dense", fusion=True,
+                description="supervised + warm-start + U + gated fusion"),
     # E012: the arm that answers "MMS only ever looks at half the acquisition".
     # Same features, warm start and objective as SS1 per branch; two branches on
     # disjoint halves, each scored on the other's real measurements.
