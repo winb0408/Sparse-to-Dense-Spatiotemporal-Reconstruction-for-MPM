@@ -1,0 +1,14 @@
+| arm | params(M) | MACs/slice(G) | MACs/volume(T) | latency ms/slice | s/volume |
+|---|---|---|---|---|---|
+| S0 | 2.552 | 23.64 | 4.728 | 28.270 | 5.655 |
+| S1 | 2.552 | 23.67 | 4.734 | 28.430 | 5.686 |
+| S2 | 2.553 | 23.7 | 4.739 | 28.890 | 5.777 |
+| S1g | 2.615 | 27.75 | 5.549 | 29.730 | 5.945 |
+| A0 | 0.000 | n/a | n/a | n/a | n/a |
+| A1 | 0.000 | n/a | n/a | n/a | n/a |
+
+Device: `cuda:2`. Tiles of 256x256 px, 200 per volume, so MACs/volume = 200 x MACs/slice: the network is 2-D and applied slice-wise.
+
+- `A0`: no network (bilinear): the parameter-free floor, MACs and latency are not applicable
+- `A1`: no network (wiener_fill_first): the parameter-free floor, MACs and latency are not applicable
+wrote runs/E021_ladder/complexity.md (6 arms, device cuda:2)

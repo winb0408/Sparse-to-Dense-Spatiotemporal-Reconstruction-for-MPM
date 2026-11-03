@@ -1,0 +1,9 @@
+A0       psnr=24.3303 dice=0.6628 e_measured=0.0000 e_missing=0.0522
+A1       psnr=24.3303 dice=0.6628 e_measured=0.0000 e_missing=0.0522
+S1       psnr=25.5335 dice=0.6420 e_measured=0.0059 e_missing=0.0444
+S2       psnr=25.5654 dice=0.6398 e_measured=0.0057 e_missing=0.0443
+wrote runs/E021_ladder/figures/qualitative_M2_FOVII_S1_vessels_y_k4.png
+wrote runs/E021_ladder/figures/error_M2_FOVII_S1_vessels_y_k4.png
+wrote runs/E021_ladder/figures/support_M2_FOVII_S1_vessels_y_k4.png
+wrote runs/E021_ladder/figures/profile_M2_FOVII_S1_vessels_y_k4.png
+ALL_DONE

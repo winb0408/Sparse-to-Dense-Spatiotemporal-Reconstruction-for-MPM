@@ -1,0 +1,106 @@
+{
+  "sample_id": "M2_FOVII_S1_vessels",
+  "fold": 0,
+  "sampling": "y_k4",
+  "sampling_fraction": 0.25,
+  "mask_geometry": {
+    "measured_fraction": 0.25,
+    "kept_y_rows": 64,
+    "y_period": 4,
+    "x_dense": true,
+    "z_dense": true,
+    "row_pattern": "1000100010001000"
+  },
+  "input_support": "full",
+  "consistency_projection": "none",
+  "arms": [
+    {
+      "arm": "A0",
+      "checkpoint": null,
+      "supervision": "none",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 24.330331802368164,
+        "mae": 0.03914912790060043,
+        "ssim": 0.5012586475005878,
+        "e_measured": 0.0,
+        "e_missing": 0.05219884051624777,
+        "dice": 0.6628455682323571,
+        "cl_dice": 0.6516774769576045,
+        "pred_fraction": 0.16103005996478603,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 331.9408866995074,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0,
+        "dice_area": 0.6677944332248361
+      }
+    },
+    {
+      "arm": "A1",
+      "checkpoint": null,
+      "supervision": "none",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 24.330331802368164,
+        "mae": 0.03914912790060043,
+        "ssim": 0.5012586475005878,
+        "e_measured": 0.0,
+        "e_missing": 0.05219884051624777,
+        "dice": 0.6628455682323571,
+        "cl_dice": 0.6516774769576045,
+        "pred_fraction": 0.16103005996478603,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 331.9408866995074,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0,
+        "dice_area": 0.6677944332248361
+      }
+    },
+    {
+      "arm": "S1",
+      "checkpoint": "runs/E021_ladder/E021_S1_y_k4/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 25.53350067138672,
+        "mae": 0.034799959510564804,
+        "ssim": 0.5838827026888654,
+        "e_measured": 0.005889547981890698,
+        "e_missing": 0.044436762614056394,
+        "dice": 0.6419521484301105,
+        "cl_dice": 0.6348953260748701,
+        "pred_fraction": 0.08131754457069736,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 432.5073891625616,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0,
+        "dice_area": 0.6998811501581501
+      }
+    },
+    {
+      "arm": "S2",
+      "checkpoint": "runs/E021_ladder/E021_S2_y_k4/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 25.565425872802734,
+        "mae": 0.03462954983115196,
+        "ssim": 0.5827298933649298,
+        "e_measured": 0.005749454616289127,
+        "e_missing": 0.04425624844255706,
+        "dice": 0.6397941536664429,
+        "cl_dice": 0.6325311009289664,
+        "pred_fraction": 0.07883960742668565,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 454.2068965517241,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0,
+        "dice_area": 0.7015798809037044
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+stages=['ablation', 'sweep', 'matched'] cells=22 todo=22 devices=['2'] jobs=2
+[2] A1   y_k2     ok  psnr=28.042  dice=0.7279  cl_dice=0.7095
+[2] A0   y_k2     ok  psnr=28.042  dice=0.7279  cl_dice=0.7095
+[2] S0   y_k2     ok  psnr=29.488  dice=0.7218  cl_dice=0.7060
+[2] S1   y_k2     ok  psnr=29.499  dice=0.7199  cl_dice=0.7029
+[2] S2   y_k2     ok  psnr=29.470  dice=0.7209  cl_dice=0.7045
+[2] S1g  y_k2     ok  psnr=29.376  dice=0.7214  cl_dice=0.7047
+[2] S1   y_k4     ok  psnr=27.522  dice=0.5450  cl_dice=0.5144
+[2] S1   y_k3     ok  psnr=28.118  dice=0.6081  cl_dice=0.5780
+[2] S1   y_k8     ok  psnr=26.116  dice=0.3810  cl_dice=0.3545
+[2] S1   z_k2     eval_failed
+[2] S1   z_k4     eval_failed
+[2] S1   yz_k2x2  ok  psnr=27.782  dice=0.5739  cl_dice=0.5461
+[2] S1   yz_k2x4  ok  psnr=26.596  dice=0.4580  cl_dice=0.4304
+[2] A0   y_k4     ok  psnr=26.016  dice=0.5979  cl_dice=0.5614
+[2] A1   y_k4     ok  psnr=26.016  dice=0.5979  cl_dice=0.5614
+[2] S2   y_k4     ok  psnr=27.539  dice=0.5457  cl_dice=0.5156
+[2] A0   z_k4     eval_failed
+[2] A1   z_k4     eval_failed
+[2] S2   z_k4     eval_failed
+[2] A0   yz_k2x2  ok  psnr=26.718  dice=0.6243  cl_dice=0.5990
+[2] A1   yz_k2x2  ok  psnr=26.718  dice=0.6243  cl_dice=0.5990
+[2] S2   yz_k2x2  ok  psnr=27.812  dice=0.5738  cl_dice=0.5459
+
+finished 22 cells in 1.31 h; state -> runs/E021_ladder/ladder.json
+FAILED: S1/z_k2, S1/z_k4, A0/z_k4, A1/z_k4, S2/z_k4  (logs in runs/E021_ladder/_logs)

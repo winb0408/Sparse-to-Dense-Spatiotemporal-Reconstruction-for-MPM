@@ -1,0 +1,425 @@
+{
+  "arm": "S1",
+  "split": "test",
+  "fold": 0,
+  "checkpoint": "runs/E021_ladder/E021_S1_yz_k2x4/best.pt",
+  "sampling": {
+    "mode": "yz",
+    "ky": 2,
+    "kz": 4,
+    "pattern": "grid",
+    "seed": 0,
+    "ideal_fraction": 0.125
+  },
+  "context_depth": 7,
+  "physics": {
+    "psf": {
+      "sigma_xy_um": 0.0,
+      "sigma_z_um": 0.0,
+      "voxel_xy_um": 0.98,
+      "voxel_z_um": 5.0,
+      "sigma_xy_px": 0.0,
+      "sigma_z_px": 0.0,
+      "is_identity": true
+    },
+    "lam": 0.01,
+    "u_kind": "geo"
+  },
+  "supervision": "dense",
+  "input_support": "full",
+  "consistency_projection": "none",
+  "n_windows": 758,
+  "n_windows_fully_measured": 0,
+  "metrics": {
+    "psnr": {
+      "metric": "psnr",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 26.596366021752672
+      },
+      "mean_of_group_means": 26.596366021752672,
+      "ci_lo": 26.596366021752672,
+      "ci_hi": 26.596366021752672,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "psnr_measured": {
+      "metric": "psnr_measured",
+      "n_units": 191,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 40.82338833808899
+      },
+      "mean_of_group_means": 40.82338833808899,
+      "ci_lo": 40.82338833808899,
+      "ci_hi": 40.82338833808899,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "psnr_missing": {
+      "metric": "psnr_missing",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 25.924370830795066
+      },
+      "mean_of_group_means": 25.924370830795066,
+      "ci_lo": 25.924370830795066,
+      "ci_hi": 25.924370830795066,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "ssim": {
+      "metric": "ssim",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.48696118315047826
+      },
+      "mean_of_group_means": 0.48696118315047826,
+      "ci_lo": 0.48696118315047826,
+      "ci_hi": 0.48696118315047826,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "mae": {
+      "metric": "mae",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.04087064788114073
+      },
+      "mean_of_group_means": 0.04087064788114073,
+      "ci_lo": 0.04087064788114073,
+      "ci_hi": 0.04087064788114073,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "e_measured": {
+      "metric": "e_measured",
+      "n_units": 191,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.016778713529222493
+      },
+      "mean_of_group_means": 0.016778713529222493,
+      "ci_lo": 0.016778713529222493,
+      "ci_hi": 0.016778713529222493,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "e_missing": {
+      "metric": "e_missing",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.04461609334058293
+      },
+      "mean_of_group_means": 0.04461609334058293,
+      "ci_lo": 0.04461609334058293,
+      "ci_hi": 0.04461609334058293,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "dice": {
+      "metric": "dice",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.45802683124928406
+      },
+      "mean_of_group_means": 0.45802683124928406,
+      "ci_lo": 0.45802683124928406,
+      "ci_hi": 0.45802683124928406,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "cl_dice": {
+      "metric": "cl_dice",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.4303824316576269
+      },
+      "mean_of_group_means": 0.4303824316576269,
+      "ci_lo": 0.4303824316576269,
+      "ci_hi": 0.4303824316576269,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "dice_area": {
+      "metric": "dice_area",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.5831483176515689
+      },
+      "mean_of_group_means": 0.5831483176515689,
+      "ci_lo": 0.5831483176515689,
+      "ci_hi": 0.5831483176515689,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "cl_dice_area": {
+      "metric": "cl_dice_area",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.5675747822651659
+      },
+      "mean_of_group_means": 0.5675747822651659,
+      "ci_lo": 0.5675747822651659,
+      "ci_hi": 0.5675747822651659,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "pred_fraction": {
+      "metric": "pred_fraction",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.053651049772478976
+      },
+      "mean_of_group_means": 0.053651049772478976,
+      "ci_lo": 0.053651049772478976,
+      "ci_hi": 0.053651049772478976,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "ref_fraction": {
+      "metric": "ref_fraction",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.186524202452486
+      },
+      "mean_of_group_means": 0.186524202452486,
+      "ci_lo": 0.186524202452486,
+      "ci_hi": 0.186524202452486,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "vessel_threshold": {
+      "metric": "vessel_threshold",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.02899822462645392
+      },
+      "mean_of_group_means": 0.02899822462645392,
+      "ci_lo": 0.02899822462645392,
+      "ci_hi": 0.02899822462645392,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "precision": {
+      "metric": "precision",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.7854082384729556
+      },
+      "mean_of_group_means": 0.7854082384729556,
+      "ci_lo": 0.7854082384729556,
+      "ci_hi": 0.7854082384729556,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "recall": {
+      "metric": "recall",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.37441047621453205
+      },
+      "mean_of_group_means": 0.37441047621453205,
+      "ci_lo": 0.37441047621453205,
+      "ci_hi": 0.37441047621453205,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "f1": {
+      "metric": "f1",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.43878403949391137
+      },
+      "mean_of_group_means": 0.43878403949391137,
+      "ci_lo": 0.43878403949391137,
+      "ci_hi": 0.43878403949391137,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "precision_area": {
+      "metric": "precision_area",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.7080237712622061
+      },
+      "mean_of_group_means": 0.7080237712622061,
+      "ci_lo": 0.7080237712622061,
+      "ci_hi": 0.7080237712622061,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "recall_area": {
+      "metric": "recall_area",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.5395499794042131
+      },
+      "mean_of_group_means": 0.5395499794042131,
+      "ci_lo": 0.5395499794042131,
+      "ci_hi": 0.5395499794042131,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "f1_area": {
+      "metric": "f1_area",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 0.6022344151618059
+      },
+      "mean_of_group_means": 0.6022344151618059,
+      "ci_lo": 0.6022344151618059,
+      "ci_hi": 0.6022344151618059,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_pred_n_branches": {
+      "metric": "skel_pred_n_branches",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 324.4617414248021
+      },
+      "mean_of_group_means": 324.4617414248021,
+      "ci_lo": 324.4617414248021,
+      "ci_hi": 324.4617414248021,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_ref_n_branches": {
+      "metric": "skel_ref_n_branches",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 1613.9313984168866
+      },
+      "mean_of_group_means": 1613.9313984168866,
+      "ci_lo": 1613.9313984168866,
+      "ci_hi": 1613.9313984168866,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_pred_n_junctions": {
+      "metric": "skel_pred_n_junctions",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 47.468337730870715
+      },
+      "mean_of_group_means": 47.468337730870715,
+      "ci_lo": 47.468337730870715,
+      "ci_hi": 47.468337730870715,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_ref_n_junctions": {
+      "metric": "skel_ref_n_junctions",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 403.8905013192612
+      },
+      "mean_of_group_means": 403.8905013192612,
+      "ci_lo": 403.8905013192612,
+      "ci_hi": 403.8905013192612,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_pred_n_endpoints": {
+      "metric": "skel_pred_n_endpoints",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 379.14643799472293
+      },
+      "mean_of_group_means": 379.14643799472293,
+      "ci_lo": 379.14643799472293,
+      "ci_hi": 379.14643799472293,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_ref_n_endpoints": {
+      "metric": "skel_ref_n_endpoints",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 1403.6596306068602
+      },
+      "mean_of_group_means": 1403.6596306068602,
+      "ci_lo": 1403.6596306068602,
+      "ci_hi": 1403.6596306068602,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_pred_total_length_vox": {
+      "metric": "skel_pred_total_length_vox",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 1456.6338142535956
+      },
+      "mean_of_group_means": 1456.6338142535956,
+      "ci_lo": 1456.6338142535956,
+      "ci_hi": 1456.6338142535956,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_ref_total_length_vox": {
+      "metric": "skel_ref_total_length_vox",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 7089.657381088032
+      },
+      "mean_of_group_means": 7089.657381088032,
+      "ci_lo": 7089.657381088032,
+      "ci_hi": 7089.657381088032,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_pred_mean_radius_vox": {
+      "metric": "skel_pred_mean_radius_vox",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 1.6472078864923816
+      },
+      "mean_of_group_means": 1.6472078864923816,
+      "ci_lo": 1.6472078864923816,
+      "ci_hi": 1.6472078864923816,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    },
+    "skel_ref_mean_radius_vox": {
+      "metric": "skel_ref_mean_radius_vox",
+      "n_units": 758,
+      "n_groups": 1,
+      "group_means": {
+        "M2": 1.3902134916639568
+      },
+      "mean_of_group_means": 1.3902134916639568,
+      "ci_lo": 1.3902134916639568,
+      "ci_hi": 1.3902134916639568,
+      "ci_estimable": false,
+      "ci_note": "fewer than 2 groups: the interval is degenerate and says nothing about between-animal variability"
+    }
+  }
+}

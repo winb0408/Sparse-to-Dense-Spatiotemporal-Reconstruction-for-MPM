@@ -1,0 +1,144 @@
+{
+  "sample_id": "M2_FOVII_S1_vessels",
+  "fold": 0,
+  "sampling": "y_k2",
+  "sampling_fraction": 0.5,
+  "mask_geometry": {
+    "measured_fraction": 0.5,
+    "kept_y_rows": 128,
+    "y_period": 2,
+    "x_dense": true,
+    "z_dense": true,
+    "row_pattern": "10101010"
+  },
+  "input_support": "full",
+  "consistency_projection": "none",
+  "arms": [
+    {
+      "arm": "A0",
+      "checkpoint": null,
+      "supervision": "none",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 26.4980411529541,
+        "mae": 0.025271952152252197,
+        "ssim": 0.6874458096884741,
+        "e_measured": 0.0,
+        "e_missing": 0.05054390252443957,
+        "dice": 0.779561556166991,
+        "cl_dice": 0.7783704666457154,
+        "pred_fraction": 0.18017916374018628,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 359.6847290640394,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "A1",
+      "checkpoint": null,
+      "supervision": "none",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 26.4980411529541,
+        "mae": 0.025271952152252197,
+        "ssim": 0.6874458096884741,
+        "e_measured": 0.0,
+        "e_missing": 0.05054390252443957,
+        "dice": 0.779561556166991,
+        "cl_dice": 0.7783704666457154,
+        "pred_fraction": 0.18017916374018628,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 359.6847290640394,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "S0",
+      "checkpoint": "runs/E021_ladder/E021_S0_y_k2/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 27.7226619720459,
+        "mae": 0.023209497332572937,
+        "ssim": 0.7539507391417555,
+        "e_measured": 0.0034361911910067637,
+        "e_missing": 0.04298280254740433,
+        "dice": 0.7837724939363832,
+        "cl_dice": 0.7822407211950655,
+        "pred_fraction": 0.12052038033020321,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 537.0443349753695,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "S1",
+      "checkpoint": "runs/E021_ladder/E021_S1_y_k2/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 27.675798416137695,
+        "mae": 0.02304716221988201,
+        "ssim": 0.7532527904792372,
+        "e_measured": 0.003117672456749554,
+        "e_missing": 0.04297665159763961,
+        "dice": 0.7832515470808973,
+        "cl_dice": 0.780108900093251,
+        "pred_fraction": 0.1201855889682112,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 543.5714285714286,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "S2",
+      "checkpoint": "runs/E021_ladder/E021_S2_y_k2/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 27.68899917602539,
+        "mae": 0.023286348208785057,
+        "ssim": 0.7535573026816833,
+        "e_measured": 0.003658529425503255,
+        "e_missing": 0.04291416640425551,
+        "dice": 0.7835907284366903,
+        "cl_dice": 0.7808993951640092,
+        "pred_fraction": 0.12032321873556805,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 538.2955665024631,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0
+      }
+    },
+    {
+      "arm": "S1g",
+      "checkpoint": "runs/E021_ladder/E021_S1g_y_k2/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 27.488536834716797,
+        "mae": 0.02410975843667984,
+        "ssim": 0.7543582469958977,
+        "e_measured": 0.004931391657242928,
+        "e_missing": 0.04328812664292129,
+        "dice": 0.7837404951517034,
+        "cl_dice": 0.7812850962642673,
+        "pred_fraction": 0.12110261964093288,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 551.3152709359606,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0
+      }
+    }
+  ]
+}

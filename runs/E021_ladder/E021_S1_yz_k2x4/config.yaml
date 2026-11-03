@@ -1,0 +1,79 @@
+experiment: E021_S1_yz_k2x4
+data:
+  index: data_local/dryad_cache/index_cohort.json
+  split: spur_mpm/experiments/E020_cohort/split.json
+  fold: 0
+  patch_hw:
+  - 256
+  - 256
+  context_slices: 7
+  context_z_um: null
+sampling:
+  mode: yz
+  ky: 2
+  kz: 4
+  pattern: grid
+  seed: 0
+physics:
+  psf:
+    sigma_xy_um: 0.0
+    sigma_z_um: 0.0
+    voxel_xy_um: 0.98
+    voxel_z_um: 5.0
+  lam: 0.01
+  u_kind: geo
+  geo_mode: per_axis
+noise:
+  poisson_photons: 0.0
+  gaussian_sigma: 0.0
+  seed: 0
+selfsupervision:
+  ratio: 0.5
+  geometry: row
+  split_supervised: false
+model:
+  arm: S1
+  base: 48
+  window: 8
+  depths:
+  - 2
+  - 2
+  - 2
+  heads:
+  - 4
+  - 8
+  - 16
+  features:
+  - y
+  - mask
+  - x0
+  context_depth: 7
+  n_parameters: 2562679
+train:
+  steps: 3000
+  batch: 8
+  lr: 0.0002
+  weight_decay: 0.0001
+  warmup_steps: 100
+  accum: 1
+  amp: true
+  patches_per_epoch: 1000
+  num_workers: 4
+  val_every: 500
+  log_every: 50
+  ckpt_every: 500
+loss:
+  l1: 1.0
+  ms_ssim: 0.5
+  rho: charbonnier
+  dc_weight: 0.0
+  dual_agree: 0.0
+eval:
+  z_stride: 1
+  input_support: full
+  holdout_baselines: false
+  consistency_projection: none
+run:
+  seed: 0
+  device: cuda
+  out_root: runs

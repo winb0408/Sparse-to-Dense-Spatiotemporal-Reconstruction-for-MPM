@@ -1,0 +1,6 @@
+--only kept 2 of 3 cells
+stages=['control'] cells=2 todo=2 devices=['2'] jobs=2
+[2] S1   y_k4     ok  psnr=27.300  dice=0.5530  cl_dice=0.5231
+[2] S1   yz_k2x2  ok  psnr=27.627  dice=0.5718  cl_dice=0.5433
+
+finished 2 cells in 0.15 h; state -> runs/E021_ladder/ladder.json

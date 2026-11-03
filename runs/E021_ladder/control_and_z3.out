@@ -1,0 +1,6 @@
+=== z_k3 (sweep, own context) 2026-11-03 15:16
+rc=0 2026-11-03 15:53
+=== context control at 7 (S1 y_k4 yz_k2x2; z_k4 reuses its own cell) 2026-11-03 15:53
+rc=0 2026-11-03 16:47
+table rebuilt rc=0 2026-11-03 16:47
+ALL_DONE

@@ -1,0 +1,198 @@
+{
+ "generated": "2026-10-31T00:35:30",
+ "device": "cuda:2",
+ "on_cpu": false,
+ "device_note": "latency measured on cuda:2",
+ "patch": 256,
+ "n_slices": 200,
+ "context_depth": 1,
+ "model": {
+  "base": 48,
+  "window": 8,
+  "depths": [
+   2,
+   2,
+   2
+  ],
+  "heads": [
+   4,
+   8,
+   16
+  ]
+ },
+ "arms": [
+  {
+   "arm": "S0",
+   "features": [
+    "y",
+    "mask"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 2,
+   "params": 2551873,
+   "params_m": 2.552,
+   "macs_per_slice": 23640145920,
+   "macs_per_volume": 4728029184000,
+   "latency_ms_per_slice": 27.97,
+   "sec_per_volume": 5.594,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 356.0,
+   "by_module": {
+    "Conv2d": 1292894208,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 27.97,
+    "p10_ms": 27.88,
+    "p90_ms": 28.13,
+    "mean_ms": 28.03,
+    "fps": 35.76,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  },
+  {
+   "arm": "S1",
+   "features": [
+    "y",
+    "mask",
+    "x0"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 3,
+   "params": 2552305,
+   "params_m": 2.552,
+   "macs_per_slice": 23668457472,
+   "macs_per_volume": 4733691494400,
+   "latency_ms_per_slice": 28.19,
+   "sec_per_volume": 5.638,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 356.0,
+   "by_module": {
+    "Conv2d": 1321205760,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 28.19,
+    "p10_ms": 28.15,
+    "p90_ms": 28.23,
+    "mean_ms": 28.19,
+    "fps": 35.47,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  },
+  {
+   "arm": "S2",
+   "features": [
+    "y",
+    "mask",
+    "x0",
+    "uncertainty"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 4,
+   "params": 2552737,
+   "params_m": 2.553,
+   "macs_per_slice": 23696769024,
+   "macs_per_volume": 4739353804800,
+   "latency_ms_per_slice": 28.8,
+   "sec_per_volume": 5.76,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 356.0,
+   "by_module": {
+    "Conv2d": 1349517312,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 28.8,
+    "p10_ms": 28.74,
+    "p90_ms": 28.82,
+    "mean_ms": 28.78,
+    "fps": 34.73,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  },
+  {
+   "arm": "S1g",
+   "features": [
+    "y",
+    "mask",
+    "x0"
+   ],
+   "supervision": "dense",
+   "learned": true,
+   "in_channels": 3,
+   "params": 2614705,
+   "params_m": 2.615,
+   "macs_per_slice": 27745320960,
+   "macs_per_volume": 5549064192000,
+   "latency_ms_per_slice": 29.68,
+   "sec_per_volume": 5.936,
+   "device": "cuda:2",
+   "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+   "peak_memory_mb": 368.0,
+   "by_module": {
+    "Conv2d": 5398069248,
+    "ConvTranspose2d": 603979776,
+    "Linear": 21743271936
+   },
+   "latency": {
+    "median_ms": 29.68,
+    "p10_ms": 29.61,
+    "p90_ms": 29.73,
+    "mean_ms": 29.68,
+    "fps": 33.69,
+    "n_iters": 10,
+    "device": "cuda:2"
+   }
+  },
+  {
+   "arm": "A0",
+   "features": [
+    "y",
+    "mask"
+   ],
+   "supervision": "none",
+   "learned": false,
+   "in_channels": null,
+   "params": 0,
+   "params_m": 0.0,
+   "macs_per_slice": null,
+   "macs_per_volume": null,
+   "latency_ms_per_slice": null,
+   "sec_per_volume": null,
+   "device": "cuda:2",
+   "note": "no network (bilinear): the parameter-free floor, MACs and latency are not applicable"
+  },
+  {
+   "arm": "A1",
+   "features": [
+    "y",
+    "mask"
+   ],
+   "supervision": "none",
+   "learned": false,
+   "in_channels": null,
+   "params": 0,
+   "params_m": 0.0,
+   "macs_per_slice": null,
+   "macs_per_volume": null,
+   "latency_ms_per_slice": null,
+   "sec_per_volume": null,
+   "device": "cuda:2",
+   "note": "no network (wiener_fill_first): the parameter-free floor, MACs and latency are not applicable"
+  }
+ ],
+ "out": "runs/E021_ladder/complexity.md"
+}

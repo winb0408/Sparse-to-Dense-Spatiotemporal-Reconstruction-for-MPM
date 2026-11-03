@@ -1,0 +1,5 @@
+--only kept 1 of 8 cells
+stages=['sweep'] cells=1 todo=1 devices=['2'] jobs=1
+[2] S1   z_k3     ok  psnr=32.775  dice=0.5924  cl_dice=0.5681
+
+finished 1 cells in 0.16 h; state -> runs/E021_ladder/ladder.json

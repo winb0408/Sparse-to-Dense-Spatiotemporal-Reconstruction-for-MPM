@@ -1,0 +1,20 @@
+stages=['sweep', 'matched'] cells=16 todo=16 devices=['2'] jobs=1
+[2] S1   y_k3     ok  psnr=28.118  dice=0.6081  cl_dice=0.5780
+[2] S1   y_k4     ok  psnr=27.522  dice=0.5450  cl_dice=0.5144
+[2] S1   y_k8     ok  psnr=26.116  dice=0.3810  cl_dice=0.3545
+[2] S1   z_k2     train_failed
+[2] S1   z_k4     train_failed
+[2] S1   yz_k2x2  train_failed
+[2] S1   yz_k2x4  train_failed
+[2] A0   y_k4     ok  psnr=26.016  dice=0.5979  cl_dice=0.5614
+[2] A1   y_k4     ok  psnr=26.016  dice=0.5979  cl_dice=0.5614
+[2] S2   y_k4     ok  psnr=27.539  dice=0.5457  cl_dice=0.5156
+[2] A0   z_k4     eval_failed
+[2] A1   z_k4     eval_failed
+[2] S2   z_k4     train_failed
+[2] A0   yz_k2x2  eval_failed
+[2] A1   yz_k2x2  eval_failed
+[2] S2   yz_k2x2  train_failed
+
+finished 16 cells in 1.86 h; state -> runs/E021_ladder/ladder.json
+FAILED: S1/z_k2, S1/z_k4, S1/yz_k2x2, S1/yz_k2x4, A0/z_k4, A1/z_k4, S2/z_k4, A0/yz_k2x2, A1/yz_k2x2, S2/yz_k2x2  (logs in runs/E021_ladder/_logs)
