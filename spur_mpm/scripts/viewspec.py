@@ -135,8 +135,31 @@ def fingerprint(files: dict, cfg: dict) -> dict:
             "config_sha256": hashlib.sha256(blob).hexdigest()}
 
 
+def projection_note(columns: list[dict] | None) -> str:
+    """What a figure projects, said from the panels it actually draws.
+
+    This used to be a constant -- "none (single XY/XZ/YZ slices; mip_z kept for
+    a future projection)" -- written when the layout had no projection panel.
+    The layout then gained a MIP-z column and the constant stayed, so every
+    ``view_spec.json`` described a figure without a projection while the PNG had
+    one. A note that is typed once and reused is a claim nothing checks; this one
+    is derived from the column list, so it cannot drift from the panels again.
+    """
+    if not columns:
+        return "not recorded: no column list was given to the view spec"
+    axes = [str(c.get("axis")) for c in columns]
+    slices = [{"xy": "XY", "xz": "XZ", "yz": "YZ", "zoom": "Zoom"}[a]
+              for a in axes if a in ("xy", "xz", "yz", "zoom")]
+    single = ", ".join(dict.fromkeys(slices)) or "none"
+    if "mipz" in axes:
+        return (f"MIP-z over the recorded z range (one fixed column); {single} "
+                "are single slices")
+    return f"no projection: every panel is a single slice ({single})"
+
+
 def annotate(spec: dict, *, windows: dict | None = None,
-             provenance: dict | None = None) -> dict:
+             provenance: dict | None = None,
+             columns: list[dict] | None = None) -> dict:
     """Return a copy of ``spec`` carrying the windows and provenance it was used with.
 
     Kept inside the spec (rather than in a sidecar next to it) because §4.4.1 D
@@ -148,10 +171,10 @@ def annotate(spec: dict, *, windows: dict | None = None,
         out["windows"] = {k: [float(v[0]), float(v[1])] for k, v in windows.items()}
     if provenance is not None:
         out["fingerprint"] = provenance
-    # No projection is drawn: every panel is a single slice.  Recorded so nobody
-    # reads ``mip_z`` and assumes a maximum-intensity projection was shown.
-    out.setdefault("projection", "none (single XY/XZ/YZ slices; mip_z kept "
-                                "for a future projection)")
+    # Re-derived rather than trusted: a frozen spec written by an older version
+    # carries the older claim, and that claim is what the reader checks against
+    # the picture.
+    out["projection"] = projection_note(columns)
     return out
 
 
@@ -209,6 +232,69 @@ def mask_geometry(mask: np.ndarray) -> dict:
 
 def _nearest(cands: np.ndarray, target: int) -> int:
     return int(cands[np.argmin(np.abs(cands - target))])
+
+
+def sampling_semantics(mask: np.ndarray, sampling: dict) -> dict:
+    """Does the mask on screen actually correspond to the protocol it is filed under?
+
+    The report is only worth its JSON if this is checked rather than asserted:
+    a figure labelled ``z_k4`` whose mask happens to subsample rows instead is
+    exactly the failure §4.4.1 exists to prevent, and the label is what a human
+    reads. Two independent facts are compared -- the measured fraction against
+    the protocol's ideal, and the dense/subsampled axis flags against the
+    protocol's own ``ky`` / ``kz``.
+    """
+    geom = mask_geometry(mask)
+    frac = float(geom["measured_fraction"])
+    ideal = sampling.get("ideal_fraction")
+    ideal = float(ideal) if ideal is not None else None
+    ky, kz = int(sampling.get("ky", 1) or 1), int(sampling.get("kz", 1) or 1)
+    # A grid lattice is exact up to the boundary: the last row/plane of a period
+    # may be kept or dropped, so the fraction can miss by at most one row (1/H)
+    # and one plane (1/Z). Anything larger is a mask that is not this protocol.
+    tol = 0.0
+    if ideal is not None:
+        _, hgt, _ = np.asarray(mask).shape
+        tol = 2.0 / max(1, hgt) + 2.0 / max(1, int(geom["z_planes_total"]))
+    return {
+        "measured_fraction": frac,
+        "ideal_fraction": ideal,
+        "fraction_tolerance": round(tol, 4),
+        "fraction_ok": (ideal is None
+                        or abs(frac - ideal) <= tol),
+        "z_dense": geom["z_dense"], "y_dense": geom["y_dense"],
+        "expected_z_dense": kz == 1, "expected_y_dense": ky == 1,
+        "axes_ok": (geom["z_dense"] == (kz == 1)
+                    and geom["y_dense"] == (ky == 1)),
+        "sampling": dict(sampling),
+    }
+
+
+def window_stability(spec: dict, ref: np.ndarray, mask: np.ndarray) -> dict:
+    """Do the frozen display windows still equal the ones this reference yields?
+
+    Deriving them twice is the cheap way to prove the frozen values are the
+    reference's own: if a spec were frozen from a different volume, an older
+    cache or a different normalisation, the two sets would differ.
+    """
+    fixed = [c for c in protocol_columns(spec, mask) if c["role"] == "fixed"]
+    now = ref_windows(ref, fixed, spec)
+    frozen = {k: [float(v[0]), float(v[1])]
+              for k, v in (spec.get("windows") or {}).items()}
+    diff = 0.0
+    missing = []
+    for key, (lo, hi) in now.items():
+        if key not in frozen:
+            missing.append(key)
+            continue
+        diff = max(diff, abs(float(lo) - frozen[key][0]),
+                   abs(float(hi) - frozen[key][1]))
+    for key in frozen:
+        if key not in now:
+            missing.append(key)
+    return {"window_diff": float(diff), "windows_missing": missing,
+            "windows_ok": bool(not missing and diff == 0.0),
+            "windows": frozen}
 
 
 def protocol_columns(spec: dict, mask: np.ndarray) -> list[dict]:

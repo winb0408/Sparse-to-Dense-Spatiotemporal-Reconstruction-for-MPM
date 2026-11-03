@@ -266,3 +266,78 @@ def test_the_fixed_xy_panel_can_be_named_explicitly():
     import pytest
     with pytest.raises(ValueError, match="outside the volume"):
         build_view_spec(ref, sample_id="s", zoom=16, z_view=ref.shape[0])
+
+
+def test_projection_note_describes_the_panels_actually_drawn():
+    """The note is a claim about the picture; it must come from the columns.
+
+    A constant said "none (single XY/XZ/YZ slices; mip_z kept for a future
+    projection)" after a MIP-z column had been added, so every stored
+    view_spec.json described a figure without a projection while the PNG had
+    one.
+    """
+    from spur_mpm.scripts.viewspec import annotate, projection_note
+
+    mask = np.ones(SHAPE, dtype=bool)
+    spec = build_view_spec(_ref(), sample_id="S")
+    cols = protocol_columns(spec, mask)
+    assert any(c["axis"] == "mipz" for c in cols)
+    note = projection_note(cols)
+    assert "MIP-z" in note
+    assert "none" not in note.lower()
+    for panel in ("XY", "XZ", "YZ", "Zoom"):
+        assert panel in note, panel
+    # and it wins over a stale note loaded from an older frozen spec
+    frozen = dict(spec, projection="none (single XY/XZ/YZ slices)")
+    assert "MIP-z" in annotate(frozen, columns=cols)["projection"]
+
+
+def test_projection_note_without_a_projection_panel():
+    from spur_mpm.scripts.viewspec import projection_note
+
+    cols = [{"key": "XY", "axis": "xy"}, {"key": "XZ", "axis": "xz"}]
+    assert projection_note(cols).startswith("no projection")
+    assert "not recorded" in projection_note(None)
+
+
+def test_the_mask_must_be_the_protocol_it_is_filed_under():
+    """A `z_k4` figure whose mask subsamples rows is the §4.4.1 failure mode."""
+    from spur_mpm.scripts.viewspec import sampling_semantics
+
+    z, h, w = 40, 64, 64
+    rows = np.zeros((z, h, w), dtype=bool)
+    rows[:, ::4, :] = True                     # y_k4, every plane visited
+    planes = np.zeros((z, h, w), dtype=bool)
+    planes[::4] = True                         # z_k4, whole planes skipped
+
+    y4 = sampling_semantics(rows, {"ky": 4, "kz": 1, "ideal_fraction": 0.25})
+    z4 = sampling_semantics(planes, {"ky": 1, "kz": 4, "ideal_fraction": 0.25})
+    assert y4["axes_ok"] and y4["fraction_ok"]
+    assert z4["axes_ok"] and z4["fraction_ok"]
+    # the same mask under the other label is caught on the axis flags
+    assert not sampling_semantics(rows, {"ky": 1, "kz": 4})["axes_ok"]
+    assert not sampling_semantics(planes, {"ky": 4, "kz": 1})["axes_ok"]
+    # and a mask that is far denser than the protocol claims is caught on size
+    dense = np.ones((z, h, w), dtype=bool)
+    bad = sampling_semantics(dense, {"ky": 8, "kz": 1, "ideal_fraction": 0.125})
+    assert not bad["fraction_ok"]
+
+
+def test_frozen_windows_are_the_ones_this_reference_derives():
+    """If the spec was frozen from another volume, the two sets must disagree."""
+    from spur_mpm.scripts.viewspec import annotate, ref_windows, window_stability
+
+    spec = build_view_spec(_ref(), sample_id="S")
+    cols = protocol_columns(spec, np.ones(SHAPE, dtype=bool))
+    fixed = [c for c in cols if c["role"] == "fixed"]
+    frozen = annotate(spec, windows=ref_windows(_ref(), fixed, spec), columns=cols)
+    good = window_stability(frozen, _ref(), np.ones(SHAPE, dtype=bool))
+    assert good["windows_ok"] and good["window_diff"] == 0.0
+
+    other = annotate(spec, windows=ref_windows(_ref(seed=7), fixed, spec) , columns=cols)
+    bad = window_stability(other, _ref(), np.ones(SHAPE, dtype=bool))
+    assert not bad["windows_ok"] and bad["window_diff"] > 0
+
+    empty = dict(frozen)
+    empty.pop("windows")
+    assert not window_stability(empty, _ref(), np.ones(SHAPE, dtype=bool))["windows_ok"]

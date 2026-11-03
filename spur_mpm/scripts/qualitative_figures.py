@@ -81,6 +81,7 @@ from spur_mpm.physics.sampling import SamplingSpec
 from spur_mpm.scripts.viewspec import (
     annotate, build_view_spec, check_group, check_protocols, fingerprint,
     load_view_spec, mask_geometry, protocol_columns, ref_windows,
+    sampling_semantics, window_stability,
     save_view_spec, take, validate_view_spec,
 )
 from spur_mpm.ssl.holdout import HoldoutSpec
@@ -678,12 +679,14 @@ def _freeze(spec: dict, ref: np.ndarray, mask: np.ndarray, cfg: dict) -> dict:
     in one protocol only, so freezing its window would make the spec look
     protocol-dependent when the geometry is not.
     """
-    fixed = [c for c in protocol_columns(spec, mask) if c["role"] == "fixed"]
+    cols = protocol_columns(spec, mask)
+    fixed = [c for c in cols if c["role"] == "fixed"]
     return annotate(
         spec,
         windows=ref_windows(ref, fixed, spec),
         provenance=fingerprint({"index": cfg["data"]["index"],
-                                "split": cfg["data"]["split"]}, cfg))
+                                "split": cfg["data"]["split"]}, cfg),
+        columns=cols)
 
 
 def slug(text: str) -> str:
@@ -803,20 +806,47 @@ def main(argv: list[str] | None = None) -> int:
         written = render_comparison(groups, out_dir, spec, dpi=args.dpi,
                                     sample=sample, name=args.figure_name)
         report = check_protocols(groups, spec)
+        # Three things the report is asked for that were being *stated* rather
+        # than checked: that the window of every panel still comes from this
+        # reference, that each mask really is the protocol it is filed under,
+        # and that the shape/physical spacing agree with the frozen spec.
+        windows = window_stability(spec, ref, groups[0]["vols"][0]["in_mask"])
+        semantics, shapes = {}, {}
+        for g in groups:
+            vol0 = g["vols"][0]
+            mask = np.asarray(vol0["in_mask"])
+            sem = sampling_semantics(mask, vol0.get("sampling") or {})
+            semantics[g["level"]] = sem
+            shapes[g["level"]] = {
+                "shape": list(mask.shape),
+                "matches_spec": list(mask.shape) == list(spec["shape"]),
+                "voxel_um": vol0.get("voxel_um"),
+                "voxel_ok": (vol0.get("voxel_um") is None
+                             or [float(v) for v in spec.get("voxel_um", [])]
+                             == [float(v) for v in vol0["voxel_um"]]),
+            }
         report.update({"sample_id": sample, "view_spec": spec,
                        "protocols": [g["level"] for g in groups],
                        "measured_fraction": {
                            g["level"]: float(np.mean(g["vols"][0]["in_mask"]))
                            for g in groups},
                        "context_depth": {g["level"]: g["vols"][0].get(
-                           "context_depth") for g in groups}})
+                           "context_depth") for g in groups},
+                       "display_windows": windows,
+                       "mask_semantics": semantics,
+                       "geometry": shapes})
         (out_dir / "consistency_report.json").write_text(
             json.dumps(report, indent=2))
         for pth in written:
             print("wrote", pth)
         ok = (report["target_diff"] == 0.0 and report["fixed_view_diff"] == 0.0
+              and windows["windows_ok"]
               and all(gr["target_diff"] == 0.0 and gr["input_diff"] == 0.0
-                      and gr["view_diff"] == 0.0 for gr in report["groups"]))
+                      and gr["view_diff"] == 0.0 for gr in report["groups"])
+              and all(sem["fraction_ok"] and sem["axes_ok"]
+                      for sem in semantics.values())
+              and all(sh["matches_spec"] and sh["voxel_ok"]
+                      for sh in shapes.values()))
         if not ok:
             print("CONSISTENCY FAILED", json.dumps(report, indent=2))
             return 2
