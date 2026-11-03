@@ -437,9 +437,12 @@ def skeleton_stats(mask: np.ndarray, voxel_um=None) -> dict:
         total_length_um = float("nan")
     else:
         scales = _voxel_scales(voxel_um, m.ndim)
-        # The distance transform is isotropic in voxel units, so converting a
-        # radius to micrometres has to average over directions: geometric mean.
-        mean_radius_um = mean_radius_vox * float(np.prod(scales) ** (1.0 / len(scales)))
+        # Physical radius must come from an anisotropic distance transform.
+        # Scaling an isotropic voxel radius by the geometric-mean pitch is not
+        # geometrically valid when Z=5 um and XY=0.98 um: even a purely lateral
+        # tube would get the wrong physical radius.
+        mean_radius_um = (float(ndi.distance_transform_edt(m, sampling=scales)[thin].mean())
+                          if n_skeleton else 0.0)
         # Same partition, measured in micrometres so anisotropy is honoured.
         total_length_um = float(
             sum(_branch_lengths(thin, junction_voxels, scales))
