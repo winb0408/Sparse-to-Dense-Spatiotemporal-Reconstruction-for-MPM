@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -567,7 +568,8 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
     return written
 
 def render_comparison(groups: list[dict], out_dir: Path, spec: dict,
-                      dpi: int = 200, sample: str = "") -> list[Path]:
+                      dpi: int = 200, sample: str = "",
+                      name: str | None = None) -> list[Path]:
     """One figure that puts two or more sparse protocols side by side.
 
     Only the *fixed* panels are used, because those are the ones whose
@@ -662,11 +664,16 @@ def render_comparison(groups: list[dict], out_dir: Path, spec: dict,
              color="0.25")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    levels = "_".join(g["level"] for g in groups)
-    png = out_dir / f"compare_{sample}_{levels}.png"
+    levels = "_".join(slug(g["level"]) for g in groups)
+    png = out_dir / (name or f"compare_{sample}_{levels}.png")
     fig.savefig(png, dpi=dpi, bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     return [png]
+
+
+def slug(text: str) -> str:
+    """A group label reduced to what a filename can carry."""
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
 
 
 def _compare_groups(cfg: dict, manifest: dict, device, sample: str) -> list[dict]:
@@ -724,6 +731,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="JSON manifest of protocol groups; writes "
                          "compare_<sample>_<levels>.png and a consistency "
                          "report, and exits non-zero if the invariants fail")
+    ap.add_argument("--figure-name", default=None,
+                    help="file name for the --compare figure; default "
+                         "compare_<sample>_<levels>.png. §4.4.1 asks for "
+                         "compare_y_z_yz_25pct.png in a per-sample directory")
     ap.add_argument("--dump", default="f16", choices=["f16", "f32", "off"],
                     help="raw array dump: float16 (default, ~1/2 the size and "
                          "lossless enough for re-rendering), float32, or off")
@@ -763,7 +774,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.save_view_spec:
             save_view_spec(spec, args.save_view_spec)
         written = render_comparison(groups, out_dir, spec, dpi=args.dpi,
-                                    sample=sample)
+                                    sample=sample, name=args.figure_name)
         report = check_protocols(groups, spec)
         report.update({"sample_id": sample, "view_spec": spec,
                        "protocols": [g["level"] for g in groups],
@@ -772,7 +783,7 @@ def main(argv: list[str] | None = None) -> int:
                            for g in groups},
                        "context_depth": {g["level"]: g["vols"][0].get(
                            "context_depth") for g in groups}})
-        (out_dir / f"consistency_report_{sample}.json").write_text(
+        (out_dir / "consistency_report.json").write_text(
             json.dumps(report, indent=2))
         for pth in written:
             print("wrote", pth)

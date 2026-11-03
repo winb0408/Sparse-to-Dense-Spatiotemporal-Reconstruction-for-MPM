@@ -215,3 +215,11 @@ def test_a_group_with_a_different_reference_is_rejected():
     b = _vol(ref + 0.01, mask, "S2")
     rep = check_group([a, b], spec)
     assert rep["target_diff"] > 0.0
+
+
+def test_group_labels_become_filename_safe():
+    """A group may be labelled "y_k4, c7"; the figure name must still be a name."""
+    from spur_mpm.scripts.qualitative_figures import slug
+    assert slug("y_k4") == "y_k4"
+    assert slug("y_k4, c7") == "y_k4_c7"
+    assert slug("yz_k2x2 (25%)") == "yz_k2x2_25"
