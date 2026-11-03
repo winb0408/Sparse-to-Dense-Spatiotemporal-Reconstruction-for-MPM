@@ -165,8 +165,7 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
             pred = select_centre(model(batch["inputs"].to(device)).float(),
                                  batch["center_index"]).cpu()
         else:
-            pred = batch["inputs"][:, _feature_slice(features, "x0", context)]
-            pred = pred[:, context // 2]
+            pred = batch["warmstart_center"]
         if projection == "hard" and model is not None:
             given = batch["in_mask"].bool()
             pred = torch.where(given, batch["y_in"], pred)
@@ -619,7 +618,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", type=Path,
-                    default=Path("spur_mpm/configs/experiments/E003_selfsup_y_k2.yaml"))
+                    default=Path("spur_mpm/configs/experiments/E002_supervised_y_k2.yaml"))
     ap.add_argument("--base", type=Path, default=DEFAULTS)
     ap.add_argument("--fold", type=int, default=0)
     ap.add_argument("--sample", default=None,
