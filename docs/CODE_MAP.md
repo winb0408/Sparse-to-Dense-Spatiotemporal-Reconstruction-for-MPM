@@ -151,6 +151,12 @@ python -m spur_mpm.train --config spur_mpm/configs/experiments/<exp>.yaml
 python -m spur_mpm.evaluate ...
 python -m spur_mpm.scripts.collect_results ...
 python -m spur_mpm.scripts.benchmark --markdown --arms A0 A1 S0 S1 S2 S1g S2g
+#    A0/A1 没有参数也没有 MACs，但 latency 列是**实测**的 warm-start 算子耗时
+#    （同为 [Z,H,W] 体），不是 n/a——否则"零参数"会被读成"零成本"
+python -m spur_mpm.inference --config <exp>.yaml --arm S1 --ckpt <best.pt> \
+    --sample M2_FOVII_S1_vessels --out /tmp/recon.npy
+#    整卷端到端真实耗时写在输出 JSON 的 timing.wall_seconds（含缓存加载、逐层
+#    前向、堆叠、np.save），单位 patch 延迟不能当部署成本
 
 # 5) 消融阶梯（固定队列，逐 cell 落盘；--eval-only 只重打分不重训）
 python -m spur_mpm.scripts.run_ladder --stage ablation --devices 2
@@ -179,6 +185,7 @@ python -m spur_mpm.scripts.qualitative_figures --compare runs/compare_y_z_yz.jso
 | `test_split.py` | 划分无泄漏 |
 | `test_skeleton.py` | 骨架指标的退化用例 |
 | `test_complexity.py` | MACs/参数量在已知结构上的正确性 |
+| `test_benchmark.py` | 成本表的**诚实性**：无参数臂也给出实测延迟（不是 `n/a`）、缺 PSF 配置时退化为说明而不是崩溃、算子跑不动时进备注而不是抛栈 |
 | `test_models_metrics.py` | 各臂前向形状、Dice/clDice 边界 |
 | `test_qualitative_figures.py` | §4.4.1 的固定视图：参考不随协议变、目标不一致必须硬失败、面板与窗宽来自参考、Z-only 只报层、Y-only 只报行、同输入重复会被拒 |
 | `test_sparse_figures.py` | 稀疏图必须画在所有层都测到的平面上（`_common_plane`），没有共同平面时拒绝出图 |

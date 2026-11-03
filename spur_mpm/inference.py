@@ -14,12 +14,17 @@ Differences from evaluation, and why they matter (plan §5.4):
 * the output is a full ``ZYX`` volume obtained by stacking per-plane
   predictions, plus the per-plane acquisition mask, so any later figure can say
   exactly which voxels were measured and which were inferred.
+
+The returned metadata records the measured wall time of the whole call --
+dataset construction, per-plane forward pass, stacking and ``np.save`` -- because
+a per-patch latency is not the deployment cost of a volume.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -44,6 +49,7 @@ DEFAULTS = Path(__file__).parent / "configs" / "base.yaml"
 def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
                        sample_id: str, out_path: str | Path,
                        device: str | None = None) -> dict:
+    t_start = time.perf_counter()
     # A bare index ("2") means "cuda:2", as in ``evaluate`` and ``benchmark``;
     # torch itself only accepts the "cuda:N" form and raises on a bare digit.
     dev = device or (cfg["run"].get("device", "cuda")
@@ -109,6 +115,7 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
             masks[zq] = batch["acq_mask"][0].numpy().astype(bool)
             x0s[zq] = batch["warmstart_center"][0].numpy()
 
+    wall = time.perf_counter() - t_start
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     np.save(out_path, volume)
@@ -124,6 +131,15 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
         "sampling": sampling.to_dict(),
         "context_depth": context,
         "physics": {"psf": psf.to_dict(), "lam": cfg["physics"]["lam"]},
+        "timing": {
+            "wall_seconds": round(wall, 3),
+            "n_planes": int(volume.shape[0]),
+            "ms_per_plane": round(1e3 * wall / max(1, int(volume.shape[0])), 3),
+            "device": str(device),
+            "includes": "index/cache load, per-sample window construction, "
+                        "per-plane forward pass, stacking, np.save of volume, "
+                        "mask and warm start",
+        },
         "notes": "virtual sparse input; not a hardware acquisition. Volume built "
                  "by stacking centre-plane predictions; see *.mask.npy for the "
                  "measured support of each plane.",

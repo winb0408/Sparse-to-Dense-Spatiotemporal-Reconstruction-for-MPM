@@ -13,11 +13,11 @@ drift from the training budget).
 
 Two traps this script is built around:
 
-* **A0 / A1 are not networks.** They are bilinear interpolation and a
-  fill-first Wiener solve. There is no forward pass to time and no parameter to
-  count, so they are reported with ``params = 0`` and ``latency = "n/a"`` rather
-  than being dropped: the reader must see the parameter-free floor in the same
-  table as the arms it is the floor *for*.
+* **A0 / A1 are not networks, and that is not the same as free.** They are
+  bilinear interpolation and a fill-first Wiener solve: no parameters, no MACs.
+  Their *latency* is measured anyway, by running the warm-start operator over a
+  volume of the same shape -- otherwise the table would quietly price an
+  interpolation floor at zero, which is the one comparison it exists to make.
 * **A latency without a device is not a number.** On cpu the measurement is
   recorded and flagged as such, because cpu milliseconds say nothing about the
   deployed model; and a machine with no free GPU must still produce the MACs and
@@ -36,6 +36,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -44,6 +45,8 @@ import torch
 from spur_mpm.common.config import load_config
 from spur_mpm.metrics.complexity import complexity_report
 from spur_mpm.models.registry import ARMS, build_model, get_arm
+from spur_mpm.physics.psf import PSFConfig
+from spur_mpm.physics.wiener import warm_start
 
 __all__ = ["benchmark_arm", "benchmark_all", "format_markdown", "free_gpus",
            "main"]
@@ -97,9 +100,59 @@ def input_channels(arm, context_depth: int) -> int:
     return len(arm.features) * int(context_depth) * (2 if arm.dual else 1)
 
 
+def _time_warm_start(arm_name: str, *, patch: int, n_slices: int, device: str,
+                     psf: dict, lam: float, warmup: int, iters: int) -> dict:
+    """Time the parameter-free floor's operator, on the same volume convention.
+
+    The baselines have no network, but they are not free: A0 interpolates every
+    missing voxel and A1 runs a fill-then-Wiener pipeline over the whole stack.
+    Reporting them as "latency n/a" makes an interpolation floor look like it
+    costs nothing, which is exactly the comparison a complexity table is for.
+    So they are timed on a ``[n_slices, patch, patch]`` observation with an
+    every-other-row mask -- the same volume convention as ``MACs/volume``.
+    """
+    dev = torch.device(device)
+    y = torch.rand(n_slices, patch, patch, device=dev)
+    mask = torch.zeros(n_slices, patch, patch, dtype=torch.bool, device=dev)
+    mask[:, ::2, :] = True
+    y = y * mask
+    psf_cfg = PSFConfig(**psf)
+    mode = get_arm(arm_name).warm_start
+
+    def once():
+        with torch.no_grad():
+            warm_start(y, mask, psf_cfg, lam=lam, mode=mode)
+        if dev.type == "cuda":
+            torch.cuda.synchronize(dev)
+
+    for _ in range(max(0, int(warmup))):
+        once()
+    samples = []
+    for _ in range(max(1, int(iters))):
+        if dev.type == "cuda":
+            torch.cuda.synchronize(dev)
+        t0 = time.perf_counter()
+        once()
+        samples.append((time.perf_counter() - t0) * 1e3)
+    samples.sort()
+    median = samples[len(samples) // 2]
+    return {"latency_ms_per_slice": median / n_slices,
+            "sec_per_volume": median / 1e3,
+            "latency": {"median_ms": median,
+                        "p10_ms": samples[int(0.1 * (len(samples) - 1))],
+                        "p90_ms": samples[int(0.9 * (len(samples) - 1))],
+                        "n_iters": len(samples), "device": device,
+                        "measured": "warm start over the whole volume"},
+            "measure": "operator only (no dataset, no disk I/O)",
+            "note": (f"no network ({mode}): params 0, MACs not applicable; the "
+                     f"latency column is the measured warm-start operator on "
+                     f"the same [Z,H,W] volume, not zero")}
+
+
 def benchmark_arm(arm_name: str, *, patch: int, n_slices: int, device: str,
                   model_cfg: dict, context_depth: int, warmup: int, iters: int,
-                  amp: bool) -> dict:
+                  amp: bool, psf: dict | None = None,
+                  lam: float = 0.01) -> dict:
     """One table row. Never raises for an arm that has no network."""
     arm = get_arm(arm_name)
     row = {"arm": arm.name, "features": list(arm.features),
@@ -109,9 +162,19 @@ def benchmark_arm(arm_name: str, *, patch: int, n_slices: int, device: str,
            "latency_ms_per_slice": None, "sec_per_volume": None,
            "device": device, "note": None}
     if not arm.needs_training:
-        # Baselines: interpolation / Wiener. Reported, not built.
-        row["note"] = (f"no network ({arm.warm_start}): the parameter-free "
-                       "floor, MACs and latency are not applicable")
+        # Baselines: interpolation / Wiener. No network -- but the operator runs.
+        if psf is None:
+            row["note"] = (f"no network ({arm.warm_start}): the parameter-free "
+                           "floor, MACs and latency are not applicable")
+            return row
+        try:
+            row.update(_time_warm_start(arm.name, patch=patch,
+                                        n_slices=n_slices, device=device,
+                                        psf=psf, lam=lam, warmup=warmup,
+                                        iters=iters))
+        except Exception as exc:                      # noqa: BLE001 - reported
+            row["note"] = (f"no network ({arm.warm_start}); the warm-start "
+                           f"operator could not be timed: {exc}")
         return row
 
     model = build_model(arm, context_depth,
@@ -139,7 +202,8 @@ def benchmark_arm(arm_name: str, *, patch: int, n_slices: int, device: str,
 
 def benchmark_all(arms, *, patch: int, n_slices: int, device: str,
                   model_cfg: dict, context_depth: int, warmup: int, iters: int,
-                  amp: bool) -> dict:
+                  amp: bool, psf: dict | None = None,
+                  lam: float = 0.01) -> dict:
     """Benchmark each requested arm; an unbuildable arm becomes a note, not a
     traceback, so one broken arm cannot cost the whole table."""
     rows = []
@@ -148,7 +212,7 @@ def benchmark_all(arms, *, patch: int, n_slices: int, device: str,
             rows.append(benchmark_arm(name, patch=patch, n_slices=n_slices,
                                       device=device, model_cfg=model_cfg,
                                       context_depth=context_depth, warmup=warmup,
-                                      iters=iters, amp=amp))
+                                      iters=iters, amp=amp, psf=psf, lam=lam))
         except Exception as exc:                      # noqa: BLE001 - reported
             rows.append({"arm": str(name), "learned": None, "params": 0,
                          "params_m": 0.0, "macs_per_slice": None,
@@ -192,6 +256,13 @@ def format_markdown(payload: dict) -> str:
               f"{payload['n_slices']} x MACs/slice: the network is 2-D and "
               "applied slice-wise.",
               ""]
+    timed = [r for r in payload["arms"] if r.get("measure")]
+    if timed:
+        lines += ["The parameter-free floors have no MACs, but they are not "
+                  "free: their latency column is the measured warm-start "
+                  "operator over the same volume shape "
+                  f"({', '.join(r['arm'] for r in timed)}).",
+                  ""]
     if payload["on_cpu"]:
         lines.append(f"**{payload['device_note']}.** Parameters and MACs are "
                      "exact; the millisecond columns are for relative "
@@ -277,7 +348,9 @@ def main(argv: list[str] | None = None) -> int:
     payload = benchmark_all(arms, patch=args.patch, n_slices=args.n_slices,
                             device=device, model_cfg=model_cfg,
                             context_depth=context_depth, warmup=args.warmup,
-                            iters=args.iters, amp=args.amp)
+                            iters=args.iters, amp=args.amp,
+                            psf=dict(cfg["physics"]["psf"]),
+                            lam=float(cfg["physics"]["lam"]))
 
     name = args.name or (f"bench_{str(device).replace(':', '')}"
                          f"_p{args.patch}_z{args.n_slices}")
