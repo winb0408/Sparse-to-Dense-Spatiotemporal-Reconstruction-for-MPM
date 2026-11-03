@@ -1,0 +1,39 @@
+{
+ "what": "whole-volume end-to-end wall time, one process per arm",
+ "device": "cuda:2",
+ "note": "wall_seconds is timed inside reconstruct_volume (cache load through np.save); process_wall_s adds interpreter start and config load. Baselines have no parameters but are not free.",
+ "arms": [
+  {
+   "arm": "A0",
+   "wall_seconds": 2.846,
+   "n_planes": 203,
+   "ms_per_plane": 14.018,
+   "device": "cuda:2",
+   "includes": "index/cache load, per-sample window construction, per-plane forward pass, stacking, np.save of volume, mask and warm start",
+   "process_wall_s": 5.22,
+   "sample_id": "M2_FOVII_S1_vessels",
+   "shape": [
+    203,
+    512,
+    512
+   ],
+   "context_depth": 1
+  },
+  {
+   "arm": "S1",
+   "wall_seconds": 41.646,
+   "n_planes": 203,
+   "ms_per_plane": 205.154,
+   "device": "cuda:2",
+   "includes": "index/cache load, per-sample window construction, per-plane forward pass, stacking, np.save of volume, mask and warm start",
+   "process_wall_s": 44.11,
+   "sample_id": "M2_FOVII_S1_vessels",
+   "shape": [
+    203,
+    512,
+    512
+   ],
+   "context_depth": 1
+  }
+ ]
+}

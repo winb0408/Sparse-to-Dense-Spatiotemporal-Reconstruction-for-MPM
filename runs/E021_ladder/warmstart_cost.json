@@ -1,0 +1,92 @@
+{
+ "what": "warm-start operator cost per volume, as a function of the PSF",
+ "why": "the identity PSF makes A1 collapse onto A0; this quantifies both that degeneracy and the cost a calibrated PSF would add",
+ "device": "cuda:2",
+ "note": "operator only: no dataset, no disk I/O",
+ "rows": [
+  {
+   "psf": "identity",
+   "mode": "bilinear",
+   "median_ms_per_volume": 1.625,
+   "p10_ms": 1.612,
+   "p90_ms": 1.633,
+   "device": "cuda:2",
+   "volume": [
+    200,
+    256,
+    256
+   ],
+   "n_iters": 10
+  },
+  {
+   "psf": "identity",
+   "mode": "wiener_fill_first",
+   "median_ms_per_volume": 1.546,
+   "p10_ms": 1.536,
+   "p90_ms": 1.551,
+   "device": "cuda:2",
+   "volume": [
+    200,
+    256,
+    256
+   ],
+   "n_iters": 10
+  },
+  {
+   "psf": "sigma_xy_0.98um",
+   "mode": "bilinear",
+   "median_ms_per_volume": 1.619,
+   "p10_ms": 1.607,
+   "p90_ms": 1.67,
+   "device": "cuda:2",
+   "volume": [
+    200,
+    256,
+    256
+   ],
+   "n_iters": 10
+  },
+  {
+   "psf": "sigma_xy_0.98um",
+   "mode": "wiener_fill_first",
+   "median_ms_per_volume": 5.462,
+   "p10_ms": 5.454,
+   "p90_ms": 8.474,
+   "device": "cuda:2",
+   "volume": [
+    200,
+    256,
+    256
+   ],
+   "n_iters": 10
+  },
+  {
+   "psf": "sigma_xy_0.98um_z_5um",
+   "mode": "bilinear",
+   "median_ms_per_volume": 1.623,
+   "p10_ms": 1.617,
+   "p90_ms": 1.628,
+   "device": "cuda:2",
+   "volume": [
+    200,
+    256,
+    256
+   ],
+   "n_iters": 10
+  },
+  {
+   "psf": "sigma_xy_0.98um_z_5um",
+   "mode": "wiener_fill_first",
+   "median_ms_per_volume": 5.497,
+   "p10_ms": 5.456,
+   "p90_ms": 5.537,
+   "device": "cuda:2",
+   "volume": [
+    200,
+    256,
+    256
+   ],
+   "n_iters": 10
+  }
+ ]
+}
