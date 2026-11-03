@@ -90,7 +90,7 @@
       },
       "config_sha256": "6627ebc075676a2ad2ba2bb653f92191afcf87ca16b6246c40e8a0eb318d84f4"
     },
-    "projection": "none (single XY/XZ/YZ slices; mip_z kept for a future projection)"
+    "projection": "MIP-z over the recorded z range (one fixed column); XY, XZ, YZ, Zoom are single slices"
   },
   "protocols": [
     "y_k4",
@@ -106,5 +106,135 @@
     "y_k4": 7,
     "z_k4": 7,
     "yz_k2x2": 7
+  },
+  "display_windows": {
+    "window_diff": 0.0,
+    "windows_missing": [],
+    "windows_ok": true,
+    "windows": {
+      "XY primary": [
+        0.08718640357255936,
+        0.7375793412327751
+      ],
+      "XZ": [
+        0.061049906667321914,
+        1.0
+      ],
+      "YZ": [
+        0.052993076667189595,
+        1.0
+      ],
+      "Zoom": [
+        0.08581961691379547,
+        0.9079651206731795
+      ],
+      "MIP-z": [
+        0.8218685388565063,
+        1.0
+      ]
+    }
+  },
+  "mask_semantics": {
+    "y_k4": {
+      "measured_fraction": 0.25,
+      "ideal_fraction": 0.25,
+      "fraction_tolerance": 0.0177,
+      "fraction_ok": true,
+      "z_dense": true,
+      "y_dense": false,
+      "expected_z_dense": true,
+      "expected_y_dense": false,
+      "axes_ok": true,
+      "sampling": {
+        "mode": "y",
+        "ky": 4,
+        "kz": 1,
+        "pattern": "grid",
+        "seed": 0,
+        "ideal_fraction": 0.25
+      }
+    },
+    "z_k4": {
+      "measured_fraction": 0.2512,
+      "ideal_fraction": 0.25,
+      "fraction_tolerance": 0.0177,
+      "fraction_ok": true,
+      "z_dense": false,
+      "y_dense": true,
+      "expected_z_dense": false,
+      "expected_y_dense": true,
+      "axes_ok": true,
+      "sampling": {
+        "mode": "z",
+        "ky": 1,
+        "kz": 4,
+        "pattern": "grid",
+        "seed": 0,
+        "ideal_fraction": 0.25
+      }
+    },
+    "yz_k2x2": {
+      "measured_fraction": 0.2512,
+      "ideal_fraction": 0.25,
+      "fraction_tolerance": 0.0177,
+      "fraction_ok": true,
+      "z_dense": false,
+      "y_dense": false,
+      "expected_z_dense": false,
+      "expected_y_dense": false,
+      "axes_ok": true,
+      "sampling": {
+        "mode": "yz",
+        "ky": 2,
+        "kz": 2,
+        "pattern": "grid",
+        "seed": 0,
+        "ideal_fraction": 0.25
+      }
+    }
+  },
+  "geometry": {
+    "y_k4": {
+      "shape": [
+        203,
+        256,
+        256
+      ],
+      "matches_spec": true,
+      "voxel_um": [
+        5.0,
+        0.98,
+        0.98
+      ],
+      "voxel_ok": true
+    },
+    "z_k4": {
+      "shape": [
+        203,
+        256,
+        256
+      ],
+      "matches_spec": true,
+      "voxel_um": [
+        5.0,
+        0.98,
+        0.98
+      ],
+      "voxel_ok": true
+    },
+    "yz_k2x2": {
+      "shape": [
+        203,
+        256,
+        256
+      ],
+      "matches_spec": true,
+      "voxel_um": [
+        5.0,
+        0.98,
+        0.98
+      ],
+      "voxel_ok": true
+    }
   }
 }

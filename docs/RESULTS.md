@@ -15,18 +15,20 @@
 | 主表：52 个 cell × 10 个指标 + 归因 + 预算曲线 | [`runs/E021_ladder/ladder.md`](../runs/E021_ladder/ladder.md) |
 | 同一批数字的机器可读版 | `runs/E021_ladder/ladder.csv`、`ladder.json` |
 | **等上下文 25 % 换轴表**（`y_k4_c7 / z_k4 / yz_k2x2_c7`，七臂齐全） | `ladder.md` 末尾 "Axis at a matched 25 % budget, one seven-plane context" |
-| 参数量 / MACs / 延迟（含 S1g、S2g） | [`runs/E021_ladder/complexity.md`](../runs/E021_ladder/complexity.md)、`benchmark_supervised.json` |
+| 参数量 / MACs / 延迟（含 S1g、S2g；A0/A1 的算子是实测值而非 `n/a`） | [`runs/E021_ladder/complexity.md`](../runs/E021_ladder/complexity.md)、`benchmark_supervised.json` |
+| **整卷端到端真实耗时**（203×512×512，A0 2.85 s / S1 41.6 s） | `runs/E023_phase1/e2e/benchmark_end_to_end.json` |
 | **整卷 3D 血管结构**（Dice / clDice / skelF1 + 计分层占比） | `runs/E021_ladder/E021_S1_y_k2/structure/structure_summary.md`；用 `--from-summary` 可从 JSON 重排版 |
 | 固定视图的三协议对照（§4.4.1 D） | `runs/E021_ladder/figures_fixed/M2_FOVII_S1_vessels/compare_y_z_yz_25pct.png` |
 | 同一批图的**逐像素一致性报告** | 同级 `consistency_report.json`（`target_diff = fixed_view_diff = input_diff = 0`） |
 | 冻结的视图定义（切面、物理间距、统一窗宽、数据/配置指纹） | 同级 `view_spec.json` |
 | 单协议定性图（输入 / A0 / S1 / 密集真值 + 误差 + 支撑 + 深度剖面） | `figures_fixed/M2_FOVII_S1_vessels/qualitative_*_{y_k4,z_k4,yz_k2x2}.png` |
-| 五臂同输入对比（A0 / S0 / S1 / S2 / S2g，`y_k2`） | `runs/E021_ladder/figures/qual_y_k2/` |
+| 五臂同输入对比（A0 / S0 / S1 / S2 / S2g，`y_k2`），**留出动物 M2 的全部四个体**（含最差卷） | `runs/E021_ladder/figures/qual_y_k2/` |
 | 稀疏采集构建自检图（掩膜、2D 阶梯、覆盖率） | `spur_mpm/figures/sparse/` |
 | 每张定性图的逐臂数字（PSNR / Dice / Dice★）与几何 | 同级 `*.json` |
 | 每个 cell 的完整评估（逐窗 `samples.csv` + 汇总 `summary.json`） | `runs/E021_ladder/E021_*/eval_test/` |
 | 每个 cell 的实际配置（稀疏参数、上下文层数、训练超参） | `runs/E021_ladder/E021_*/config.yaml` |
 | 代码地图与三个硬性图形约束 | [`docs/CODE_MAP.md`](CODE_MAP.md) |
+| **手册验收记录**（改了什么 / 怎么复现 / 测试输出 / 图在哪 / 前后差别） | [`docs/PHASE1_ACCEPTANCE_REPORT.md`](PHASE1_ACCEPTANCE_REPORT.md) |
 
 ## 一句话结论
 
@@ -38,6 +40,12 @@
   +0.0001 Dice），却把 MACs 抬 17 %、延迟抬 6 %。这是本轮唯一一条"成本涨、收益没到"的净结论。
 - **不可主张**：Z 轴与 Y+Z 轴的结构增益；50 % / 33 % 预算上的结构增益；三个创新点
   （X0 / U / 门控融合）的任何独立贡献；任何"某个稀疏轴更好"。
+- **不可主张（容易误主张）**：**整卷 3D 结构上 S1 优于插值地板**。A1（零参数，单位 PSF
+  下等于 bilinear）与 S1 的整卷差是 Dice +0.024 / clDice +0.030 / skelF1 +0.021，四卷符号
+  一致但**都压在地板上**。过门槛的是等面积 tile 的 ★ 指标（+0.040 / +0.059），两个层次
+  不能互相背书。
+- **可主张（量级明显，Dice 看不见）**：拓扑分量的方向相反——插值把血管打碎到参考的
+  1.1–1.7 倍，S1 合并到 0.53–0.71 倍。两种错误性质不同，别用 Dice 排序。
 - 门槛：跨动物方差约 2.8 dB / 0.08 Dice，所以 < 1 dB 与 < 0.03 Dice 的差异不写结论。
 
 ## 引用整卷结构分数时必须一起引用的东西
@@ -51,10 +59,12 @@
 | M2_FOVI_S1 | 82/201 | 59 % |
 | M2_FOVI_S2 | 101/152 | **34 %** |
 
-均值 Dice 0.8634 / clDice 0.7725 / skelF1 0.7373 是**"幸存层上的分数"**，不是整卷分数；
+均值 Dice 0.8634 / clDice 0.7725 / skelF1 0.7373 是 **S1 在"幸存层上的分数"**，不是整卷分数；
 四卷占比差一倍，跨卷比较也因此受限。`structure_summary.md` 现在逐卷打印
 `gated/total (scored %)`。被门控清空的 slab 原实现记 `dice = 1.0`（两个空掩膜"完全一致"），
-已改为 NaN，否则对 slab 求平均等于给最难深度发奖励。
+已改为 NaN，否则对 slab 求平均等于给最难深度发奖励。两张已存档的 summary 的
+`depth_profile` 是在规则改变前算的，已用 `runs/E023_phase1/rescore_depth_profile.py`
+从**导出的同一份 TIFF 掩膜**重算（不重跑推理），并重写了 `structure_summary.md`。
 
 ## 没有入库的东西
 
@@ -68,8 +78,8 @@
 ## 环境
 
 conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -q`
-（**178 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
-`test_ladder_report.py`、`test_skeleton.py` 的扩充，以及 `test_run_ladder_state.py`）。
+（**187 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
+`test_benchmark.py`、`test_ladder_report.py`、`test_skeleton.py` 的扩充，以及 `test_run_ladder_state.py`）。
 
 ## 两个必须知道的口径陷阱
 

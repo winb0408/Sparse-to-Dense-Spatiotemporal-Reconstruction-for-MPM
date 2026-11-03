@@ -284,7 +284,7 @@
       },
       "config_sha256": "9878040f423d4c3c80b92b2ff6216e804359a6009acbc7bd430ae307dd220f0e"
     },
-    "projection": "none (single XY/XZ/YZ slices; mip_z kept for a future projection)"
+    "projection": "MIP-z over the recorded z range (one fixed column); XY, XZ, YZ, Zoom are single slices"
   },
   "columns": [
     {

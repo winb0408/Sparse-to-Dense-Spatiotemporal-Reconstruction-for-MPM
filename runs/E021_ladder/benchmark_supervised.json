@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-04T03:40:24",
+ "generated": "2026-11-04T03:59:56",
  "device": "cuda:2",
  "on_cpu": false,
  "device_note": "latency measured on cuda:2",
@@ -22,6 +22,60 @@
  },
  "arms": [
   {
+   "arm": "A0",
+   "features": [
+    "y",
+    "mask"
+   ],
+   "supervision": "none",
+   "learned": false,
+   "in_channels": null,
+   "params": 0,
+   "params_m": 0.0,
+   "macs_per_slice": null,
+   "macs_per_volume": null,
+   "latency_ms_per_slice": 0.009354439680464566,
+   "sec_per_volume": 0.0018708879360929132,
+   "device": "cuda:2",
+   "note": "no network (bilinear): params 0, MACs not applicable; the latency column is the measured warm-start operator on the same [Z,H,W] volume, not zero",
+   "latency": {
+    "median_ms": 1.8708879360929132,
+    "p10_ms": 1.7369060078635812,
+    "p90_ms": 2.0038819639012218,
+    "n_iters": 50,
+    "device": "cuda:2",
+    "measured": "warm start over the whole volume"
+   },
+   "measure": "operator only (no dataset, no disk I/O)"
+  },
+  {
+   "arm": "A1",
+   "features": [
+    "y",
+    "mask"
+   ],
+   "supervision": "none",
+   "learned": false,
+   "in_channels": null,
+   "params": 0,
+   "params_m": 0.0,
+   "macs_per_slice": null,
+   "macs_per_volume": null,
+   "latency_ms_per_slice": 0.00867027963977307,
+   "sec_per_volume": 0.0017340559279546142,
+   "device": "cuda:2",
+   "note": "no network (wiener_fill_first): params 0, MACs not applicable; the latency column is the measured warm-start operator on the same [Z,H,W] volume, not zero",
+   "latency": {
+    "median_ms": 1.7340559279546142,
+    "p10_ms": 1.7006660345941782,
+    "p90_ms": 1.7973219510167837,
+    "n_iters": 50,
+    "device": "cuda:2",
+    "measured": "warm start over the whole volume"
+   },
+   "measure": "operator only (no dataset, no disk I/O)"
+  },
+  {
    "arm": "S0",
    "features": [
     "y",
@@ -34,8 +88,8 @@
    "params_m": 2.552,
    "macs_per_slice": 23640145920,
    "macs_per_volume": 4728029184000,
-   "latency_ms_per_slice": 28.14,
-   "sec_per_volume": 5.629,
+   "latency_ms_per_slice": 28.28,
+   "sec_per_volume": 5.656,
    "device": "cuda:2",
    "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
    "peak_memory_mb": 356.0,
@@ -45,12 +99,12 @@
     "Linear": 21743271936
    },
    "latency": {
-    "median_ms": 28.14,
-    "p10_ms": 27.95,
-    "p90_ms": 28.39,
-    "mean_ms": 28.18,
-    "fps": 35.53,
-    "n_iters": 10,
+    "median_ms": 28.28,
+    "p10_ms": 28.06,
+    "p90_ms": 28.48,
+    "mean_ms": 28.29,
+    "fps": 35.36,
+    "n_iters": 50,
     "device": "cuda:2"
    }
   },
@@ -68,8 +122,8 @@
    "params_m": 2.552,
    "macs_per_slice": 23668457472,
    "macs_per_volume": 4733691494400,
-   "latency_ms_per_slice": 28.31,
-   "sec_per_volume": 5.662,
+   "latency_ms_per_slice": 28.81,
+   "sec_per_volume": 5.762,
    "device": "cuda:2",
    "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
    "peak_memory_mb": 356.0,
@@ -79,12 +133,12 @@
     "Linear": 21743271936
    },
    "latency": {
-    "median_ms": 28.31,
-    "p10_ms": 28.26,
-    "p90_ms": 28.43,
-    "mean_ms": 28.33,
-    "fps": 35.32,
-    "n_iters": 10,
+    "median_ms": 28.81,
+    "p10_ms": 28.6,
+    "p90_ms": 28.93,
+    "mean_ms": 28.78,
+    "fps": 34.71,
+    "n_iters": 50,
     "device": "cuda:2"
    }
   },
@@ -103,8 +157,8 @@
    "params_m": 2.553,
    "macs_per_slice": 23696769024,
    "macs_per_volume": 4739353804800,
-   "latency_ms_per_slice": 28.95,
-   "sec_per_volume": 5.79,
+   "latency_ms_per_slice": 29.72,
+   "sec_per_volume": 5.943,
    "device": "cuda:2",
    "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
    "peak_memory_mb": 356.0,
@@ -114,12 +168,12 @@
     "Linear": 21743271936
    },
    "latency": {
-    "median_ms": 28.95,
-    "p10_ms": 28.89,
-    "p90_ms": 29.09,
-    "mean_ms": 28.97,
-    "fps": 34.54,
-    "n_iters": 10,
+    "median_ms": 29.72,
+    "p10_ms": 29.55,
+    "p90_ms": 29.84,
+    "mean_ms": 29.72,
+    "fps": 33.65,
+    "n_iters": 50,
     "device": "cuda:2"
    }
   },
@@ -137,8 +191,8 @@
    "params_m": 2.615,
    "macs_per_slice": 27745320960,
    "macs_per_volume": 5549064192000,
-   "latency_ms_per_slice": 29.83,
-   "sec_per_volume": 5.966,
+   "latency_ms_per_slice": 30.91,
+   "sec_per_volume": 6.182,
    "device": "cuda:2",
    "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
    "peak_memory_mb": 368.0,
@@ -148,12 +202,12 @@
     "Linear": 21743271936
    },
    "latency": {
-    "median_ms": 29.83,
-    "p10_ms": 29.68,
-    "p90_ms": 29.9,
-    "mean_ms": 29.82,
-    "fps": 33.52,
-    "n_iters": 10,
+    "median_ms": 30.91,
+    "p10_ms": 30.84,
+    "p90_ms": 31.2,
+    "mean_ms": 31.0,
+    "fps": 32.35,
+    "n_iters": 50,
     "device": "cuda:2"
    }
   },
@@ -172,8 +226,8 @@
    "params_m": 2.615,
    "macs_per_slice": 27773632512,
    "macs_per_volume": 5554726502400,
-   "latency_ms_per_slice": 30.19,
-   "sec_per_volume": 6.038,
+   "latency_ms_per_slice": 31.07,
+   "sec_per_volume": 6.214,
    "device": "cuda:2",
    "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
    "peak_memory_mb": 368.0,
@@ -183,12 +237,12 @@
     "Linear": 21743271936
    },
    "latency": {
-    "median_ms": 30.19,
-    "p10_ms": 30.0,
-    "p90_ms": 30.4,
-    "mean_ms": 30.19,
-    "fps": 33.12,
-    "n_iters": 10,
+    "median_ms": 31.07,
+    "p10_ms": 30.62,
+    "p90_ms": 31.35,
+    "mean_ms": 31.03,
+    "fps": 32.19,
+    "n_iters": 50,
     "device": "cuda:2"
    }
   }

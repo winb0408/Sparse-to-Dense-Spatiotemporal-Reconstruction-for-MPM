@@ -58,7 +58,7 @@
         "mtime": 1793370331
       }
     },
-    "config_sha256": "d08a74026ef112380e269f23898fc156fba20eb7517c180a8bbab62a502daf75"
+    "config_sha256": "6627ebc075676a2ad2ba2bb653f92191afcf87ca16b6246c40e8a0eb318d84f4"
   },
-  "projection": "none (single XY/XZ/YZ slices; mip_z kept for a future projection)"
+  "projection": "MIP-z over the recorded z range (one fixed column); XY, XZ, YZ, Zoom are single slices"
 }

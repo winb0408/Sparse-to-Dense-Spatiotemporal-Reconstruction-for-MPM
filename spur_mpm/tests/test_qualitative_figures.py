@@ -341,3 +341,48 @@ def test_frozen_windows_are_the_ones_this_reference_derives():
     empty = dict(frozen)
     empty.pop("windows")
     assert not window_stability(empty, _ref(), np.ones(SHAPE, dtype=bool))["windows_ok"]
+
+
+def test_the_report_reads_the_protocol_spec_not_the_volume_tag():
+    """A volume sidecar says `y_k2`; the mask has to be checked against ky/kz.
+
+    The first version of the report passed ``vol["sampling"]`` -- which is a tag
+    string -- into the checker that expects a spec dict, so the compare branch
+    crashed on every run. Silence would have been worse than the crash: a tag
+    carries no ky/kz, and the checks would have passed vacuously.
+    """
+    from spur_mpm.scripts.qualitative_figures import consistency_fields
+
+    ref, masks = _ref(), _masks()
+    spec = build_view_spec(ref, sample_id="s", zoom=16)
+    spec = _freeze_spec(spec, ref, masks["y_k2"])
+    levels = {"y_k2": {"mode": "y", "ky": 2, "kz": 1},
+              "z_k2": {"mode": "z", "ky": 1, "kz": 2}}
+    groups = []
+    for level, samp in levels.items():
+        from spur_mpm.physics.sampling import SamplingSpec
+        vol = _vol(ref, masks[level])
+        vol["sampling"] = SamplingSpec.from_dict(samp).tag   # the string, as stored
+        groups.append({"level": level, "vols": [vol],
+                       "sampling": SamplingSpec.from_dict(samp).to_dict()})
+    fields = consistency_fields(groups, spec, ref, "s")
+    assert fields["display_windows"]["windows_ok"]
+    assert fields["mask_semantics"]["y_k2"]["axes_ok"]
+    assert fields["mask_semantics"]["z_k2"]["axes_ok"]
+    assert fields["mask_semantics"]["y_k2"]["ideal_fraction"] == 0.5
+
+    # the mask filed under the wrong protocol is caught, not accepted
+    groups[1]["sampling"] = {"mode": "y", "ky": 2, "kz": 1, "ideal_fraction": 0.5}
+    assert not consistency_fields(groups, spec, ref, "s")["mask_semantics"]["z_k2"]["axes_ok"]
+
+    # and a group that forgot to carry its spec is an error, not a free pass
+    groups[1].pop("sampling")
+    with pytest.raises(ValueError):
+        consistency_fields(groups, spec, ref, "s")
+
+
+def _freeze_spec(spec, ref, mask):
+    from spur_mpm.scripts.qualitative_figures import _freeze
+    cfg = {"data": {"index": "index.json", "split": "split.json"},
+           "sampling": {"mode": "y", "ky": 2, "kz": 1}}
+    return _freeze(spec, ref, mask, cfg)

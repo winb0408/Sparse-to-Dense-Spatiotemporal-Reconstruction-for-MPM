@@ -707,8 +707,51 @@ def _compare_groups(cfg: dict, manifest: dict, device, sample: str) -> list[dict
                                device)
             v["arm"] = label
             vols.append(v)
-        groups.append({"level": g["level"], "vols": vols})
+        # The protocol as a spec, not just as the ``y_k4`` tag the volume carries:
+        # the consistency report has to compare the mask on screen against the
+        # ky/kz and expected fraction this panel was *meant* to be drawn under.
+        groups.append({"level": g["level"], "vols": vols,
+                       "sampling": SamplingSpec.from_dict(
+                           cfg_g["sampling"]).to_dict()})
     return groups
+
+
+def consistency_fields(groups: list[dict], spec: dict, ref: np.ndarray,
+                       sample: str) -> dict:
+    """The three report blocks that used to be written by hand.
+
+    ``sampling_semantics`` needs the protocol *spec* (ky/kz and the fraction it
+    implies). A volume sidecar only carries the ``y_k4`` tag, so the spec has to
+    travel on the group; a group without one is a bug in the caller, and letting
+    it fall through to ``{}`` would make both checks vacuous and pass.
+    """
+    windows = window_stability(spec, ref, groups[0]["vols"][0]["in_mask"])
+    semantics, shapes = {}, {}
+    for g in groups:
+        if not isinstance(g.get("sampling"), dict):
+            raise ValueError(f"group {g['level']!r} carries no sampling spec: "
+                             f"the mask cannot be checked against a protocol")
+        vol0 = g["vols"][0]
+        mask = np.asarray(vol0["in_mask"])
+        semantics[g["level"]] = sampling_semantics(mask, g["sampling"])
+        shapes[g["level"]] = {
+            "shape": list(mask.shape),
+            "matches_spec": list(mask.shape) == list(spec["shape"]),
+            "voxel_um": vol0.get("voxel_um"),
+            "voxel_ok": (vol0.get("voxel_um") is None
+                         or [float(v) for v in spec.get("voxel_um", [])]
+                         == [float(v) for v in vol0["voxel_um"]]),
+        }
+    return {"sample_id": sample, "view_spec": spec,
+            "protocols": [g["level"] for g in groups],
+            "measured_fraction": {
+                g["level"]: float(np.mean(g["vols"][0]["in_mask"]))
+                for g in groups},
+            "context_depth": {g["level"]: g["vols"][0].get("context_depth")
+                              for g in groups},
+            "display_windows": windows,
+            "mask_semantics": semantics,
+            "geometry": shapes}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -810,31 +853,10 @@ def main(argv: list[str] | None = None) -> int:
         # than checked: that the window of every panel still comes from this
         # reference, that each mask really is the protocol it is filed under,
         # and that the shape/physical spacing agree with the frozen spec.
-        windows = window_stability(spec, ref, groups[0]["vols"][0]["in_mask"])
-        semantics, shapes = {}, {}
-        for g in groups:
-            vol0 = g["vols"][0]
-            mask = np.asarray(vol0["in_mask"])
-            sem = sampling_semantics(mask, vol0.get("sampling") or {})
-            semantics[g["level"]] = sem
-            shapes[g["level"]] = {
-                "shape": list(mask.shape),
-                "matches_spec": list(mask.shape) == list(spec["shape"]),
-                "voxel_um": vol0.get("voxel_um"),
-                "voxel_ok": (vol0.get("voxel_um") is None
-                             or [float(v) for v in spec.get("voxel_um", [])]
-                             == [float(v) for v in vol0["voxel_um"]]),
-            }
-        report.update({"sample_id": sample, "view_spec": spec,
-                       "protocols": [g["level"] for g in groups],
-                       "measured_fraction": {
-                           g["level"]: float(np.mean(g["vols"][0]["in_mask"]))
-                           for g in groups},
-                       "context_depth": {g["level"]: g["vols"][0].get(
-                           "context_depth") for g in groups},
-                       "display_windows": windows,
-                       "mask_semantics": semantics,
-                       "geometry": shapes})
+        fields = consistency_fields(groups, spec, ref, sample)
+        windows = fields["display_windows"]
+        semantics, shapes = fields["mask_semantics"], fields["geometry"]
+        report.update(fields)
         (out_dir / "consistency_report.json").write_text(
             json.dumps(report, indent=2))
         for pth in written:

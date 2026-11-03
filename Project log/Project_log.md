@@ -1611,24 +1611,39 @@ ImageJ/Fiji 可直接打开核对。
 2. **面板按协议命名**：Z-only 报"实测层 / 跳过的层"，Y-only 报"实测行 / 跳过的行"，
    YZ 两者都报；标签由实际 mask 判定，不再出现笼统的 given/gap；
 3. **一致性自检**：`--compare` 跑完写 `consistency_report.json`，参考与固定面板在不同协议
-   间必须逐像素相同，否则非零退出。本次实测 `target_diff = 0.0`、`fixed_view_diff = 0.0`、
-   三组 `input_diff = 0`，实测比例 0.25 / 0.2512 / 0.2512，三协议上下文都是 7。
+   间必须逐像素相同，否则非零退出（`return 2`）。本次实测 `target_diff = 0.0`、
+   `fixed_view_diff = 0.0`、三组 `input_diff = 0`，实测比例 0.25 / 0.2512 / 0.2512，
+   三协议上下文都是 7。**报数的同时把三类东西也验了**（原来只是写在报告里、没人查）：
+   `display_windows.window_diff`（把窗宽从同一参考再派生一次，要求完全一致）、
+   `mask_semantics`（掩膜的 z/y 稀疏轴是否与它声称的 `kz`/`ky` 一致、实测比例是否在
+   `2/H + 2/Z` 容差内）、`geometry`（形状与物理间距对得上冻结的 spec）。
 4. `sparse_figures.py`：XY 面板固定画在**所有层都测到**的那一层（`_common_plane`），
    YZ 条不再翻转，每幅图标出坐标方向；2D 阶梯图显示掩膜实际切片的那一层。
 
-**过程中发现并修掉的两处**：① 固定 XY 面板原来取 `Z//2 = 101`，而这一层在 `z_k4` /
+**过程中发现并修掉的三处**：① 固定 XY 面板原来取 `Z//2 = 101`，而这一层在 `z_k4` /
 `yz_k2x2` 下**正是被跳过的层**，共享列在两个协议里输入行全空——改成显式 `--z-view 100`
 （三协议都测到：25 % / 100 % / 50 %），坐标仍由配置给定、不随 mask 变化，旧的 z=101 图
 另存 `figures_fixed/M2_FOVII_S1_vessels_z101/` 未覆盖；② `build_view_spec` 对越界坐标
-原会抛 `IndexError`，改为提前 `ValueError`。
+原会抛 `IndexError`，改为提前 `ValueError`；③ **`projection` 说明是个常量**：
+"none (single XY/XZ/YZ slices; mip_z kept for a future projection)"——写于布局还没有
+MIP-z 列的时候，后来加了一整列投影面板，这句话没跟着改，于是每个 `view_spec.json` 都在说
+"本图没有投影"，而 PNG 上就有。我第一次改的时候只改了字符串、没改它的来源，所以下一次
+`annotate()` 又把旧常量写回去了——**这正说明"只改标签不修逻辑"是错的**。现在
+`projection_note(columns)` 从实际面板列表派生（有 `mipz` 就写 MIP-z 覆盖的 z 范围），
+冻结 spec 里的旧值在加载时被重算覆盖，并加了两条测试（有/无投影面板各一条）。
+整批图已用新代码重新渲染：`compare_y_z_yz_25pct.png` 的字节数与旧图完全一致（6 080 722）
+——像素没变，变的只是元数据，这也是"只改了说明、没动坐标"的机器证据。
 
 产物（`runs/E021_ladder/figures_fixed/M2_FOVII_S1_vessels/`）：
 `compare_y_z_yz_25pct.png`、`consistency_report.json`、`view_spec.json`、三个层级的
 `qualitative_*`/`error_*`/`support_*`/`profile_*`，以及**float32** 的 `*.npz`（含 target、
 y_in、两个 mask、各臂 pred，未压缩精度，可复核）。
-五臂同输入的 `y_k2` 图在 `runs/E021_ladder/figures/qual_y_k2/`（M2_FOVI_S1_vessels）：
-A0 27.25 dB / Dice★ 0.7473，S0/S1/S2/S2g 28.57–28.64 dB / 0.7709–0.7722——PSNR 过地板
-（+1.4 dB），Dice★ 差 +0.024 **未过** 0.03 地板，四个学习臂之间差 < 0.001。
+五臂同输入的 `y_k2` 图现在覆盖留出动物 M2 的**全部四个体**
+（`runs/E021_ladder/figures/qual_y_k2/`，每卷一套）。单裁剪的 Dice★：
+M2_FOVI_S1 0.7473 → 0.7709–0.7722；M2_FOVII_S2 0.7154 → 0.7420–0.7436；
+M2_FOVI_S2 0.6521 → 0.6658–0.6668。三卷增益 **+0.014 … +0.027，全部在 0.03 地板之下**，
+而 PSNR 增益 +1.2 … +1.4 dB 过地板——与主表"50 % 预算上结构增益不可主张、灰度可主张"一致。
+（单裁剪不是全卷平均，只用于看图；结论以表和整卷为准。）
 
 ### 8. 结论（可以写的 / 不能写的）
 
@@ -1648,4 +1663,118 @@ A0 27.25 dB / Dice★ 0.7473，S0/S1/S2/S2g 28.57–28.64 dB / 0.7709–0.7722�
 固定面板与窗宽来自参考、Z-only 只报层、Y-only 只报行、YZ 两轴都报、同输入重复被拒、
 指纹随配置变）、`test_sparse_figures.py`（4 条：共同平面、无共同平面拒绝出图）、
 `test_ladder_report.py`（+等上下文表）、`test_skeleton.py`（+被门控清空的 slab 记 NaN）。
-全套 **178 条通过**。`docs/CODE_MAP.md` 已补 `viewspec.py`、S2g、新 CLI 与三个新测试文件。
+全套 **186 条通过**（含新增的 `test_benchmark.py` 4 条与视图/一致性 4 条）。`docs/CODE_MAP.md` 已补 `viewspec.py`、S2g、新 CLI 与三个新测试文件。
+
+### 10. 补做 §4.5 的两处缺口与 §4.4 的"全部测试卷"
+
+上一轮报成本表时留了两个洞，手册都点名了，这里补掉。
+
+**(a) 零参数不等于零成本。** `benchmark.py` 原来给 A0/A1 打 `latency n/a`
+（"no network, MACs and latency are not applicable"）。手册明确禁止这种写法：插值和
+Wiener 是**要执行的**，把它写成零，等于让读者以为"无参数的地板"免费。现在
+`_time_warm_start()` 在**同样的 `[Z,H,W]` 体形状**上真跑 warm-start 算子并计时，
+`psf` 为空时退化成原来的说明（向后兼容），算子跑不动就进备注而不是抛栈（配
+`test_benchmark.py` 四条）。实测（cuda:2，200×256×256）：
+
+| arm | params(M) | MACs/slice(G) | ms/slice | s/volume |
+|---|---|---|---|---|
+| A0（bilinear） | 0 | n/a | 0.009 | 0.002 |
+| S0 | 2.552 | 23.64 | 28.28 | 5.66 |
+| S1 | 2.552 | 23.67 | 28.81 | 5.76 |
+| S2 | 2.553 | 23.70 | 29.72 | 5.94 |
+| S1g | 2.615 | 27.75 | 30.91 | 6.18 |
+| S2g | 2.615 | 27.77 | 31.07 | 6.21 |
+
+（与上一版的 5.63–6.04 差异 1–3 %，是共享卡上的运行间抖动，不是代码变化；两次都是
+在 cuda:2 空闲时测的，`p10/p90` 记录在 JSON 里。）
+
+顺手把 PSF 的代价也量了（同一体、`wiener_fill_first`）：单位 PSF 下 **1.72 ms/volume**,
+和 bilinear 的 1.73 ms 一样——因为 `_wiener_pipeline` 在 `psf.is_identity` 时直接跳过反
+卷积，这正是 A1≡A0 的实现原因；换成各向异性 PSF（σ_xy=0.98 µm，或再叠加 σ_z=5 µm）后
+升到 **5.55–5.58 ms/volume**，约 3 倍。无论哪种，物理预计算都只占网络成本的
+0.03–0.1 %，**端到端成本由网络主导**——这条把手册担心的"Wiener 执行耗时被写为零"彻底关掉。
+
+**(b) 单位 patch 延迟不是部署成本。** 手册要求同时测整卷端到端 wall-time。给
+`reconstruct_volume` 加了 `timing` 段（`wall_seconds` / `ms_per_plane` / 含哪些步骤），
+在留出动物的 M2_FOVII_S1 整卷上实测（203 层 × 512 × 512）：
+
+| arm | 端到端 wall | 进程 wall | ms/plane | 相对 patch 估算 |
+|---|---|---|---|---|
+| A0 | **2.85 s** | 5.22 s | 14.0 | – |
+| S1 | **41.6 s** | 44.1 s | 205.2 | patch 估算 5.76 s → **低估 7.2 倍** |
+
+差值不是噪声：整卷是 512×512（patch 表按 256² 算，面积 4 倍），再叠加逐层的窗口构造
+（稀疏模拟 + warm start）与数据搬运。**论文里必须写 41.6 s/卷（S1，cuda:2），不能写
+5.8 s。** 产物 `runs/E023_phase1/e2e/benchmark_end_to_end.json` 与两份 `*.json` meta。
+
+**(c) 定性图覆盖全部测试卷。** 原来只出了一卷（M2_FOVI_S1）。现在五臂 `y_k2` 对比图
+在 M2 的全部四个体上都有（`runs/E021_ladder/figures/qual_y_k2/`），失败案例不再只靠
+文字描述——最差的一卷（M2_FOVI_S2，整卷 clDice 0.55、只有 34 % 的层参与评分）和最好
+的一卷并排可见。
+
+**(d) 整卷结构：S1 相对插值地板的增益压在地板上——这条必须写清楚。**
+
+把 A1（零参数、单位 PSF 下等于 bilinear）与 S1 的整卷结构放在一起（同一门控、同一阈值、
+四卷全部），差异是：
+
+| 指标 | A1 | S1 | 差 |
+|---|---|---|---|
+| Dice | 0.8392 | 0.8634 | **+0.024** |
+| clDice | 0.7424 | 0.7725 | **+0.030** |
+| skelF1 | 0.7163 | 0.7373 | **+0.021** |
+
+**Dice 差 +0.024、skelF1 差 +0.021 都在 0.03 地板之下，clDice +0.030 正在地板上。**
+也就是说：**整卷结构层面，"监督重建优于插值"这一条按本项目的门槛不能主张**，尽管四卷
+符号一致（每卷三个指标都是 S1 更高）。真正过门槛的是**等面积 tile 层面**的 ★ 指标
+（25 % 预算 Dice★ +0.040、12.5 % +0.059，clDice★ +0.067/+0.097）——层次不同，不能互相
+背书，论文里必须分别写，不能拿 ★ 的 0.040 去替整卷的 0.024。
+
+有一个 Dice 抓不住但量级很大的差别：**拓扑分量的方向相反**。参考的分量数在四卷是
+1580 / 11664 / 17833 / 31094；A1 把血管**打碎**成 2653 / 12386 / 22403 / 32820（1.1–1.7 倍），
+S1 则**合并**到 1130 / 7654 / 10475 / 19882（0.53–0.71 倍）。插值地板造断裂和伪连通，
+监督网络造过度连接——这是两种不同性质的错误，Dice 只看到"面积重合了多少"。
+下一轮若主打拓扑恢复，应把「分量数比」「平均分支长度」「端点/分叉比」作为一等指标，
+而不是继续用 Dice 排序。
+
+**顺带修掉一个自己造的假分数**：上面两张 summary 的 `depth_profile` 是在空 slab 规则
+改变**之前**算的，所以最差卷有 3/6、其余卷各 1/6 个 slab 把"参考掩膜为空"记成
+`dice = 1.0`（两个空掩膜"完全一致"），等于给信号最弱的深层发奖励。体积层面的数字不受
+影响（掩膜非空），但存档的分层剖面受影响。处置：`runs/E023_phase1/rescore_depth_profile.py`
+从**导出到磁盘的那两份 TIFF 掩膜**重算分层剖面（不重跑推理、不重新取阈），并重写
+`structure_summary.md`；被门控清空的 slab 现在记为 `NaN`。
+
+### 11. 把"报告里的断言"变成"报告里的计算"——以及它第一次跑就崩了
+
+手册 §4.4.1 D 要求 `consistency_report.json` 写出**显示窗宽、掩膜采样语义、几何/体素间距**。
+第一版做到了"写出来"，但写的是**抄进去的冻结值**：掩膜就算根本不是 `z_k4`（而是按行
+抽的 `y_k4`），报告也照样写 `ok`——因为没有任何一步去比对。这与本轮前面修掉的
+`projection` 常量是同一类错误：**元数据在描述自己，而不是在检验产物**。
+
+现在三项都是重算后比对，任一不成立就 `return 2`：
+
+| 字段 | 怎么算的 | 实测（`figures_fixed/M2_FOVII_S1_vessels/`） |
+|---|---|---|
+| `display_windows` | 用同一份密集参考把窗宽**再派生一次**，与冻结值逐位比 | `window_diff = 0.0`，5 个面板齐全 |
+| `mask_semantics.<level>` | `measured_fraction` 对 `ideal_fraction`（容差 `2/H + 2/Z` = 0.0177）+ `z_dense`/`y_dense` 对 `kz`/`ky` | `0.25 / 0.2512 / 0.2512`，三者 `axes_ok` 全 True |
+| `geometry.<level>` | 掩膜形状对冻结 `spec.shape`，体素间距对 `voxel_um` | `[203,256,256]`、`[5.0,0.98,0.98]`，全 True |
+
+**它第一次跑就崩了，而且崩得有价值**：报告把 volume sidecar 里的 `sampling`（那是**标签
+字符串**，`"y_k4"`）当成协议 spec 传进校验函数，`AttributeError`。两种修法里必须选后者：
+
+1. 让它 `try` 过去 → 标签里没有 `ky/kz`，两项校验**空过**，报告继续"全绿"；
+2. 让协议 spec 跟着 group 走（`SamplingSpec.to_dict()` → `ky/kz/ideal_fraction`），**缺了
+   直接 `ValueError`**。选了 2，并加 `test_the_report_reads_the_protocol_spec_not_the_volume_tag`
+   钉住这条路径：既断言真 spec 能过，也断言"同一掩膜挂错协议必须被抓""缺 spec 必须报错"。
+
+**证据：只动元数据，没动像素。** 重绘前后 `compare_y_z_yz_25pct.png` 都是 6,080,722 字节，
+`git status` 里三个协议的 `qualitative_*.png` / `support_*.png` / `error_*.png` /
+`profile_*.png` 全部无改动，只有 `view_spec.json`、三个 sidecar 和 `consistency_report.json`
+变了。`view_spec.json` 的 diff 只有两行：`projection` 说明，以及 `config_sha256`
+（本次重绘多带了 `--set data.split=...`，指纹如实反映，不是漂移）。
+
+顺带清掉一个残留：`figures/qual_y_k2/view_spec.json` 是 03:32 一次单卷运行留下的、只
+对应 `M2_FOVI_S1_vessels` 一份的 spec，里面的 `projection` 还是旧常量。用该卷单独跑
+一遍 A0（无网络，秒级）重新生成后逐字段比对，**只有 `projection` 一行不同**，窗宽/切面/
+指纹完全一致，再覆盖。四卷图各自的内嵌 spec 本来就是各卷自己的，比这份共享文件更准确。
+
+测试总数 186 → **187**，全绿。

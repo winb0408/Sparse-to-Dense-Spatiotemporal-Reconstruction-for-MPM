@@ -113,7 +113,7 @@ PSNR 会系统性偏低而与结构好坏无关。分层结论一律用 `dice`/`
 |---|---|
 | `spur_mpm/scripts/sparse_figures.py` | 稀疏构建示意、掩膜覆盖图、采集时间占比。XY 面板固定画在**所有层都测到的那一层**上（`_common_plane`），否则 Z 稀疏面板会因"画在没扫的层上"而整幅空白；每幅图都标注坐标方向（y 向下、x/y 向右、z 向下） |
 | `spur_mpm/scripts/viewspec.py` | **固定视图层**（§4.4.1）：`ViewSpec` 只从密集参考里取一次，`protocol_columns` 按协议给列名、`take` 按列取面板、`ref_windows` 给统一窗、`check_group`/`check_protocols` 断言不同协议看到的是同一份参考与同一块面板 |
-| `spur_mpm/scripts/qualitative_figures.py` | 定性对比图（稀疏输入 / 各臂重建 / 密集真值），指标标在子图右下角。面板、窗宽、ROI 全部来自 `viewspec`；`--compare` 跑多协议一致性自检（`target_diff`/`fixed_view_diff` 必须为 0），不一致时非零退出 |
+| `spur_mpm/scripts/qualitative_figures.py` | 定性对比图（稀疏输入 / 各臂重建 / 密集真值），指标标在子图右下角。面板、窗宽、ROI 全部来自 `viewspec`；`--compare` 跑多协议一致性自检（`target_diff`/`fixed_view_diff` 必须为 0），不一致时非零退出。`consistency_fields` 负责报告里三项**重算**出来的校验：窗宽重派生（`window_diff`）、掩膜是否真是它挂名的协议（`mask_semantics`）、形状/体素间距对得上冻结 spec（`geometry`） |
 | `spur_mpm/scripts/sampling_diagram.py` | 采样图样与相位的示意图 |
 | `spur_mpm/scripts/profile_depth.py` | 按深度的指标曲线（PSNR 与 Dice 分列） |
 
@@ -173,6 +173,11 @@ python -m spur_mpm.scripts.qualitative_figures --compare runs/compare_y_z_yz.jso
 
 ---
 
+## 6b. 验收记录
+
+`docs/PHASE1_ACCEPTANCE_REPORT.md`：手册 §2–§4.5 的逐条验收结果（改动的文件、可复现命令、
+测试输出、§4.4.1 D 门槛对照表、修复前后差别、未闭合风险）。
+
 ## 7. 测试
 
 `python -m pytest spur_mpm/tests -q`
@@ -187,7 +192,7 @@ python -m spur_mpm.scripts.qualitative_figures --compare runs/compare_y_z_yz.jso
 | `test_complexity.py` | MACs/参数量在已知结构上的正确性 |
 | `test_benchmark.py` | 成本表的**诚实性**：无参数臂也给出实测延迟（不是 `n/a`）、缺 PSF 配置时退化为说明而不是崩溃、算子跑不动时进备注而不是抛栈 |
 | `test_models_metrics.py` | 各臂前向形状、Dice/clDice 边界 |
-| `test_qualitative_figures.py` | §4.4.1 的固定视图：参考不随协议变、目标不一致必须硬失败、面板与窗宽来自参考、Z-only 只报层、Y-only 只报行、同输入重复会被拒 |
+| `test_qualitative_figures.py` | §4.4.1 的固定视图：参考不随协议变、目标不一致必须硬失败、面板与窗宽来自参考、Z-only 只报层、Y-only 只报行、同输入重复会被拒；`projection` 说明随面板变化；掩膜挂错协议/窗宽不是本参考的/报告缺协议 spec 都必须被抓 |
 | `test_sparse_figures.py` | 稀疏图必须画在所有层都测到的平面上（`_common_plane`），没有共同平面时拒绝出图 |
 | `test_run_ladder_state.py` | 阶梯状态按 cell 目录名去重：`_c7` 单元格不能顶掉同臂同层的兄弟 |
 | `test_ladder_report.py` | 出表的**口径**：差异小于 1 dB / 0.03 Dice 必须打印"不可主张"、同预算换轴不足 0.03 Dice 不得写成"轴有影响"、缺测指标打印为 `–` 而不是 `nan` |
