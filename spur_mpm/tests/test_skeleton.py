@@ -368,3 +368,20 @@ def test_mean_radius_um_uses_anisotropic_distance_not_voxel_geometric_mean():
     expected = distance_transform_edt(mask, sampling=VOXEL)[thin].mean()
     measured = skeleton_stats(mask, voxel_um=VOXEL)["mean_radius_um"]
     assert measured == pytest.approx(float(expected), rel=1e-6)
+
+
+def test_a_slab_emptied_by_gating_is_not_a_perfect_reconstruction():
+    """dice = 1.0 for two empty masks is right; averaging it is not.
+
+    On the real M2 volumes the bottom slabs are gated out, and a mean over slabs
+    that counts them as 1.0 reports the easiest number for the hardest part.
+    """
+    z, h, w = 8, 16, 16
+    ref = np.zeros((z, h, w), dtype=bool)
+    pred = np.zeros_like(ref)
+    ref[:4, 2:6, 2:10] = True
+    pred[:4, 2:6, 2:10] = True                 # top half perfect, bottom empty
+    profile = depth_profile(pred, ref, VOXEL, n_slabs=2)
+    assert profile[0]["n_empty"] == 0 and profile[0]["dice"] == pytest.approx(1.0)
+    assert profile[1]["n_empty"] == 1
+    assert profile[1]["dice"] != profile[1]["dice"]        # NaN, not 1.0

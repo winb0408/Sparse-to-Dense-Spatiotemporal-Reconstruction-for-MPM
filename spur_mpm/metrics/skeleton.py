@@ -569,6 +569,16 @@ def depth_profile(pred_mask: np.ndarray, ref_mask: np.ndarray, voxel_um,
     for group in groups:
         lo, hi = int(group[0]), int(group[-1]) + 1
         slab = _mask_metrics(pm[lo:hi], rm[lo:hi], voxel_um, tolerance_vox)
+        if slab["n_empty"]:
+            # Two empty masks score dice = 1.0 by the usual convention, and a
+            # slab that a gate emptied is *not* a perfect reconstruction of a
+            # vessel-less slab -- it is a slab with nothing to score. On a real
+            # M2 volume the bottom third of the stack is gated out, so averaging
+            # slabs would otherwise report a flattering number for the hardest
+            # part of the volume. NaN + n_empty=1 says "no number here".
+            for key in ("dice", "cl_dice", "f1"):
+                if key in slab:
+                    slab[key] = float("nan")
         # A single plane spans one voxel of axial sampling, not n_rows of depth.
         slab["z_lo_um"] = 0.0 if pm.ndim != 3 else float(lo) * z_um
         slab["z_hi_um"] = z_um if pm.ndim != 3 else float(hi) * z_um

@@ -83,7 +83,7 @@ def structure_for_sample(cfg: dict, arm: str, ckpt: Path | None, sample_id: str,
         result[f"{name}_mask_path"] = str(path)
     result.update({"sample_id": sample_id, "arm": arm, "ckpt": str(ckpt),
                    "sampling": cfg["sampling"], "recon": str(recon),
-                   "recon_meta": meta})
+                   "n_planes": int(pred.shape[0]), "recon_meta": meta})
     if not keep_recon:
         # A 200-plane float32 stack plus its warm start is ~450 MB per volume per
         # arm; keeping those for two dozen cells would fill the disk to hold data
@@ -102,6 +102,70 @@ def _row(label: str, r: dict) -> str:
             f"{r['ref_n_junctions']} → {r['pred_n_junctions']} | "
             f"{r['ref_total_length_um']:.0f} → {r['pred_total_length_um']:.0f} | "
             f"{r['ref_mean_radius_um']:.3f} → {r['pred_mean_radius_um']:.3f} |")
+
+
+def _n_planes(r: dict) -> int | None:
+    """Planes in the volume: from the record, else from the exported mask.
+
+    Needed because the gated share is a *fraction*; "57 gated planes" says
+    nothing until it is set against 203, and a reader who assumes those were
+    plane indices would be badly wrong.
+    """
+    if r.get("n_planes"):
+        return int(r["n_planes"])
+    path = r.get("pred_mask_path")
+    if not path:
+        return None
+    try:
+        import tifffile
+        with tifffile.TiffFile(str(path)) as tf:
+            return int(len(tf.pages))
+    except Exception:                                   # pragma: no cover
+        return None
+
+
+def render_summary(summary: dict) -> str:
+    """The markdown table, including the share of planes that survived gating.
+
+    Depth-stratified numbers only mean something if the reader knows how much of
+    the stack was scored: on this cohort 28-50 % of the planes are gated out, so
+    the Dice below is a Dice on the scored part, not on the volume.
+    """
+    results = summary["volumes"]
+    md = ["| volume | Dice | clDice | skelF1 | components ref→pred | "
+          "junctions ref→pred | length µm ref→pred | radius µm ref→pred | "
+          "planes scored |",
+          "|---|---|---|---|---|---|---|---|---|"]
+    for r in results:
+        n, gated = _n_planes(r), int(r.get("n_planes_gated") or 0)
+        share = (f"{n - gated}/{n} ({100 * (n - gated) / n:.0f} %)"
+                 if n else "–")
+        md.append(_row(r["sample_id"], r).rstrip().rstrip("|").rstrip() +
+                  f" | {share} |")
+    m = summary["means"]
+    md.append(_row("**mean**", {**{k: v for k, v in m.items()},
+                                "ref_n_components": m["ref_n_components"],
+                                "pred_n_components": m["pred_n_components"]}
+                  ).rstrip().rstrip("|").rstrip() + " | – |")
+    md.append("")
+    # The count of gated planes is a *count*: quoting it alone invites the reader
+    # to take it for a plane index, and quoting it without the denominator hides
+    # that on this cohort a third of the stack is not scored at all.
+    gated = [f"{r['sample_id']} {int(r.get('n_planes_gated') or 0)}/{_n_planes(r) or '?'}"
+             for r in results]
+    md.append(f"**Planes gated out** (reference mask fills > "
+              f"{results[0].get('max_plane_fraction')} of the plane, so both "
+              f"masks are emptied): {', '.join(gated)}. Every number above is a "
+              "score on the planes that survived, not on the whole volume; "
+              "report the share beside the table and spot-check the gated planes "
+              "in ImageJ.")
+    md.append(f"Binarisation: {results[0].get('segment_method', 'vesselness')} "
+              f"response, threshold {results[0]['threshold']:.6g} fitted on the "
+              f"reference only ({results[0].get('threshold_mode', 'per_plane')}), "
+              f"foreground ref {results[0]['ref_fraction']:.1%} / "
+              f"pred {results[0]['pred_fraction']:.1%}. "
+              f"Skeleton overlap tolerance 1 voxel.")
+    return "\n".join(md)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -126,7 +190,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-planes", type=int, default=None,
                    help="analyse only the first N planes (debug runs)")
     p.add_argument("--set", dest="overrides", action="append", default=[])
+    p.add_argument("--from-summary", type=Path, default=None,
+                   help="re-render an existing structure_summary.json (no GPU, "
+                        "no inference) instead of analysing volumes again")
     args = p.parse_args(argv)
+
+    if args.from_summary:
+        summary = json.loads(args.from_summary.read_text())
+        text = render_summary(summary)
+        (args.from_summary.parent / "structure_summary.md").write_text(text + "\n")
+        print(text)
+        return 0
 
     cfg = load_config(args.base)
     if args.config:
@@ -172,26 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "structure_summary.json").write_text(json.dumps(summary, indent=2))
 
-    md = ["| volume | Dice | clDice | skelF1 | components ref→pred | "
-          "junctions ref→pred | length µm ref→pred | radius µm ref→pred |",
-          "|---|---|---|---|---|---|---|---|"]
-    md += [_row(r["sample_id"], r) for r in results]
-    m = summary["means"]
-    md.append(_row("**mean**", {**{k: v for k, v in m.items()},
-                                "ref_n_components": m["ref_n_components"],
-                                "pred_n_components": m["pred_n_components"]}))
-    md.append("")
-    md.append(f"Gated planes (reference mask fills > "
-              f"{results[0].get('max_plane_fraction')} of the plane): "
-              f"{', '.join(str(r.get('n_planes_gated')) for r in results)} "
-              f"(one number per volume); those planes are in neither mask.")
-    md.append(f"Binarisation: {results[0].get('segment_method', 'vesselness')} "
-              f"response, threshold {results[0]['threshold']:.6g} fitted on the "
-              f"reference only ({results[0].get('threshold_mode', 'per_plane')}), "
-              f"foreground ref {results[0]['ref_fraction']:.1%} / "
-              f"pred {results[0]['pred_fraction']:.1%}. "
-              f"Skeleton overlap tolerance 1 voxel.")
-    text = "\n".join(md)
+    text = render_summary(summary)
     (args.out / "structure_summary.md").write_text(text + "\n")
     print(text)
     print(f"\nwrote {args.out}")
