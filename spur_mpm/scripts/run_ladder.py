@@ -60,7 +60,7 @@ COHORT_INDEX = "data_local/dryad_cache/index_cohort.json"
 COHORT_SPLIT = "spur_mpm/experiments/E020_cohort/split.json"
 
 FREE_ARMS = ("A0", "A1")
-TRAINED_ARMS = ("S0", "S1", "S2", "S1g")
+TRAINED_ARMS = ("S0", "S1", "S2", "S1g", "S2g")
 
 STAGES: dict[str, list[tuple[str, str]]] = {
     "ablation": [(arm, "y_k2") for arm in FREE_ARMS + TRAINED_ARMS],
@@ -68,7 +68,7 @@ STAGES: dict[str, list[tuple[str, str]]] = {
               ("y_k3", "y_k4", "y_k8", "z_k2", "z_k3", "z_k4", "yz_k2x2",
                "yz_k2x4")],
     "matched": [(arm, level) for level in ("y_k4", "z_k4", "yz_k2x2")
-                for arm in ("A0", "A1", "S1", "S2")],
+                for arm in ("A0", "A1", "S0", "S1", "S2", "S1g", "S2g")],
     # A floor under *every* rung, not only under y_k2: a budget curve where
     # most levels have no parameter-free number cannot say whether a drop came
     # from the method or from the budget. A0 and A1 coincide under the identity
