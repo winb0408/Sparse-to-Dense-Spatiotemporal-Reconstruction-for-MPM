@@ -203,7 +203,8 @@ def _lattice_pattern(keep: torch.Tensor) -> dict | None:
 
 def verify_construction(dense: np.ndarray, y: np.ndarray, mask: np.ndarray,
                         spec: SamplingSpec, *, phase: tuple[int, ...] = (0, 0, 0),
-                        noisy: bool = False, atol: float = 0.0) -> dict:
+                        noisy: bool = False, atol: float = 0.0,
+                        psf: PSFConfig | None = None) -> dict:
     """Check one construction against the definition ``Y = M . D``.
 
     Returns a dict of named checks (all booleans) plus the numbers they were
@@ -221,18 +222,29 @@ def verify_construction(dense: np.ndarray, y: np.ndarray, mask: np.ndarray,
     # and an upcast would double the footprint of every check for no extra truth.
     d = np.asarray(dense, dtype=np.float32)
     yy = np.asarray(y, dtype=np.float32)
-    m = np.asarray(mask).astype(bool)
+    raw_mask = np.asarray(mask)
+    if d.shape != yy.shape or d.shape != raw_mask.shape:
+        return {"ok": False, "shape_matches": False,
+                "expected_shape": list(d.shape),
+                "measurement_shape": list(yy.shape),
+                "mask_shape": list(raw_mask.shape)}
+    m = raw_mask.astype(bool)
 
     checks: dict[str, bool] = {}
-    checks["shape_matches"] = d.shape == yy.shape == m.shape
-    checks["mask_is_boolean"] = m.dtype == bool
+    checks["shape_matches"] = True
+    # Validate the ORIGINAL dtype, not the boolean dtype after casting.
+    checks["mask_is_boolean"] = np.issubdtype(raw_mask.dtype, np.bool_)
     checks["unmeasured_is_exactly_zero"] = bool(
         np.all(yy[~m] == 0.0)) if m.any() else bool(np.all(yy == 0.0))
     if noisy:
         checks["measured_equals_dense"] = None       # not a property under noise
     else:
+        expected = d
+        if psf is not None and not psf.is_identity:
+            from spur_mpm.physics.acquisition import apply_otf
+            expected = apply_otf(torch.from_numpy(d), psf).numpy()
         checks["measured_equals_dense"] = bool(
-            np.allclose(yy[m], d[m], atol=atol, rtol=0.0))
+            np.allclose(yy[m], expected[m], atol=atol, rtol=0.0))
 
     # Geometry: a kept row is kept across the whole fast axis (that is what makes
     # line skipping a scanning scheme), and in ``z`` mode a kept plane is kept
