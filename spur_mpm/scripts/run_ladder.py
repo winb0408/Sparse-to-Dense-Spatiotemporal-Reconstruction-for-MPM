@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -64,7 +65,8 @@ TRAINED_ARMS = ("S0", "S1", "S2", "S1g")
 STAGES: dict[str, list[tuple[str, str]]] = {
     "ablation": [(arm, "y_k2") for arm in FREE_ARMS + TRAINED_ARMS],
     "sweep": [("S1", level) for level in
-              ("y_k3", "y_k4", "y_k8", "z_k2", "z_k4", "yz_k2x2", "yz_k2x4")],
+              ("y_k3", "y_k4", "y_k8", "z_k2", "z_k3", "z_k4", "yz_k2x2",
+               "yz_k2x4")],
     "matched": [(arm, level) for level in ("y_k4", "z_k4", "yz_k2x2")
                 for arm in ("A0", "A1", "S1", "S2")],
     # A floor under *every* rung, not only under y_k2: a budget curve where
@@ -72,6 +74,10 @@ STAGES: dict[str, list[tuple[str, str]]] = {
     # from the method or from the budget. A0 and A1 coincide under the identity
     # PSF (E001), so only A0 is run and the degeneracy is reported instead of
     # paying for it nine more times.
+    # Plan §3.3 control: the same three 25 % budgets at one fixed context, so
+    # the "axis does not matter" finding cannot be explained by the Z context
+    # each protocol happens to need. Run it with --context-slices 7.
+    "control": [("S1", level) for level in ("y_k4", "z_k4", "yz_k2x2")],
     "floors": [("A0", level) for level in
                ("y_k2", "y_k3", "y_k4", "y_k8", "z_k2", "z_k3", "z_k4",
                 "yz_k2x2", "yz_k2x4")],
@@ -133,7 +139,9 @@ def cell_name(arm: str, level: str, context: int | None = None) -> str:
     minimum. The suffix keeps both cells, and the report can pair them.
     """
     name = f"E021_{arm}_{level}"
-    return name if context is None else f"{name}_c{int(context)}"
+    if context is None or int(context) == level_context(level):
+        return name          # the level already runs at that context
+    return f"{name}_c{int(context)}"
 
 
 def _free_gpus() -> list[str]:
@@ -178,10 +186,19 @@ class State:
         if path.exists():
             self.rows = json.loads(path.read_text())["cells"]
 
+    @staticmethod
+    def _key(row: dict) -> tuple:
+        # Keyed on the directory name: a forced-context rerun of the same level
+        # is a different cell. Keying on (arm, level) used to make the _c7 row
+        # *replace* the minimum-context row, so the ladder forgot that the cell
+        # it already had was finished (and a later run would retrain it).
+        name = row.get("name")
+        return ("name", name) if name else ("arm", row["arm"], row["level"])
+
     def add(self, row: dict) -> None:
         with self._lock:
-            self.rows = [r for r in self.rows
-                         if (r["arm"], r["level"]) != (row["arm"], row["level"])]
+            key = self._key(row)
+            self.rows = [r for r in self.rows if self._key(r) != key]
             self.rows.append(row)
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
@@ -270,6 +287,64 @@ def _cell(arm: str, level: str, *, out_root: Path, steps: int | None,
     return row
 
 
+def _arm_level_from_name(name: str) -> tuple[str, str] | None:
+    """Split "E021_<arm>_<level>[_c<N>]" back into its arm and level."""
+    from spur_mpm.models.registry import ARMS
+
+    if not name.startswith("E021_"):
+        return None
+    rest = name[len("E021_"):]
+    for arm in sorted(ARMS, key=len, reverse=True):
+        if rest.startswith(arm + "_"):
+            # the _c<N> suffix is the context override, not part of the level
+            return arm, re.sub(r"_c\d+$", "", rest[len(arm) + 1:])
+    return None
+
+
+def rebuild_state(out_root: Path) -> list[dict]:
+    """Reconstruct ladder.json from the run directories.
+
+    The state file is a convenience, not the source of truth: every finished
+    cell already carries ``config.yaml`` and ``eval_test/summary.json``. This
+    makes the ladder recoverable after a state bug, without retraining, and is
+    what ``--rebuild-state`` writes back.
+    """
+    rows = []
+    for run_dir in sorted(out_root.glob("E021_*")):
+        summary = run_dir / "eval_test" / "summary.json"
+        parsed = _arm_level_from_name(run_dir.name)
+        if not summary.exists() or parsed is None:
+            continue
+        arm, level = parsed
+        m = json.loads(summary.read_text()).get("metrics", {})
+        rows.append({"arm": arm, "level": level, "name": run_dir.name,
+                     "status": "ok",
+                     "context": _context_of(run_dir),
+                     "metrics": {k: v.get("mean_of_group_means", v.get("mean"))
+                                 for k, v in m.items() if isinstance(v, dict)}})
+    return rows
+
+
+def _context_of(run_dir: Path) -> int | None:
+    cfg = run_dir / "config.yaml"
+    if not cfg.exists():
+        return None
+    import yaml
+
+    return yaml.safe_load(cfg.read_text()).get("data", {}).get("context_slices")
+
+
+def select(pairs, only, context=None):
+    """Keep the cells whose *final* name contains one of ``only``.
+
+    Matching on the final name (not on arm or level) is what makes this safe:
+    "y_k4" would otherwise also select the "y_k4_c7" cell, which is a different
+    experiment -- same rows, seven planes of context instead of one.
+    """
+    return [pr for pr in pairs
+            if any(sub in cell_name(pr[0], pr[1], context) for sub in only)]
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -281,6 +356,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--jobs", type=int, default=None, help="parallel runs")
     p.add_argument("--steps", type=int, default=None,
                    help="override train.steps (smoke runs)")
+    p.add_argument("--rebuild-state", action="store_true",
+                   help="rebuild ladder.json from the run directories before "
+                        "planning (the directories, not the state file, are the "
+                        "source of truth)")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--force", action="store_true", help="redo finished cells")
     p.add_argument("--eval-only", action="store_true",
@@ -292,6 +371,13 @@ def main(argv: list[str] | None = None) -> int:
                         "protocols compared at equal context, not equal kz). "
                         "Cells are suffixed _c<N> so they never overwrite the "
                         "cells trained at their own minimum context.")
+    p.add_argument("--only", action="append", default=None, metavar="SUBSTR",
+                   help="restrict to cells whose name contains SUBSTR "
+                        "(repeatable). Used to re-score a handful of cells "
+                        "after a metric change without redoing the ladder. "
+                        "Substring, so do not pass --context-slices while "
+                        "selecting a cell that ran at its own context: the "
+                        "name it would match is the _c<N> one.")
     p.add_argument("--skeleton", action="store_true",
                    help="also score the skeleton per window (slower; adds "
                         "skelF1 and the skeleton counts to summary.json)")
@@ -299,6 +385,10 @@ def main(argv: list[str] | None = None) -> int:
 
     stages = args.stage or ["ablation"]
     pairs = plan(stages)
+    if args.only:
+        before = len(pairs)
+        pairs = select(pairs, args.only, args.context_slices)
+        print(f"--only kept {len(pairs)} of {before} cells")
     devices = ([d.strip() for d in args.devices.split(",")] if args.devices
                else _free_gpus())
     if not devices:
@@ -308,6 +398,11 @@ def main(argv: list[str] | None = None) -> int:
     jobs = args.jobs or len(devices)
 
     state = State(args.out_root / "ladder.json")
+    if args.rebuild_state:
+        n = len(state.rows)
+        for row in rebuild_state(args.out_root):
+            state.add(row)
+        print(f"--rebuild-state: {n} rows -> {len(state.rows)}")
     todo = [pr for pr in pairs
             if args.force or state.done(pr[0], pr[1],
                                         cell_name(pr[0], pr[1], args.context_slices)) is None]

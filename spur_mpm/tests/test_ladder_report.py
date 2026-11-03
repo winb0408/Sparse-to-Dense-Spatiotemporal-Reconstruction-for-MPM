@@ -89,3 +89,18 @@ def test_level_context_is_the_minimum_the_protocol_needs():
     assert level_context("z_k4") == 7        # 2*(4-1)+1
     assert level_context("yz_k2x2") == 3
     assert level_context("yz_k2x4") == 7     # the plane spacing decides
+
+
+def test_only_filter_matches_the_final_cell_name():
+    from spur_mpm.scripts.run_ladder import select
+
+    pairs = [("S1", "y_k4"), ("S1", "y_k8"), ("A0", "y_k4")]
+    # an arm+level pair, not a level: "y_k4" must not drag y_k8 along
+    assert select(pairs, ["y_k4"]) == [("S1", "y_k4"), ("A0", "y_k4")]
+    # Under a forced context both y_k4 cells *own* the _c7 name, so "y_k4"
+    # selects them too -- substring matching cannot tell the two experiments
+    # apart, and it should not pretend to: the safe way to re-score the
+    # own-context cell is to drop --context-slices from that invocation.
+    assert select(pairs, ["y_k4_c7"], 7) == [("S1", "y_k4"), ("A0", "y_k4")]
+    assert select(pairs, ["y_k4"], 7) == [("S1", "y_k4"), ("A0", "y_k4")]
+    assert select(pairs, ["S1"]) == [("S1", "y_k4"), ("S1", "y_k8")]

@@ -204,6 +204,11 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
         "sampling": sampling.tag,
         "sampling_fraction": float(sampling.ideal_fraction()),
         "consistency_projection": projection,
+        # The number of planes the arm's window actually spans. Recorded
+        # because a kz=4 figure at context 1 and one at context 7 look the same
+        # in every other field of this sidecar, and the plan (§3.3) forbids
+        # letting a kz setting quietly see more planes.
+        "context_depth": int(context),
         "dual": arm.dual,
         "pred": cat(preds).astype(np.float32),
         # what the arm was handed: zero-filled measurements. Rendered with the
@@ -720,6 +725,7 @@ def main(argv: list[str] | None = None) -> int:
          "mask_geometry": _mask_geometry(vols[0]["in_mask"]),
          "input_support": vols[0]["input_support"],
          "consistency_projection": vols[0]["consistency_projection"],
+         "context_depth": vols[0]["context_depth"],
          "arms": [{"arm": v["arm"], "checkpoint": v["checkpoint"],
                    "supervision": v["supervision"],
                    # A dual arm's Input row is the union of its two branches;

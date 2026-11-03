@@ -80,7 +80,9 @@
 | `spur_mpm/common/*` | 配置加载、随机种子、日志、provenance（每个 run 记录 git 状态） |
 | `spur_mpm/configs/base.yaml` | 全局预算（步数、batch、patch、主干宽度），**任何表里的成本数字都从这里取** |
 | `spur_mpm/configs/experiments/*.yaml` | 每个实验一个文件；换臂/换稀疏等级 = 换 YAML |
-| `spur_mpm/scripts/run_ladder.py` | 在固定队列上跑"臂 × 稀疏等级"整个阶梯，阶段 = 问题（ablation / sweep / matched），逐 cell 写进度；`--eval-only` 只重打分不重训（换了指标/分割规则后用，检查点与这些无关） | 消融与稀疏曲线的主入口 |
+| `spur_mpm/scripts/run_ladder.py` | 在固定队列上跑"臂 × 稀疏等级"整个阶梯，阶段 = 问题（ablation / sweep / matched / floors / control），逐 cell 写进度；`--eval-only` 只重打分不重训（换了指标/分割规则后用，检查点与这些无关）；`--context-slices` 强制统一 Z 上下文（plan §3.3 的同上下文对照，cell 名加 `_c<N>`）；`--only` 按最终 cell 名筛子集；`--rebuild-state` 从 run 目录重建 `ladder.json` | 消融与稀疏曲线的主入口 |
+
+**进度文件（`ladder.json`）以 cell 目录为键**，不是 `(arm, level)`：强制上下文的 `_c7` 与最小上下文的同级 cell 是两个实验，按 `(arm, level)` 去重会让前者**顶掉**后者的记录，之后 `done()` 认不出它已完成、下次会重训。真值仍在各 cell 目录的 `config.yaml` + `eval_test/summary.json` 里，所以任何时候都能 `--rebuild-state` 无损重建。
 
 ---
 
