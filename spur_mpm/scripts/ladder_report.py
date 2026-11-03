@@ -183,24 +183,41 @@ def axis_comparison(cells: dict[tuple[str, str], dict],
     spread across those three is under the floor for every arm, then the axis
     does not matter at this budget and no "Z-skipping is better" sentence may be
     written -- which is the sentence this table exists to police.
+
+    The verdict is taken on the **equal-area** numbers where they exist, because
+    the trained arms' reference-fitted Dice carries their contrast drift into
+    this comparison (y_k4: 0.545 fitted, 0.640 equal-area, against a floor of
+    0.03). Both spreads are printed so the difference is visible rather than
+    corrected away.
     """
     arms = [a for a in ARMS if sum((a, lvl) in cells for lvl in levels) >= 2]
     if not arms:
         return ""
+    # Header must follow the row order below: every level's Dice first, then
+    # every level's Dice★. Building it by interleaving gives a table whose
+    # numbers sit under the wrong labels -- the failure mode these tables exist
+    # to prevent, so the two orders are written out rather than derived.
     out = ["\n### Axis of the sparsity at a matched 25 % budget\n",
-           "| arm | " + " | ".join(f"{k} {lvl}" for lvl in levels
-                                   for k in ("Dice",)) + " | ΔDice | ΔclDice | claim |",
-           "|---" * (len(levels) + 3) + "|"]
+           "| arm | " + " | ".join(f"Dice {lvl}" for lvl in levels) + " | " +
+           " | ".join(f"Dice★ {lvl}" for lvl in levels) +
+           " | ΔDice | ΔclDice | ΔDice★ | ΔclDice★ | claim (on ★) |",
+           "|---" * (2 * len(levels) + 5) + "|"]
     for arm in arms:
-        dice = [cells.get((arm, lvl), {}).get("dice", float("nan")) for lvl in levels]
-        cl = [cells.get((arm, lvl), {}).get("cl_dice", float("nan")) for lvl in levels]
-        span_dice = _span(dice)
-        span_cl = _span(cl)
-        claimed = span_dice >= DICE_FLOOR or span_cl >= DICE_FLOOR
-        verdict = ("axis matters" if claimed else
-                   "no claim (spread < .03)")
-        out.append(f"| {arm} | " + " | ".join(f"{d:.4f}" for d in dice) +
-                   f" | {span_dice:.4f} | {span_cl:.4f} | {verdict} |")
+        get = lambda key, lvl: cells.get((arm, lvl), {}).get(key, float("nan"))
+        dice = [get("dice", l) for l in levels]
+        cl = [get("cl_dice", l) for l in levels]
+        dice_a = [get("dice_area", l) for l in levels]
+        cl_a = [get("cl_dice_area", l) for l in levels]
+        span_dice, span_cl = _span(dice), _span(cl)
+        span_dice_a, span_cl_a = _span(dice_a), _span(cl_a)
+        basis = (span_dice_a, span_cl_a) if span_dice_a == span_dice_a else \
+            (span_dice, span_cl)
+        claimed = any(v == v and v >= DICE_FLOOR for v in basis)
+        verdict = "axis matters" if claimed else "no claim (spread < .03)"
+        cells_ = ([f"{d:.4f}" for d in dice] + [f"{d:.4f}" for d in dice_a])
+        out.append(f"| {arm} | " + " | ".join(cells_) +
+                   f" | {span_dice:.4f} | {span_cl:.4f} | {span_dice_a:.4f} | "
+                   f"{span_cl_a:.4f} | {verdict} |")
     return "\n".join(out)
 
 
