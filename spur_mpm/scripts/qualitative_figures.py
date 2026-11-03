@@ -77,6 +77,11 @@ from spur_mpm.models.registry import build_model, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
 from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.physics.sampling import SamplingSpec
+from spur_mpm.scripts.viewspec import (
+    build_view_spec, check_group, check_protocols, load_view_spec,
+    mask_geometry, protocol_columns, ref_windows, save_view_spec, take,
+    validate_view_spec,
+)
 from spur_mpm.ssl.holdout import HoldoutSpec
 
 __all__ = ["predict_volume", "render", "main"]
@@ -217,6 +222,10 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
         "acq_mask": cat(m_acq),
         "in_mask": cat(m_in),
         "z": torch.cat(zs)[order].numpy(),
+        # Physical pitch, so a saved view spec states the geometry it is
+        # drawn in instead of an implicit isotropic assumption.
+        "voxel_um": (float(geom0.z_step_um), float(geom0.voxel_xy_um),
+                     float(geom0.voxel_xy_um)),
     }
 
 
@@ -250,103 +259,6 @@ def _metrics(vol: dict) -> dict:
     for k, v in e.items():
         out[k] = float(np.nanmean(v)) if v else float("nan")
     return out
-
-
-VIEW_KEYS = ("XY 25%", "XY 50%", "XY 75%", "XZ given", "XZ gap",
-             "YZ mid", "MIP-z", "Zoom")
-
-
-def _nanmax(vol: np.ndarray, axis: int) -> np.ndarray:
-    """Max that keeps "nothing here" as NaN instead of hiding it in a zero.
-
-    Used for the projection of the masked input: a row that was never measured
-    has no maximum, and pretending it has one would paint the gap as background.
-    """
-    ok = np.isfinite(vol)
-    out = np.where(ok, vol, -np.inf).max(axis=axis)
-    return np.where(ok.any(axis=axis), out, np.nan)
-
-
-def _view_spec(ref: np.ndarray, mask: np.ndarray, zoom: int = 96) -> dict:
-    """Choose the cuts every row of the figure will share, from data alone.
-
-    ``y_meas`` / ``y_gap`` are the best- and worst-covered y rows (ties broken
-    towards the middle of the volume), so the two XZ columns show, respectively,
-    a plane the input has and a plane it does not. The zoom box is centred on
-    the busiest patch of the mid plane, fixed once so all rows crop alike.
-    """
-    z, h, w = ref.shape
-    cov = mask.reshape(z, h, -1).mean(axis=(0, 2))          # [H] per-row cover
-    best = np.flatnonzero(cov >= cov.max() - 1e-9)
-    worst = np.flatnonzero(cov <= cov.min() + 1e-9)
-    n = int(min(zoom, h, w))
-    zc = int(0.5 * z)
-    plane = np.nan_to_num(ref[zc], nan=0.0)
-    sm = uniform_filter(plane, size=max(n // 3, 3), mode="nearest")
-    fy, fx = np.unravel_index(int(np.argmax(sm)), sm.shape)
-    return {
-        "z": zc,
-        "y_meas": int(best[np.argmin(np.abs(best - h // 2))]),
-        "y_gap": int(worst[np.argmin(np.abs(worst - h // 2))]),
-        "y0": int(np.clip(fy - n // 2, 0, max(h - n, 0))),
-        "x0": int(np.clip(fx - n // 2, 0, max(w - n, 0))),
-        "n": n,
-        "row_cover": cov,
-    }
-
-
-def _views(vol: np.ndarray, spec: dict) -> dict:
-    """The eight panels, as 2D arrays, from a (Z, Y, X) array.
-
-    ``spec`` comes from :func:`_view_spec` and is computed once per figure, so
-    every row of the figure looks at the same cut of the same volume.
-    """
-    z, h, w = vol.shape
-    zc, n, y0, x0 = spec["z"], spec["n"], spec["y0"], spec["x0"]
-    return {
-        "XY 25%": vol[int(0.25 * z)],
-        "XY 50%": vol[zc],
-        "XY 75%": vol[int(0.75 * z)],
-        "XZ given": vol[:, spec["y_meas"], :],
-        "XZ gap": vol[:, spec["y_gap"], :],
-        "YZ mid": vol[:, :, w // 2],
-        "MIP-z": _nanmax(vol, axis=0),
-        "Zoom": vol[zc, y0:y0 + n, x0:x0 + n],
-    }
-
-
-def _mask_geometry(mask: np.ndarray) -> dict:
-    """Describe a measured-support mask as a lattice, measured from the mask.
-
-    The sidecar exists so a figure can be re-read without the run config, and
-    the one thing a reader needs is *which* sparse pattern is on screen. Rather
-    than echo the config (which older dumps never recorded), measure it: keep a
-    y row only if it is entirely measured, then read the period off those rows.
-    ``x_dense``/``z_dense`` say whether the other two axes were left alone,
-    which is the whole difference between row skipping and a 2-D lattice.
-    """
-    z, h, w = mask.shape
-    rows = mask.all(axis=2).any(axis=0)              # [H]: row kept end-to-end
-    kept = np.flatnonzero(rows)
-    step = int(np.diff(kept).min()) if kept.size > 1 else 1
-    return {
-        "measured_fraction": round(float(mask.mean()), 4),
-        "kept_y_rows": int(rows.sum()),
-        "y_period": step,
-        # kept rows must be complete along x AND present in every z plane
-        "x_dense": bool(kept.size and mask[:, kept, :].all()),
-        "z_dense": bool(mask.any(axis=(1, 2)).all()),
-        "row_pattern": "".join("1" if r else "0" for r in rows[:4 * step]),
-    }
-
-
-def _window(img: np.ndarray) -> tuple[float, float]:
-    """Robust display window: 0.5th-99.5th percentile of the finite voxels."""
-    v = img[np.isfinite(img)]
-    if v.size == 0:
-        return 0.0, 1.0
-    lo, hi = np.percentile(v, (0.5, 99.5))
-    return float(lo), float(max(hi, lo + 1e-6))
 
 
 def _tail(img: np.ndarray, q: float = 99.5) -> float:
@@ -423,7 +335,8 @@ def _panel_metrics(pred: np.ndarray, ref: np.ndarray) -> dict | None:
     return out
 
 def render(vols: list[dict], out_dir: Path, dpi: int = 200,
-           tag: str = "") -> list[Path]:
+           tag: str = "", spec: dict | None = None,
+           zoom: int = 96) -> list[Path]:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -432,13 +345,23 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     ref = vols[0]["target"]
-    spec = _view_spec(ref, vols[0]["in_mask"])
-    cols = list(VIEW_KEYS)
-    views = _views(ref, spec)
+    if spec is None:
+        spec = build_view_spec(ref, sample_id=sample,
+                               voxel_um=vols[0].get("voxel_um", (1.0, 1.0, 1.0)),
+                               zoom=zoom)
+    else:
+        validate_view_spec(spec, ref.shape)
+    cols = [c["key"] for c in protocol_columns(spec, vols[0]["in_mask"])]
+    col_meta = {c["key"]: c for c in protocol_columns(spec, vols[0]["in_mask"])}
+    views = {c: take(ref, col_meta[c], spec) for c in cols}
     # One window per column, taken from the dense reference and reused by every
     # row. A dim prediction must read as a dim prediction; re-normalising each
     # panel would turn a wrong intensity back into a plausible picture.
-    rng = {c: _window(views[c]) for c in cols}
+    rng = ref_windows(ref, [col_meta[c] for c in cols], spec)
+    rep = check_group(vols, spec)
+    if rep["target_diff"] != 0.0:
+        raise RuntimeError(f"arms disagree on the dense reference: "
+                           f"max|d|={rep['target_diff']}; the figure would lie")
     written: list[Path] = []
 
     # ---- figure 1: sparse input -> reconstructions -> dense reference -------
@@ -448,7 +371,7 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
     # and the gaps are cyan on purpose -- grey on grey is what made an earlier
     # version read as if input and reference were the same picture.
     given = np.where(vols[0]["in_mask"], vols[0]["y_in"], np.nan)
-    gviews = _views(given, spec)
+    gviews = {c: take(given, col_meta[c], spec) for c in cols}
     labels = ["Input", "GT"] + [v["arm"] for v in vols]
     n_rows = len(labels)
     fig, axes = plt.subplots(n_rows, len(cols),
@@ -464,14 +387,19 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
         # so instead of printing a placeholder number.
         _note(axes[0][c], "meas 0%\n(no data)" if m is None else
               f"meas {100 * m['cover']:.0f}%\nPSNR {m['psnr']:.2f}")
-        axes[0][c].set_title(col, fontsize=8.5, pad=3.0)
+        cb = col_meta[col]
+        axes[0][c].set_title(
+            col if cb["role"] == "fixed" else f"{col} (diagnostic)\n{cb['note']}",
+            fontsize=7.4 if cb["role"] != "fixed" else 8.5, pad=3.0)
+        if cb["role"] == "fixed":
+            axes[0][c].set_xlabel(cb["note"], fontsize=5.8, labelpad=1.0)
 
     for c, col in enumerate(cols):
         _show(axes[1][c], views[col], rng[col])
         _note(axes[1][c], "reference")
 
     for i, v in enumerate(vols):
-        vv = _views(v["pred"], spec)
+        vv = {c: take(v["pred"], col_meta[c], spec) for c in cols}
         for c, col in enumerate(cols):
             _show(axes[i + 2][c], vv[col], rng[col])
             m = _panel_metrics(vv[col], views[col])
@@ -487,7 +415,7 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
                         rotation=90, va="center", ha="right", fontsize=9)
 
     fig.suptitle(sample, fontsize=10, y=0.995)
-    cy = spec["y_gap"] if spec["y_gap"] != spec["y_meas"] else None
+    geom = mask_geometry(vols[0]["in_mask"])
     dual = [v["arm"] for v in vols if v.get("dual")]
     fig.text(0.5, 0.001,
              f"magma, one window per column (dense reference, p0.5-p99.5) | "
@@ -496,10 +424,10 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
              f"projection {vols[0]['consistency_projection']} | "
              + (f"{'/'.join(dual)}: Input = union of the two branches "
                 f"(each saw half) | " if dual else "")
-             + f"XZ given y={spec['y_meas']}"
-             + (f", XZ gap y={cy}" if cy is not None else "")
-             + f" | zoom {spec['n']}x{spec['n']} at "
-               f"(z={spec['z']}, y={spec['y0']}, x={spec['x0']})",
+             + f"y period {geom['y_period']}, z planes "
+               f"{geom['z_planes_measured']}/{geom['z_planes_total']}"
+             + f" | zoom {spec['zoom']}x{spec['zoom']} at "
+               f"(z={spec['z_view']}, y={spec['roi'][0]}, x={spec['roi'][1]})",
              ha="center", va="bottom", fontsize=6.2, color="0.25")
     p1 = out_dir / f"qualitative_{sample}{tag}.png"
     fig.savefig(p1, dpi=dpi, bbox_inches="tight", pad_inches=0.04)
@@ -507,14 +435,17 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
     written.append(p1)
 
     # ---- figure 2: error maps, one shared scale for every row ----------------
-    ecols = ["XY 50%", "XZ given", "XZ gap", "MIP-z"]
-    eviews = {c: _views(ref, spec)[c] for c in ecols}
-    errs = [{c: np.abs(_views(v["pred"], spec)[c] - eviews[c]) for c in ecols}
-            for v in vols]
+    # Fixed panels only: an error map of a *diagnostic* panel would change which
+    # pixels are on screen between protocols, which is the thing this rewrite
+    # exists to stop.
+    ecols = [c for c in cols if col_meta[c]["role"] == "fixed"][:4]
+    eviews = {c: views[c] for c in ecols}
+    errs = [{c: np.abs(take(v["pred"], col_meta[c], spec) - eviews[c])
+             for c in ecols} for v in vols]
     # Row 0 is what the reconstruction cannot be blamed for: the measurements
     # the arm was given, minus the dense reference, on the voxels it did take.
     a_err = np.abs(given - ref)
-    av = {c: _views(a_err, spec)[c] for c in ecols}
+    av = {c: take(a_err, col_meta[c], spec) for c in ecols}
     vmax = max(_tail(a[c]) for a in [*errs, av] for c in ecols)
     vmax = max(vmax, 1e-6)
     fig, axes = plt.subplots(len(vols) + 1, len(ecols),
@@ -526,7 +457,8 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
         mae_v = _mid(av[col])
         _note(axes[0][c], "no data" if mae_v is None else
               f"MAE {mae_v:.4f}\n(measured only)")
-        axes[0][c].set_title(col, fontsize=8.5, pad=3.0)
+        axes[0][c].set_title(f"{col} ({col_meta[col]['note']})", fontsize=8.5,
+                             pad=3.0)
     for i, (v, e) in enumerate(zip(vols, errs)):
         for c, col in enumerate(ecols):
             _show(axes[i + 1][c], e[col], (0.0, vmax), cmap="inferno")
@@ -547,28 +479,47 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
     written.append(p2)
 
     # ---- figure 3: what the arm was given ------------------------------------
+    # Every sentence here is measured off the mask. The old caption asserted
+    # "x and z are never subsampled", which is false for z_k4 and yz_* -- the
+    # very protocols this panel exists to explain.
     acq = vols[0]["acq_mask"]
-    aviews = _views(acq.astype(np.float32), spec)
-    fig = plt.figure(figsize=(10.4, 3.6))
-    ax1 = fig.add_subplot(1, 3, 1)
-    ax1.imshow(aviews["XY 50%"], cmap="gray", aspect="auto",
-               interpolation="nearest", vmin=0, vmax=1)
-    ax1.set_title("measured voxels, XY 50%", fontsize=9)
+    geom = mask_geometry(acq)
+    xy_key = "XY primary"
+    xz_key = next((c for c in cols if col_meta[c]["axis"] == "xz"), "XZ")
+    fig = plt.figure(figsize=(13.0, 3.6))
+    ax1 = fig.add_subplot(1, 4, 1)
+    ax1.imshow(take(acq.astype(np.float32), col_meta[xy_key], spec), cmap="gray",
+               aspect="auto", interpolation="nearest", vmin=0, vmax=1)
+    ax1.set_title(f"measured voxels, XY z={spec['z_view']}", fontsize=9)
     ax1.set_xticks([]); ax1.set_yticks([])
-    ax2 = fig.add_subplot(1, 3, 2)
-    ax2.imshow(aviews["XZ given"], cmap="gray", aspect="auto",
-               interpolation="nearest", vmin=0, vmax=1)
-    ax2.set_title(f"measured voxels, XZ given (y={spec['y_meas']})", fontsize=9)
+    ax2 = fig.add_subplot(1, 4, 2)
+    ax2.imshow(take(acq.astype(np.float32), col_meta[xz_key], spec), cmap="gray",
+               aspect="auto", interpolation="nearest", vmin=0, vmax=1)
+    ax2.set_title(f"measured voxels, XZ {col_meta[xz_key]['note']}", fontsize=9)
     ax2.set_xlabel("x"); ax2.set_ylabel("z")
-    ax3 = fig.add_subplot(1, 3, 3)
+    ax3 = fig.add_subplot(1, 4, 3)
     ax3.plot(acq.reshape(acq.shape[0], -1).mean(axis=1), np.arange(acq.shape[0]),
              lw=1.0, color="#c2410c")
     ax3.set_xlabel("measured fraction of the plane"); ax3.set_ylabel("z index")
-    ax3.set_title("per-plane measurement density", fontsize=9)
+    ax3.set_title(f"per-plane density "
+                  f"({geom['z_planes_measured']}/{geom['z_planes_total']} planes)",
+                  fontsize=9)
     ax3.grid(alpha=0.3)
-    fig.text(0.5, 0.005, "white = measured; x and z are never subsampled, so the "
-                         "lattice is entirely in y", ha="center", fontsize=6.4,
-             color="0.25")
+    ax4 = fig.add_subplot(1, 4, 4)
+    ax4.plot(acq.mean(axis=(0, 2)), np.arange(acq.shape[1]), lw=1.0,
+             color="#1d4ed8")
+    ax4.set_xlabel("measured fraction of the row"); ax4.set_ylabel("y index")
+    ax4.set_title(f"per-row density (period {geom['y_period']})", fontsize=9)
+    ax4.grid(alpha=0.3)
+    axes_text = (f"white = measured | y: "
+                 + ("every row" if geom["y_dense"] else
+                    f"period {geom['y_period']} ({geom['kept_y_rows']} rows kept)")
+                 + " | x: " + ("every column" if geom["x_dense"] else "subsampled")
+                 + " | z: " + ("every plane" if geom["z_dense"] else
+                               f"{geom['z_planes_measured']}/"
+                               f"{geom['z_planes_total']} planes kept")
+                 + f" | measured fraction {100 * geom['measured_fraction']:.1f}%")
+    fig.text(0.5, 0.005, axes_text, ha="center", fontsize=6.4, color="0.25")
     fig.tight_layout(rect=(0, 0.03, 1, 0.95))
     p3 = out_dir / f"support_{sample}{tag}.png"
     fig.savefig(p3, dpi=dpi, bbox_inches="tight", pad_inches=0.04)
@@ -579,8 +530,9 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
     # The 2D views above are the right overview but they cannot show whether a
     # method *fills* a skipped row or smears its neighbours. A single intensity
     # cut across y does, and it is the panel to look at first.
-    z_mid = ref.shape[0] // 2
-    x_cut = int(np.argmax(ref[z_mid].var(axis=0)))
+    z_mid = int(spec["z_view"])
+    y0, x0, n = (int(v) for v in spec["roi"])
+    x_cut = x0 + int(np.argmax(ref[z_mid, y0:y0 + n, x0:x0 + n].var(axis=0)))
     m_in0 = vols[0]["in_mask"][z_mid]
     y_given_row = vols[0]["y_in"][z_mid][:, x_cut]
     styles = ["#111111", "#c2410c", "#1d4ed8", "#15803d", "#7e22ce", "#a16207",
@@ -614,6 +566,126 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
     written.append(p4)
     return written
 
+def render_comparison(groups: list[dict], out_dir: Path, spec: dict,
+                      dpi: int = 200, sample: str = "") -> list[Path]:
+    """One figure that puts two or more sparse protocols side by side.
+
+    Only the *fixed* panels are used, because those are the ones whose
+    coordinates do not depend on the protocol: this is the figure the plan asks
+    for (same sample, same ROI, same dense reference, different sampling). The
+    measured-support mask goes in as its own column, since that is what actually
+    differs between the rows.
+
+    Every invariant is checked before a pixel is drawn, and a violation raises:
+    a comparison figure whose rows look at different pixels is worse than no
+    figure at all.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    report = check_protocols(groups, spec)
+    if report["target_diff"] != 0.0 or report["fixed_view_diff"] != 0.0:
+        raise RuntimeError(
+            "the dense reference differs between protocols "
+            f"(target max|d|={report['target_diff']}, fixed view max|d|="
+            f"{report['fixed_view_diff']}): that is a data-path bug, not a "
+            "figure bug -- fix the cache/normalisation before publishing")
+
+    ref = np.asarray(groups[0]["vols"][0]["target"])
+    cols = [c for c in protocol_columns(spec, groups[0]["vols"][0]["in_mask"])
+            if c["role"] == "fixed"]
+    meta = {c["key"]: c for c in cols}
+    keys = [c["key"] for c in cols]
+    views = {k: take(ref, meta[k], spec) for k in keys}
+    rng = ref_windows(ref, cols, spec)
+
+    rows = []
+    for g in groups:
+        rows.append(("input", g))
+        for v in g["vols"]:
+            rows.append((v["arm"], g))
+
+    fig, axes = plt.subplots(len(rows) + 1, len(keys) + 1,
+                             figsize=(2.30 * (len(keys) + 1), 2.05 * (len(rows) + 1)),
+                             gridspec_kw=dict(wspace=0.035, hspace=0.035),
+                             squeeze=False)
+    for c, k in enumerate(keys):
+        _show(axes[0][c], views[k], rng[k])
+        axes[0][c].set_title(k, fontsize=8.5, pad=3.0)
+        axes[0][c].set_xlabel(meta[k]["note"], fontsize=5.8, labelpad=1.0)
+    axes[0][len(keys)].text(0.5, 0.5, "dense reference\n(same for every row)",
+                            transform=axes[0][len(keys)].transAxes, ha="center",
+                            va="center", fontsize=7)
+    axes[0][len(keys)].set_xticks([]); axes[0][len(keys)].set_yticks([])
+
+    for r, (label, g) in enumerate(rows, start=1):
+        v = g["vols"][0]
+        if label == "input":
+            masked = np.where(v["in_mask"], v["y_in"], np.nan)
+            for c, k in enumerate(keys):
+                _show(axes[r][c], take(masked, meta[k], spec), rng[k])
+                axes[r][c].set_title("")
+            frac = float(np.mean(v["in_mask"]))
+            axes[r][len(keys)].text(0.5, 0.5,
+                                    f"measured\n{100 * frac:.1f}%",
+                                    transform=axes[r][len(keys)].transAxes,
+                                    ha="center", va="center", fontsize=7.5)
+        else:
+            vol = next(x for x in g["vols"] if x["arm"] == label)
+            for c, k in enumerate(keys):
+                img = take(vol["pred"], meta[k], spec)
+                _show(axes[r][c], img, rng[k])
+                m = _panel_metrics(img, views[k])
+                if m is not None:
+                    _note(axes[r][c], f"PSNR {m['psnr']:.2f}\n"
+                                      f"Dice {m['dice']:.3f}\n"
+                                      f"Dice★ {m['dice_area']:.3f}")
+            axes[r][len(keys)].imshow(
+                take(v["in_mask"].astype(np.float32), meta["XY primary"], spec),
+                cmap="gray", aspect="auto", interpolation="nearest",
+                vmin=0, vmax=1)
+            axes[r][len(keys)].set_title("mask, XY primary", fontsize=7.4)
+            axes[r][len(keys)].set_xticks([]); axes[r][len(keys)].set_yticks([])
+        axes[r][0].text(-0.05, 0.5, f"{g['level']}\n{label}" if label != "input"
+                        else f"{g['level']}\ninput",
+                        transform=axes[r][0].transAxes, rotation=90,
+                        va="center", ha="right", fontsize=8)
+
+    fig.suptitle(f"{sample} -- the same dense reference under different sparse "
+                 f"protocols (fixed ROI z={spec['z_view']}, y={spec['y_view']}, "
+                 f"x={spec['x_view']})", fontsize=10, y=0.995)
+    fig.text(0.5, 0.001,
+             "one window per column taken from the dense reference and reused by "
+             "every row | cyan = never measured | the mask column is the only "
+             "thing that is supposed to differ", ha="center", fontsize=6.2,
+             color="0.25")
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    levels = "_".join(g["level"] for g in groups)
+    png = out_dir / f"compare_{sample}_{levels}.png"
+    fig.savefig(png, dpi=dpi, bbox_inches="tight", pad_inches=0.04)
+    plt.close(fig)
+    return [png]
+
+
+def _compare_groups(cfg: dict, manifest: dict, device, sample: str) -> list[dict]:
+    """Run every (protocol, arm) of a comparison manifest."""
+    from spur_mpm.common.config import apply_overrides
+
+    groups = []
+    for g in manifest["groups"]:
+        cfg_g = apply_overrides(cfg, list(g.get("overrides", [])))
+        vols = []
+        for label, ckpt in g["arms"].items():
+            v = predict_volume(cfg_g, sample, label, Path(ckpt) if ckpt else None,
+                               device)
+            v["arm"] = label
+            vols.append(v)
+        groups.append({"level": g["level"], "vols": vols})
+    return groups
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -639,6 +711,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--tag", default="",
                     help="appended to every output name, so a second arm set for "
                          "the same sample does not overwrite the first figure")
+    ap.add_argument("--view-spec", type=Path, default=None,
+                    help="reuse a frozen view geometry instead of deriving one "
+                         "from the reference (required for cross-protocol "
+                         "comparison: the panels must not be re-chosen)")
+    ap.add_argument("--save-view-spec", type=Path, default=None,
+                    help="write the view geometry this figure used, so another "
+                         "protocol can reuse exactly it")
+    ap.add_argument("--zoom", type=int, default=96,
+                    help="side of the square zoom panel, in voxels")
+    ap.add_argument("--compare", type=Path, default=None,
+                    help="JSON manifest of protocol groups; writes "
+                         "compare_<sample>_<levels>.png and a consistency "
+                         "report, and exits non-zero if the invariants fail")
     ap.add_argument("--dump", default="f16", choices=["f16", "f32", "off"],
                     help="raw array dump: float16 (default, ~1/2 the size and "
                          "lossless enough for re-rendering), float32, or off")
@@ -657,6 +742,51 @@ def main(argv: list[str] | None = None) -> int:
     test_ids = folds[args.fold]["test"]
     sample = args.sample or test_ids[0]
 
+    # A bare index ("2") means "cuda:2", as in evaluate / benchmark; a device
+    # string ("cuda:2", "cpu") is taken as given. Resolved here because the
+    # compare branch needs it before the arm list is parsed.
+    dev = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{dev}" if str(dev).isdigit() else dev)
+
+    if args.compare:
+        manifest = json.loads(Path(args.compare).read_text())
+        sample = manifest.get("sample", sample)
+        groups = _compare_groups(cfg, manifest, device, sample)
+        ref = np.asarray(groups[0]["vols"][0]["target"])
+        spec = (validate_view_spec(load_view_spec(args.view_spec), ref.shape)
+                if args.view_spec else
+                build_view_spec(ref, sample_id=sample,
+                                voxel_um=groups[0]["vols"][0].get("voxel_um",
+                                                                 (1.0, 1.0, 1.0)),
+                                zoom=args.zoom))
+        out_dir = Path(args.out)
+        if args.save_view_spec:
+            save_view_spec(spec, args.save_view_spec)
+        written = render_comparison(groups, out_dir, spec, dpi=args.dpi,
+                                    sample=sample)
+        report = check_protocols(groups, spec)
+        report.update({"sample_id": sample, "view_spec": spec,
+                       "protocols": [g["level"] for g in groups],
+                       "measured_fraction": {
+                           g["level"]: float(np.mean(g["vols"][0]["in_mask"]))
+                           for g in groups},
+                       "context_depth": {g["level"]: g["vols"][0].get(
+                           "context_depth") for g in groups}})
+        (out_dir / f"consistency_report_{sample}.json").write_text(
+            json.dumps(report, indent=2))
+        for pth in written:
+            print("wrote", pth)
+        ok = (report["target_diff"] == 0.0 and report["fixed_view_diff"] == 0.0
+              and all(gr["target_diff"] == 0.0 and gr["input_diff"] == 0.0
+                      and gr["view_diff"] == 0.0 for gr in report["groups"]))
+        if not ok:
+            print("CONSISTENCY FAILED", json.dumps(report, indent=2))
+            return 2
+        print("consistency ok: dense reference and fixed views identical across "
+              f"{len(groups)} protocols")
+        print("ALL_DONE")
+        return 0
+
     arms: list[tuple[str, str, Path | None]] = [_arm_spec(a) for a in args.arm]
     for exp in (args.experiments or []):
         ckpt = Path("runs") / f"{exp}_fold{args.fold}" / "best.pt"
@@ -666,10 +796,6 @@ def main(argv: list[str] | None = None) -> int:
     if not arms:
         raise SystemExit("give at least one --arm or --experiments")
 
-    # A bare index ("2") means "cuda:2", as in evaluate / benchmark; a device
-    # string ("cuda:2", "cpu") is taken as given.
-    dev = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
-    device = torch.device(f"cuda:{dev}" if str(dev).isdigit() else dev)
     vols = []
     for label, arm_name, ckpt in arms:
         v = predict_volume(cfg, sample, arm_name, ckpt, device)
@@ -690,6 +816,14 @@ def main(argv: list[str] | None = None) -> int:
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
+    ref = np.asarray(vols[0]["target"])
+    spec = (validate_view_spec(load_view_spec(args.view_spec), ref.shape)
+            if args.view_spec else
+            build_view_spec(ref, sample_id=sample,
+                            voxel_um=vols[0].get("voxel_um", (1.0, 1.0, 1.0)),
+                            zoom=args.zoom))
+    if args.save_view_spec:
+        save_view_spec(spec, args.save_view_spec)
     tag = args.tag
     if args.dump != "off":
         # Float16 halves the dump and is well inside the precision of the
@@ -721,10 +855,20 @@ def main(argv: list[str] | None = None) -> int:
          "sampling_fraction": vols[0].get("sampling_fraction"),
          # Measured off the mask that is actually on screen, so a dump made
          # before the config string was recorded still states its geometry.
-         "mask_geometry": _mask_geometry(vols[0]["in_mask"]),
+         "mask_geometry": mask_geometry(vols[0]["in_mask"]),
          "input_support": vols[0]["input_support"],
          "consistency_projection": vols[0]["consistency_projection"],
          "context_depth": vols[0]["context_depth"],
+         # The frozen geometry, so a later figure can reuse these exact cuts.
+         "view_spec": spec,
+         # The panels actually drawn, with the coordinate each one shows and
+         # whether it is a fixed panel or a protocol diagnostic. Recorded so a
+         # reader (or a test) can check the labels without opening the PNG.
+         "columns": protocol_columns(spec, vols[0]["in_mask"]),
+         # The display window used for each panel, taken from the reference.
+         "windows": {k: list(v) for k, v in ref_windows(
+             np.asarray(vols[0]["target"]),
+             protocol_columns(spec, vols[0]["in_mask"]), spec).items()},
          "arms": [{"arm": v["arm"], "checkpoint": v["checkpoint"],
                    "supervision": v["supervision"],
                    # A dual arm's Input row is the union of its two branches;
@@ -732,7 +876,7 @@ def main(argv: list[str] | None = None) -> int:
                    "input_is_branch_union": v["dual"],
                    "metrics_on_shown_crop": v["metrics"]} for v in vols]},
         indent=2))
-    for p in render(vols, out_dir, dpi=args.dpi, tag=args.tag):
+    for p in render(vols, out_dir, dpi=args.dpi, tag=args.tag, spec=spec):
         print("wrote", p)
     print("ALL_DONE")
     return 0

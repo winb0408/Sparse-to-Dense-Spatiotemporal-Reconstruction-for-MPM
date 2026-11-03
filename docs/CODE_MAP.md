@@ -44,7 +44,7 @@
 |---|---|
 | `spur_mpm/models/swin_unet_2d.py` | 主干：Swin-UNet 2-D（逐切片重建，所以体数据的成本 = 切片数 × 单切片成本，没有跨切片项） |
 | `spur_mpm/models/attention.py` | 主干内部的注意力块（与创新点无关，属结构本体） |
-| `spur_mpm/models/registry.py` | **臂注册表**：`A0/A1/S0/S1/S2/S1g` 每个臂是一行声明式记录 |
+| `spur_mpm/models/registry.py` | **臂注册表**：`A0/A1/S0/S1/S2/S1g/S2g` 每个臂是一行声明式记录（S2g = X0+U+门控） |
 | `spur_mpm/models/__init__.py` | 导出 |
 
 臂 = 输入特征 × 物理热启动 × 融合方式的组合，**换臂只改配置，不改数据管线**。
@@ -111,13 +111,22 @@ PSNR 会系统性偏低而与结构好坏无关。分层结论一律用 `dice`/`
 
 | 文件 | 产物 |
 |---|---|
-| `spur_mpm/scripts/sparse_figures.py` | 稀疏构建示意、掩膜覆盖图、采集时间占比 |
-| `spur_mpm/scripts/qualitative_figures.py` | 定性对比图（稀疏输入 / 各臂重建 / 密集真值），指标标在子图右下角 |
+| `spur_mpm/scripts/sparse_figures.py` | 稀疏构建示意、掩膜覆盖图、采集时间占比。XY 面板固定画在**所有层都测到的那一层**上（`_common_plane`），否则 Z 稀疏面板会因"画在没扫的层上"而整幅空白；每幅图都标注坐标方向（y 向下、x/y 向右、z 向下） |
+| `spur_mpm/scripts/viewspec.py` | **固定视图层**（§4.4.1）：`ViewSpec` 只从密集参考里取一次，`protocol_columns` 按协议给列名、`take` 按列取面板、`ref_windows` 给统一窗、`check_group`/`check_protocols` 断言不同协议看到的是同一份参考与同一块面板 |
+| `spur_mpm/scripts/qualitative_figures.py` | 定性对比图（稀疏输入 / 各臂重建 / 密集真值），指标标在子图右下角。面板、窗宽、ROI 全部来自 `viewspec`；`--compare` 跑多协议一致性自检（`target_diff`/`fixed_view_diff` 必须为 0），不一致时非零退出 |
 | `spur_mpm/scripts/sampling_diagram.py` | 采样图样与相位的示意图 |
 | `spur_mpm/scripts/profile_depth.py` | 按深度的指标曲线（PSNR 与 Dice 分列） |
 
 所有定性图都遵循同一约定：**未测量体素用青色 `#22d3ee` 画出**，灰度窗统一由密集
-参考的 1%–99.5% 分位决定，所以"暗"是测量暗，不是窗宽造成的错觉。
+参考的 1%–99.5% 分位决定，所以"暗"是测量暗，不是窗宽造成的错觉。§4.4.1 之后还多三条
+硬约束，由 `viewspec.py` 强制、由测试守着：
+
+1. **固定面板**：XY/YZ/XZ 的位置、缩放、ROI 只从密集参考取一次并存进 `view_spec.json`，
+   所有协议、所有臂共用同一份；
+2. **方向与轴**：每个面板标注它到底是哪个轴（"XZ 实测行 / XZ 跳过的行"），Z-only 协议
+   只报层、Y-only 协议只报行，不再出现"XZ 给定/缺失"这种把 Z 稀疏说成 X 稀疏的措辞；
+3. **一致性自检**：`--compare` 跑完写 `consistency_report.json`，参考与固定面板在不同
+   协议间必须逐像素相同（`target_diff == 0`），否则非零退出而不是出一张看不出问题的图。
 
 ---
 
@@ -141,7 +150,7 @@ python -m spur_mpm.train --config spur_mpm/configs/experiments/<exp>.yaml
 # 4) 评估 / 汇总 / 成本
 python -m spur_mpm.evaluate ...
 python -m spur_mpm.scripts.collect_results ...
-python -m spur_mpm.scripts.benchmark --markdown --arms A0 A1 S0 S1 S2 S1g
+python -m spur_mpm.scripts.benchmark --markdown --arms A0 A1 S0 S1 S2 S1g S2g
 
 # 5) 消融阶梯（固定队列，逐 cell 落盘；--eval-only 只重打分不重训）
 python -m spur_mpm.scripts.run_ladder --stage ablation --devices 2
@@ -151,7 +160,9 @@ python -m spur_mpm.scripts.ladder_report --root runs/E021_ladder --out runs/E021
 # 6) 结构评估（整卷骨架 + ImageJ 可读掩膜 + 定性图）
 python -m spur_mpm.scripts.structure_report --arm S1 --ckpt runs/E021_ladder/E021_S1_y_k2/best.pt \
     --out runs/E021_ladder/E021_S1_y_k2/structure --device 2
-python -m spur_mpm.scripts.qualitative_figures --arm S1=runs/E021_ladder/E021_S1_y_k2/best.pt ...
+python -m spur_mpm.scripts.qualitative_figures --manifest runs/E021_ladder/manifest_y_k2.json \
+    --level y_k2 --save-view-spec runs/E021_ladder/view_spec.json --out spur_mpm/figures/qualitative_y_k2
+python -m spur_mpm.scripts.qualitative_figures --compare runs/compare_y_z_yz.json --out spur_mpm/figures/fixed
 ```
 
 ---
@@ -169,6 +180,9 @@ python -m spur_mpm.scripts.qualitative_figures --arm S1=runs/E021_ladder/E021_S1
 | `test_skeleton.py` | 骨架指标的退化用例 |
 | `test_complexity.py` | MACs/参数量在已知结构上的正确性 |
 | `test_models_metrics.py` | 各臂前向形状、Dice/clDice 边界 |
+| `test_qualitative_figures.py` | §4.4.1 的固定视图：参考不随协议变、目标不一致必须硬失败、面板与窗宽来自参考、Z-only 只报层、Y-only 只报行、同输入重复会被拒 |
+| `test_sparse_figures.py` | 稀疏图必须画在所有层都测到的平面上（`_common_plane`），没有共同平面时拒绝出图 |
+| `test_run_ladder_state.py` | 阶梯状态按 cell 目录名去重：`_c7` 单元格不能顶掉同臂同层的兄弟 |
 | `test_ladder_report.py` | 出表的**口径**：差异小于 1 dB / 0.03 Dice 必须打印"不可主张"、同预算换轴不足 0.03 Dice 不得写成"轴有影响"、缺测指标打印为 `–` 而不是 `nan` |
 
 冻结的自监督测试移到了 `archive/selfsup_v1/tests/`，不在主测试集里跑。

@@ -107,10 +107,16 @@ def render(cells: dict[tuple[str, str], dict], levels: list[str] | None = None) 
 def innovations(cells: dict[tuple[str, str], dict], level: str) -> str:
     """Paired deltas for the innovation ablation at one level."""
     base = {a: cells.get((a, level)) for a in ARMS}
+    # Ordered so each line adds exactly one module to the line above it, which
+    # is what makes an attribution table readable: S2g is S1g plus U, so the
+    # last two rows say whether U survives the gate instead of being absorbed
+    # by it (the question the runbook raised when S2 alone gained nothing).
     pairs = [("physics warm start (X0)", "S0", "S1"),
              ("uncertainty head (U)", "S1", "S2"),
              ("gated prior fusion", "S1", "S1g"),
-             ("all three (S1g over S0)", "S0", "S1g")]
+             ("all three (S1g over S0)", "S0", "S1g"),
+             ("U under gating (S2g over S1g)", "S1g", "S2g"),
+             ("everything (S2g over S0)", "S0", "S2g")]
     out = [f"\n### Innovation attribution at ``{level}``\n",
            "| step | PSNR Δ (dB) | PSNRmiss Δ (dB) | Dice Δ | clDice Δ | claim |",
            "|---|---|---|---|---|---|"]

@@ -14,7 +14,8 @@ trust:
     in cyan rather than black, so the support is visible instead of being
     indistinguishable from dark tissue. The XY row shows that a kept row is kept
     across the whole fast axis; the YZ row shows that Z-skipping removes entire
-    planes.
+    planes. The XY row is drawn on a plane every one of those levels measured --
+    on a skipped plane a Z-sparse panel would be blank for display reasons alone.
 ``sparse_2_ladder_2d.png``
     The 2-D (Y-direction only) ladder, with the row pattern drawn underneath as a
     binary raster -- the "dense in, sparse out" statement made literal.
@@ -65,6 +66,13 @@ def _note(ax, text: str) -> None:
     ax.text(0.972, 0.028, text, transform=ax.transAxes, zorder=6, **_NOTE)
 
 
+def _axes_hint(ax, text: str) -> None:
+    """Which way each displayed axis runs, in the panel's own corner."""
+    ax.text(0.028, 0.972, text, transform=ax.transAxes, zorder=6,
+            fontsize=5.6, color="white", ha="left", va="top",
+            bbox=dict(facecolor="black", alpha=0.55, lw=0.0, pad=1.3))
+
+
 def _entries(manifest: dict, sample_id: str) -> dict[str, dict]:
     return {e["level"]: e for e in manifest["entries"] if e["sample_id"] == sample_id}
 
@@ -72,8 +80,7 @@ def _entries(manifest: dict, sample_id: str) -> dict[str, dict]:
 def _cross_check(sample_id: str, entry: dict, shape: tuple[int, ...], plane: int | None) -> np.ndarray:
     """Rebuild the mask from its spec and require it to equal the stored one."""
     spec = SamplingSpec.from_dict(entry["spec"])
-    ref_shape = (shape[-1],) if False else shape  # keep the tuple explicit
-    m = measured_mask(ref_shape, spec, phase=tuple(entry["phase"]))
+    m = measured_mask(shape, spec, phase=tuple(entry["phase"]))
     if plane is not None:
         m = m[plane]
     stored = _load_mask(entry, plane=plane)
@@ -91,6 +98,29 @@ def _load_mask(entry: dict, plane: int | None) -> np.ndarray:
     flat = np.unpackbits(packed)[:int(np.prod(shape))]
     m = flat.reshape(shape).astype(bool)
     return m[plane] if plane is not None else m
+
+
+def _common_plane(entries: dict[str, dict], shape: tuple[int, ...]) -> int:
+    """A plane that *every* one of these levels measured, nearest the centre.
+
+    If the panel row is drawn on a plane that some level skipped, that panel is
+    entirely cyan and reads as "this protocol measures nothing here" -- a
+    display artefact, not a property of the protocol.
+    """
+    shared = None
+    for entry in entries.values():
+        planes = _load_mask(entry, plane=None).any(axis=(1, 2))
+        shared = planes if shared is None else (shared & planes)
+    if shared is None or not shared.any():
+        raise RuntimeError("no single plane is measured by every level; "
+                           "draw the panels on separate planes instead")
+    idx = np.flatnonzero(shared)
+    return int(idx[np.argmin(np.abs(idx - shape[0] // 2))])
+
+
+def _shape_of(entry: dict) -> tuple[int, ...]:
+    with np.load(entry["mask_path"]) as z:
+        return tuple(int(v) for v in z["shape"])
 
 
 def _crop(img: np.ndarray, size: int) -> tuple[np.ndarray, tuple[int, int]]:
@@ -124,9 +154,12 @@ def render(index: Path, manifest3d: Path | None, manifest2d: Path | None,
         ent = _entries(man, sample_id)
         levels = [name for name in ("y_k2", "y_k4", "z_k2", "z_k4", "yz_k2x2",
                                    "yz_k2x4") if name in ent]
-        xy0, (y0, x0) = _crop(dense[zmid], crop)
+        # draw the XY row on a plane that every rendered level measured, else the
+        # Z-sparse panels would be entirely cyan for display reasons alone
+        z1 = _common_plane({n: ent[n] for n in levels}, _shape_of(ent[levels[0]]))
+        xy0, (y0, x0) = _crop(dense[z1], crop)
         xc = xy0.shape[-1] // 2
-        yz0 = dense[:, y0:y0 + crop, x0 + xc][:, ::-1]  # [Z, y], Z downwards
+        yz0 = dense[:, y0:y0 + crop, x0 + xc]         # [Z, y]: z down, y right
 
         fig, axes = plt.subplots(2, len(levels) + 1, figsize=(1.62 * (len(levels) + 1), 3.9),
                                  gridspec_kw=dict(wspace=0.03, hspace=0.06,
@@ -134,26 +167,30 @@ def render(index: Path, manifest3d: Path | None, manifest2d: Path | None,
                                                   top=0.86, bottom=0.02))
         _show(axes[0, 0], xy0, rng)
         axes[0, 0].set_title("dense reference", **_HEAD)
-        _note(axes[0, 0], f"z = {zmid}")
+        _note(axes[0, 0], f"z = {z1}")
         _show(axes[1, 0], yz0, rng)
         axes[1, 0].set_title("dense reference", **_HEAD)
         _note(axes[1, 0], f"x = {x0 + xc}")
 
         for j, name in enumerate(levels, start=1):
-            m = _cross_check(sample_id, ent[name], dense.shape, plane=None)
+            m = _cross_check(sample_id, ent[name], _shape_of(ent[name]), plane=None)
             y = np.where(m, dense, np.nan).astype(np.float32)
-            _show(axes[0, j], y[zmid, y0:y0 + crop, x0:x0 + crop], rng)
+            _show(axes[0, j], y[z1, y0:y0 + crop, x0:x0 + crop], rng)
             axes[0, j].set_title(name.replace("_", " "), **_HEAD)
             _note(axes[0, j], f"{ent[name]['measured_fraction'] * 100:.1f} % measured")
-            _show(axes[1, j], y[:, y0:y0 + crop, x0 + xc][:, ::-1], rng)
+            _show(axes[1, j], y[:, y0:y0 + crop, x0 + xc], rng)
             _note(axes[1, j], f"{ent[name]['scan_line_fraction'] * 100:.0f} % scan time")
+
+        _axes_hint(axes[0, 0], "y↓  x→")
+        _axes_hint(axes[1, 0], "z↓  y→")
 
         fig.text(0.005, 0.955, "sparse acquisition, one volume",
                  fontsize=9, ha="left", va="top")
         fig.text(0.005, 0.925,
-                 f"{sample_id}  |  top: XY plane at z = {zmid}  |  bottom: YZ slice at "
-                 f"x = {x0 + xc} (depth downwards)  |  cyan = not measured, drawn as "
-                 "no-data rather than black",
+                 f"{sample_id}  |  top: XY plane at z = {z1} (measured by every level "
+                 f"shown)  |  bottom: YZ slice at x = {x0 + xc}  |  y increases "
+                 "downwards, x and y increase rightwards, z increases downwards  |  "
+                 "cyan = not measured, drawn as no-data rather than black",
                  fontsize=5.8, ha="left", va="top", color="#333333")
         p = out_dir / "sparse_1_construction.png"
         fig.savefig(p, dpi=dpi, facecolor="white", bbox_inches="tight")
@@ -168,8 +205,8 @@ def render(index: Path, manifest3d: Path | None, manifest2d: Path | None,
                                                   top=0.80, bottom=0.05))
         axes = np.atleast_1d(axes)
         for ax, name in zip(axes, names):
-            m = _cross_check(sample_id, ent[name], dense.shape, plane=None)
-            lines = m.any(axis=-1)
+            m = _cross_check(sample_id, ent[name], _shape_of(ent[name]), plane=None)
+            lines = m.any(axis=-1)                    # [Z, Y]: z down, y right
             ax.imshow(lines, cmap="binary", vmin=0, vmax=1, aspect="auto",
                       interpolation="nearest")
             ax.set_xticks([])
@@ -180,11 +217,14 @@ def render(index: Path, manifest3d: Path | None, manifest2d: Path | None,
             ax.text(0.97, 0.04, f"{ent[name]['scan_line_fraction'] * 100:.0f} % of scan time",
                     transform=ax.transAxes, fontsize=5.4, ha="right", va="bottom",
                     color="white" if lines.mean() > 0.5 else "black")
+        _axes_hint(axes[0], "z↓  y→")
         fig.text(0.004, 0.955, "which (Z, Y) scan lines were acquired",
                  fontsize=9, ha="left", va="top")
         fig.text(0.004, 0.925,
-                 f"{sample_id}  |  white = line scanned (all of X), black = line skipped  |  "
-                 "a full line costs a full line of dwell time, so white area = scan time",
+                 f"{sample_id}  |  rows = z (z = 0 at the top, deepest plane at the "
+                 "bottom), columns = y  |  white = line scanned (all of X), black = line "
+                 "skipped  |  a full line costs a full line of dwell time, so white "
+                 "area = scan time",
                  fontsize=5.8, ha="left", va="top", color="#333333")
         p = out_dir / "sparse_3_coverage.png"
         fig.savefig(p, dpi=dpi, facecolor="white", bbox_inches="tight")
@@ -194,15 +234,18 @@ def render(index: Path, manifest3d: Path | None, manifest2d: Path | None,
     # ---- figure 2: the 2-D ladder ------------------------------------------
     if manifest2d is not None:
         man2 = read_manifest(manifest2d)
-        ent2 = {k: v for k, v in _entries(man2, f"{sample_id}#z{zmid}").items()}
-        if not ent2:                      # figures made with a different plane
-            key = next((e["sample_id"] for e in man2["entries"]
+        key = f"{sample_id}#z{zmid}"
+        if not any(e["sample_id"] == key for e in man2["entries"]):
+            key = next((e["sample_id"] for e in man2["entries"]           # another plane
                         if e["sample_id"].startswith(sample_id)), None)
             if key is None:
                 raise SystemExit(f"{sample_id} not in {manifest2d}")
-            ent2 = _entries(man2, key)
+        ent2 = _entries(man2, key)
+        # the masks were cut from the plane named in their key; show that plane,
+        # not "the middle of the volume", so the picture and the mask agree
+        z2 = int(key.rsplit("#z", 1)[1]) if "#z" in key else zmid
         names = [n for n in ("y_k2", "y_k3", "y_k4", "y_k8") if n in ent2]
-        ref, off = _crop(dense[zmid], crop)
+        ref, off = _crop(dense[z2], crop)
         ncol = len(names) + 1
         fig, axes = plt.subplots(2, ncol, figsize=(1.62 * ncol, 3.5),
                                  gridspec_kw=dict(wspace=0.03, hspace=0.06,
@@ -212,12 +255,15 @@ def render(index: Path, manifest3d: Path | None, manifest2d: Path | None,
         _show(axes[0, 0], ref, rng)
         axes[0, 0].set_title("dense reference", **_HEAD)
         _note(axes[0, 0], "100 % measured")
+        _axes_hint(axes[0, 0], "y↓  x→")
+        _axes_hint(axes[1, 0], "y↓")
         mask_ref = np.ones_like(ref, dtype=bool)
         _show(axes[1, 0], mask_ref.astype(np.float32), (0, 1), cmap="gray", bad=None)
 
         for j, name in enumerate(names, start=1):
-            m2 = _cross_check(ent2[name]["sample_id"], ent2[name], dense.shape[1:], plane=None)
-            y = np.where(m2, dense[zmid], np.nan).astype(np.float32)
+            m2 = _cross_check(ent2[name]["sample_id"], ent2[name],
+                              _shape_of(ent2[name]), plane=None)
+            y = np.where(m2, dense[z2], np.nan).astype(np.float32)
             m2c = m2[off[0]:off[0] + crop, off[1]:off[1] + crop]
             yc = y[off[0]:off[0] + crop, off[1]:off[1] + crop]
             _show(axes[0, j], yc, rng)
@@ -237,8 +283,9 @@ def render(index: Path, manifest3d: Path | None, manifest2d: Path | None,
         fig.text(0.005, 0.955, "2-D ladder: Y-direction sparsity only",
                  fontsize=9, ha="left", va="top")
         fig.text(0.005, 0.925,
-                 f"{sample_id}, plane z = {zmid}  |  top: measurement (cyan = row not "
-                 "scanned)  |  bottom: scanned / skipped row pattern at true scale",
+                 f"{sample_id}, plane z = {z2}  |  top: measurement (cyan = row not "
+                 "scanned)  |  bottom: scanned / skipped row pattern at true scale  |  "
+                 "y increases downwards, x increases rightwards",
                  fontsize=5.8, ha="left", va="top", color="#333333")
         p = out_dir / "sparse_2_ladder_2d.png"
         fig.savefig(p, dpi=dpi, facecolor="white", bbox_inches="tight")

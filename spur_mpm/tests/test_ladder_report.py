@@ -104,3 +104,19 @@ def test_only_filter_matches_the_final_cell_name():
     assert select(pairs, ["y_k4_c7"], 7) == [("S1", "y_k4"), ("A0", "y_k4")]
     assert select(pairs, ["y_k4"], 7) == [("S1", "y_k4"), ("A0", "y_k4")]
     assert select(pairs, ["S1"]) == [("S1", "y_k4"), ("S1", "y_k8")]
+
+
+def test_attribution_ladder_reaches_the_complete_arm():
+    """S2g is S1g plus U, so the table must be able to ask that one question."""
+    from spur_mpm.scripts.ladder_report import innovations
+
+    cells = {("S0", "y_k2"): {"psnr": 30.0, "dice": 0.70},
+             ("S1", "y_k2"): {"psnr": 30.0, "dice": 0.70},
+             ("S1g", "y_k2"): {"psnr": 30.0, "dice": 0.70},
+             ("S2g", "y_k2"): {"psnr": 31.5, "dice": 0.75}}
+    text = innovations(cells, "y_k2")
+    assert "U under gating (S2g over S1g)" in text
+    assert "everything (S2g over S0)" in text
+    # the one line that has a real delta must be the one that claims it
+    rows = [ln for ln in text.splitlines() if "S2g over S1g" in ln]
+    assert rows and "yes" in rows[0]
