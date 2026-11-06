@@ -1,0 +1,19 @@
+{
+  "sample_id": "M2_FOVII_S2_vessels",
+  "shape": [
+    202,
+    512,
+    512
+  ],
+  "z0": 2,
+  "y0": 414,
+  "x0": 414,
+  "nz": 12,
+  "ny": 96,
+  "nx": 96,
+  "crop_size": 96,
+  "slab": 12,
+  "junction_voxels_in_crop": 651,
+  "chosen_from": "reference skeleton junction density",
+  "note": "frozen crop: re-rendering reuses these indices even if the mask changes; delete the JSON to re-choose"
+}

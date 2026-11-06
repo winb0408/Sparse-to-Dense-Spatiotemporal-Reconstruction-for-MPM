@@ -132,7 +132,11 @@ def render_summary(summary: dict) -> str:
     the Dice below is a Dice on the scored part, not on the volume.
     """
     results = summary["volumes"]
-    md = ["| volume | Dice | clDice | skelF1 | components ref→pred | "
+    # "components" is the count of 26-connected *skeleton* components
+    # (``skeleton_stats``), not the count of connected *mask* blobs
+    # (``mask_vessel_metrics``); both live in the JSON and they differ by orders
+    # of magnitude, so the header has to say which one it is quoting.
+    md = ["| volume | Dice | clDice | skelF1 | skeleton components ref→pred | "
           "junctions ref→pred | length µm ref→pred | radius µm ref→pred | "
           "planes scored |",
           "|---|---|---|---|---|---|---|---|---|"]
@@ -165,6 +169,12 @@ def render_summary(summary: dict) -> str:
               f"foreground ref {results[0]['ref_fraction']:.1%} / "
               f"pred {results[0]['pred_fraction']:.1%}. "
               f"Skeleton overlap tolerance 1 voxel.")
+    # Two component counts exist and they are not interchangeable: the table
+    # quotes skeleton components (26-connected in 3-D); the connected *mask*
+    # blobs are in the JSON as ``n_components_ref`` / ``n_components_pred``.
+    md.append("Components above count 26-connected **skeleton** fragments; the "
+              "connected mask blobs are recorded separately in the JSON as "
+              "`n_components_ref` / `n_components_pred`.")
     return "\n".join(md)
 
 
@@ -173,11 +183,15 @@ def main(argv: list[str] | None = None) -> int:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--config", type=Path)
     p.add_argument("--base", type=Path, default=DEFAULTS)
-    p.add_argument("--arm", required=True)
+    # ``--arm`` / ``--out`` are only needed to *analyse* volumes; the
+    # ``--from-summary`` re-render reads everything from the JSON. Demanding
+    # them at parse time made the no-GPU path unusable, so they are checked in
+    # the branch that actually needs them.
+    p.add_argument("--arm")
     p.add_argument("--ckpt", type=Path, default=None)
     p.add_argument("--samples", nargs="+", default=None,
                    help="default: the test split of the configured fold")
-    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--out", type=Path)
     p.add_argument("--n-slabs", type=int, default=6)
     p.add_argument("--device", default=None)
     p.add_argument("--keep-recon", action="store_true",
@@ -202,6 +216,12 @@ def main(argv: list[str] | None = None) -> int:
         print(text)
         return 0
 
+    missing = [name for name, val in (("--arm", args.arm), ("--out", args.out))
+               if not val]
+    if missing:
+        p.error(f"the following arguments are required without "
+                f"--from-summary: {', '.join(missing)}")
+
     cfg = load_config(args.base)
     if args.config:
         cfg = deep_merge(cfg, load_config(args.config))
@@ -224,7 +244,8 @@ def main(argv: list[str] | None = None) -> int:
         results.append(r)
         print(f"{sid}: dice={r['dice']:.4f} clDice={r['cl_dice']:.4f} "
               f"skelF1={r['f1']:.4f} "
-              f"components {r['ref_n_components']}->{r['pred_n_components']}",
+              f"skeleton components "
+              f"{r['ref_n_components']}->{r['pred_n_components']}",
               flush=True)
 
     summary = {

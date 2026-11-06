@@ -1,4 +1,4 @@
-| volume | Dice | clDice | skelF1 | components ref→pred | junctions ref→pred | length µm ref→pred | radius µm ref→pred | planes scored |
+| volume | Dice | clDice | skelF1 | skeleton components ref→pred | junctions ref→pred | length µm ref→pred | radius µm ref→pred | planes scored |
 |---|---|---|---|---|---|---|---|---|
 | M2_FOVII_S1_vessels | 0.9337 | 0.9574 | 0.8892 | 1580 → 1130 | 1703 → 1503 | 143348 → 135125 | 2.295 → 2.349 | 146/203 (72 %) |
 | M2_FOVII_S2_vessels | 0.8705 | 0.7739 | 0.7272 | 11664 → 7654 | 2725 → 2138 | 136925 → 107633 | 1.759 → 1.921 | 134/202 (66 %) |
@@ -8,3 +8,4 @@
 
 **Planes gated out** (reference mask fills > 0.15 of the plane, so both masks are emptied): M2_FOVII_S1_vessels 57/203, M2_FOVII_S2_vessels 68/202, M2_FOVI_S1_vessels 82/201, M2_FOVI_S2_vessels 101/152. Every number above is a score on the planes that survived, not on the whole volume; report the share beside the table and spot-check the gated planes in ImageJ.
 Binarisation: vesselness response, threshold 0.0413627 fitted on the reference only (per_plane), foreground ref 2.2% / pred 2.1%. Skeleton overlap tolerance 1 voxel.
+Components above count 26-connected **skeleton** fragments; the connected mask blobs are recorded separately in the JSON as `n_components_ref` / `n_components_pred`.
