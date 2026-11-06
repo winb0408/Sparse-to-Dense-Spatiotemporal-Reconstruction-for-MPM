@@ -1,0 +1,1221 @@
+{
+ "what": "Fig. 2 provenance: every tick and every number with the field it was derived from",
+ "why": "the matrix is generated from ARMS so that editing the registry changes the figure; a hand-typed row could claim an experiment nobody ran",
+ "registry": "spur_mpm/models/registry.py",
+ "numbers_sources": [
+  "runs/E021_ladder/benchmark_supervised.json",
+  "runs/E021_ladder/complexity.json"
+ ],
+ "numbers_precedence": "first non-null value per field, in source order; disagreeing files are listed under 'alternates'",
+ "columns": [
+  {
+   "key": "y",
+   "label": "Y",
+   "kind": "tick",
+   "field": "features",
+   "rule": "'y' in arm.features"
+  },
+  {
+   "key": "mask",
+   "label": "M",
+   "kind": "tick",
+   "field": "features",
+   "rule": "'mask' in arm.features"
+  },
+  {
+   "key": "x0",
+   "label": "X0 in",
+   "kind": "tick",
+   "field": "features",
+   "rule": "'x0' in arm.features"
+  },
+  {
+   "key": "uncertainty",
+   "label": "U",
+   "kind": "tick",
+   "field": "features",
+   "rule": "'uncertainty' in arm.features"
+  },
+  {
+   "key": "fusion",
+   "label": "Gate",
+   "kind": "tick",
+   "field": "fusion",
+   "rule": "arm.fusion"
+  },
+  {
+   "key": "trunk",
+   "label": "Swin UNet",
+   "kind": "tick",
+   "field": "needs_training",
+   "rule": "arm.needs_training"
+  },
+  {
+   "key": "warm_start",
+   "label": "warm start",
+   "kind": "text",
+   "field": "warm_start",
+   "rule": "arm.warm_start"
+  },
+  {
+   "key": "supervision",
+   "label": "super- vision",
+   "kind": "text",
+   "field": "supervision",
+   "rule": "arm.supervision"
+  },
+  {
+   "key": "params",
+   "label": "params (M)",
+   "kind": "number",
+   "field": "params_m",
+   "rule": "source field params_m"
+  },
+  {
+   "key": "macs",
+   "label": "MACs/slice (G)",
+   "kind": "number",
+   "field": "macs_per_slice",
+   "rule": "source field macs_per_slice / 1e9"
+  },
+  {
+   "key": "latency",
+   "label": "ms/slice",
+   "kind": "number",
+   "field": "latency_ms_per_slice",
+   "rule": "source field latency_ms_per_slice"
+  }
+ ],
+ "groups": {
+  "floors": "no-learning floors  (needs_training = False) - the reference a network has to beat",
+  "supervised": "supervised - measured in Phase 1",
+  "frozen": "self-supervised - frozen 2026-10-30, NOT measured in Phase 1 (archive/selfsup_v1)"
+ },
+ "arms": {
+  "A0": {
+   "group": "floors",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A0'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A0'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A0'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A0'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A0'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A0'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "bilinear",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A0'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "none",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A0'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "0.000",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[A0].params_m",
+     "rule": "source field params_m",
+     "note": "no network (bilinear): params 0, MACs not applicable; the latency column is the measured warm-start operator on the same [Z,H,W] volume, not zero"
+    },
+    "macs": {
+     "tick": null,
+     "text": "n/a",
+     "source": "runs/E021_ladder/benchmark_supervised.json; runs/E021_ladder/complexity.json",
+     "field": "arms[A0].macs_per_slice (null in every source)",
+     "rule": "source field macs_per_slice / 1e9",
+     "note": "no network (bilinear): the parameter-free floor, MACs and latency are not applicable"
+    },
+    "latency": {
+     "tick": null,
+     "text": "0.009",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[A0].latency_ms_per_slice",
+     "rule": "source field latency_ms_per_slice",
+     "note": "no network (bilinear): params 0, MACs not applicable; the latency column is the measured warm-start operator on the same [Z,H,W] volume, not zero"
+    }
+   }
+  },
+  "A1": {
+   "group": "floors",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A1'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A1'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A1'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A1'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A1'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A1'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener_fill_first",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A1'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "none",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['A1'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "0.000",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[A1].params_m",
+     "rule": "source field params_m",
+     "note": "no network (wiener_fill_first): params 0, MACs not applicable; the latency column is the measured warm-start operator on the same [Z,H,W] volume, not zero"
+    },
+    "macs": {
+     "tick": null,
+     "text": "n/a",
+     "source": "runs/E021_ladder/benchmark_supervised.json; runs/E021_ladder/complexity.json",
+     "field": "arms[A1].macs_per_slice (null in every source)",
+     "rule": "source field macs_per_slice / 1e9",
+     "note": "no network (wiener_fill_first): the parameter-free floor, MACs and latency are not applicable"
+    },
+    "latency": {
+     "tick": null,
+     "text": "0.009",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[A1].latency_ms_per_slice",
+     "rule": "source field latency_ms_per_slice",
+     "note": "no network (wiener_fill_first): params 0, MACs not applicable; the latency column is the measured warm-start operator on the same [Z,H,W] volume, not zero"
+    }
+   }
+  },
+  "S0": {
+   "group": "supervised",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S0'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S0'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S0'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S0'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S0'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S0'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "bilinear",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S0'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S0'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "2.552",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S0].params_m",
+     "rule": "source field params_m",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "macs": {
+     "tick": null,
+     "text": "23.64",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S0].macs_per_slice",
+     "rule": "source field macs_per_slice / 1e9",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "latency": {
+     "tick": null,
+     "text": "28.28",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S0].latency_ms_per_slice",
+     "rule": "source field latency_ms_per_slice",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+     "alternates": [
+      "runs/E021_ladder/complexity.json:27.97"
+     ]
+    }
+   }
+  },
+  "S1": {
+   "group": "supervised",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "2.552",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S1].params_m",
+     "rule": "source field params_m",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "macs": {
+     "tick": null,
+     "text": "23.67",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S1].macs_per_slice",
+     "rule": "source field macs_per_slice / 1e9",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "latency": {
+     "tick": null,
+     "text": "28.81",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S1].latency_ms_per_slice",
+     "rule": "source field latency_ms_per_slice",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+     "alternates": [
+      "runs/E021_ladder/complexity.json:28.19"
+     ]
+    }
+   }
+  },
+  "S2": {
+   "group": "supervised",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "2.553",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S2].params_m",
+     "rule": "source field params_m",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "macs": {
+     "tick": null,
+     "text": "23.70",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S2].macs_per_slice",
+     "rule": "source field macs_per_slice / 1e9",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "latency": {
+     "tick": null,
+     "text": "29.72",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S2].latency_ms_per_slice",
+     "rule": "source field latency_ms_per_slice",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+     "alternates": [
+      "runs/E021_ladder/complexity.json:28.8"
+     ]
+    }
+   }
+  },
+  "S1g": {
+   "group": "supervised",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1g'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1g'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1g'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1g'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1g'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1g'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1g'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S1g'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "2.615",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S1g].params_m",
+     "rule": "source field params_m",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "macs": {
+     "tick": null,
+     "text": "27.75",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S1g].macs_per_slice",
+     "rule": "source field macs_per_slice / 1e9",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "latency": {
+     "tick": null,
+     "text": "30.91",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S1g].latency_ms_per_slice",
+     "rule": "source field latency_ms_per_slice",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline",
+     "alternates": [
+      "runs/E021_ladder/complexity.json:29.68"
+     ]
+    }
+   }
+  },
+  "S2g": {
+   "group": "supervised",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2g'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2g'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2g'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2g'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2g'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2g'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2g'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['S2g'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "2.615",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S2g].params_m",
+     "rule": "source field params_m",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "macs": {
+     "tick": null,
+     "text": "27.77",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S2g].macs_per_slice",
+     "rule": "source field macs_per_slice / 1e9",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    },
+    "latency": {
+     "tick": null,
+     "text": "31.07",
+     "source": "runs/E021_ladder/benchmark_supervised.json",
+     "field": "arms[S2g].latency_ms_per_slice",
+     "rule": "source field latency_ms_per_slice",
+     "note": "measured on cuda:2; tiles are timed one at a time, matching the evaluation pipeline"
+    }
+   }
+  },
+  "SS0": {
+   "group": "frozen",
+   "frozen": true,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS0'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS0'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS0'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS0'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS0'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS0'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "bilinear",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS0'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "self",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS0'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "macs": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "latency": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    }
+   }
+  },
+  "SS1": {
+   "group": "frozen",
+   "frozen": true,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "self",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "macs": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "latency": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    }
+   }
+  },
+  "SS2": {
+   "group": "frozen",
+   "frozen": true,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "self",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "macs": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "latency": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    }
+   }
+  },
+  "SS2g": {
+   "group": "frozen",
+   "frozen": true,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2g'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2g'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2g'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2g'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2g'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2g'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2g'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "self",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS2g'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "macs": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "latency": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    }
+   }
+  },
+  "SS1c": {
+   "group": "frozen",
+   "frozen": true,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1c'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1c'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1c'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1c'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1c'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1c'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1c'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "self",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['SS1c'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "macs": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    },
+    "latency": {
+     "tick": null,
+     "text": "frozen",
+     "source": "archive/selfsup_v1/README.md",
+     "field": "-",
+     "rule": "self-supervised arm is frozen"
+    }
+   }
+  }
+ },
+ "pipeline": {
+  "registry": "spur_mpm/models/registry.py",
+  "warm_start_modes": [
+   "bilinear",
+   "wiener",
+   "wiener_fill_first",
+   "iterdc"
+  ],
+  "warm_start_source": "spur_mpm/physics/wiener.py::WARM_START_MODES",
+  "sampling_modes": [
+   "y",
+   "z",
+   "yz",
+   "xy",
+   "full"
+  ],
+  "sampling_modes_source": "spur_mpm/physics/sampling.py::MODES",
+  "arms_by_warm_start": {
+   "bilinear": [
+    "A0",
+    "S0",
+    "SS0"
+   ],
+   "wiener": [
+    "S1",
+    "S2",
+    "SS1",
+    "SS2",
+    "SS2g",
+    "S1g",
+    "S2g",
+    "SS1c"
+   ],
+   "wiener_fill_first": [
+    "A1"
+   ],
+   "iterdc": []
+  },
+  "x0_input_arms": [
+   "S1",
+   "S2",
+   "SS1",
+   "SS2",
+   "SS2g",
+   "S1g",
+   "S2g",
+   "SS1c"
+  ],
+  "uncertainty_arms": [
+   "S2",
+   "SS2",
+   "SS2g",
+   "S2g"
+  ],
+  "fusion_arms": [
+   "SS2g",
+   "S1g",
+   "S2g"
+  ],
+  "trunk_arms": [
+   "S0",
+   "S1",
+   "S2",
+   "SS0",
+   "SS1",
+   "SS2",
+   "SS2g",
+   "S1g",
+   "S2g",
+   "SS1c"
+  ],
+  "no_network_arms": [
+   "A0",
+   "A1"
+  ],
+  "frozen_arms": [
+   "SS0",
+   "SS1",
+   "SS2",
+   "SS2g",
+   "SS1c"
+  ],
+  "features_per_arm": {
+   "S0": 2,
+   "S1": 3,
+   "S2": 4,
+   "SS0": 2,
+   "SS1": 3,
+   "SS2": 4,
+   "SS2g": 4,
+   "S1g": 3,
+   "S2g": 4,
+   "SS1c": 3
+  },
+  "channels_source": "spur_mpm/models/registry.py::Arm.features (len), SwinUNet2D(in_ch = len(features) * context_depth)"
+ }
+}

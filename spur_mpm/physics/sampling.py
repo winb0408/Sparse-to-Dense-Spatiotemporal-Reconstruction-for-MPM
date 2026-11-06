@@ -29,9 +29,11 @@ from dataclasses import dataclass
 
 import torch
 
-__all__ = ["SamplingSpec", "make_mask", "kept_rows", "kept_planes"]
+__all__ = ["SamplingSpec", "MODES", "make_mask", "kept_rows", "kept_planes"]
 
-_MODES = ("y", "z", "yz", "xy", "full")
+#: Every lattice the virtual acquisition understands.  Public because figures
+#: quote it: a panel that hard-codes the list drifts the moment a mode is added.
+MODES = ("y", "z", "yz", "xy", "full")
 
 
 @dataclass(frozen=True)
@@ -55,8 +57,8 @@ class SamplingSpec:
     seed: int = 0
 
     def __post_init__(self) -> None:
-        if self.mode not in _MODES:
-            raise ValueError(f"unknown sampling mode {self.mode!r}; expected {_MODES}")
+        if self.mode not in MODES:
+            raise ValueError(f"unknown sampling mode {self.mode!r}; expected {MODES}")
         if self.ky < 1 or self.kz < 1:
             raise ValueError(f"ky/kz must be >= 1, got ky={self.ky} kz={self.kz}")
 
