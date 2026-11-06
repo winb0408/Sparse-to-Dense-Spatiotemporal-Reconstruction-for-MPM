@@ -12,7 +12,7 @@
 | 项 | 状态 |
 |---|---|
 | §2 显式稀疏数据构建与独立核对 | **通过**（90/90 构建逐点校验） |
-| §4.1 回归测试 / 配置 / 模型代码 | **通过**（187 条测试全绿） |
+| §4.1 回归测试 / 配置 / 模型代码 | **通过**（207 条测试全绿） |
 | §4.2 最小有监督消融 + 重打分 + 主表 | **通过**（52 个 cell，含 S2g 与等上下文对照） |
 | §4.3 整卷 3D 血管结构 | **通过，带门控披露**（计分层占比 34–72 %） |
 | §4.4 定性图（全部测试卷） | **通过** |
@@ -95,7 +95,7 @@ PYTHONPATH=. python runs/E023_phase1/probe_warmstart_cost.py
 
 ```
 $ python -m pytest spur_mpm/tests -q
-187 passed in 7.56s
+# 207 条全部通过（rc=0），整轮约 13 s
 ```
 
 版本信息记录在 `runs/E021_ladder/figures_fixed/M2_FOVII_S1_vessels/run_log.json`：
@@ -121,7 +121,7 @@ python 3.10.19 / torch 2.6.0+cu124 / numpy 2.2.6 / RTX A6000 / 绘图代码 comm
 | 逐臂输入一致性 | 每组 `input_diff = 0`（含 `in_mask` 逐点相同） | 通过 |
 | 失败必须非零退出，不能只 warning | `return 2` + 打印整个 report | 通过 |
 | PNG + JSON + NPZ，float32 未压缩 | `--dump f32`，`qualitative_*.npz` 为 float32 | 通过 |
-| pytest + 保存通过的日志与版本信息 | 187 passed + `run_log.json` | 通过 |
+| pytest + 保存通过的日志与版本信息 | 207 条全过（rc=0） + `run_log.json` | 通过 |
 | 禁止仅改 label 不修坐标/输入逻辑 | 坐标从密集参考一次性冻结；`projection` 说明改由面板派生并配测试；输入由 `Y = M·D` 产生，`input_diff` 校验 | 通过 |
 
 **这三项本身就是"断言"改"计算"的产物**：`display_windows` / `mask_semantics` / `geometry`
@@ -140,6 +140,20 @@ python 3.10.19 / torch 2.6.0+cu124 / numpy 2.2.6 / RTX A6000 / 绘图代码 comm
 必须被抓"与"缺 spec 必须报错"两个断言）。
 
 **三协议上下文一致**：`context_depth = {y_k4: 7, z_k4: 7, yz_k2x2: 7}`（plan §3.3）。
+
+### 5.1 手册 §7 图件清单（哪张已出、在哪、哪张还缺）
+
+| 手册要求 | 状态 | 文件 |
+|---|---|---|
+| Fig. 1 几何/动物划分、Y/Z/YZ 稀疏 Mask 与预算示意 | 出图 | `spur_mpm/figures/sparse/sparse_1_construction.png`、`sparse_2_ladder_2d.png`、`sparse_3_coverage.png` |
+| Fig. 2 网络/消融矩阵示意 | **缺（示意图，非数据图）** | 消融矩阵以 `runs/E021_ladder/ladder.md` 的 52 cell 表代替；示意图需手绘 |
+| Fig. 3 Y 稀疏下各消融 XY/XZ/YZ + 统一色标 + 误差图 | 出图 | `runs/E021_ladder/figures_fixed/M2_FOVII_S1_vessels/`（三协议 × 两臂：`compare_y_z_yz_25pct.png`、`qualitative_*`、`error_*`、`support_*`、`profile_*`）；五臂全测试卷另在 `runs/E021_ladder/figures/qual_y_k2/` |
+| Fig. 4 Z/YZ 性能–稀疏曲线、同 25 % 预算、固定 Z 上下文对照 | 出图（本轮补齐） | `runs/E021_ladder/figures/curves/curve_{y,z,yz}.png`、`curve_matched_25pct.png`、`curve_matched_25pct_c7.png`（脚本 `spur_mpm/scripts/ladder_curves.py`） |
+| Fig. 5 3D 掩膜/骨架、局部分叉、断裂/伪连接标记 | **部分**：掩膜/骨架 TIFF 与 clDice / skeleton F1 数值已出，叠加标记图未渲染 | `runs/E021_ladder/E021_{S1,A1}_y_k2/structure/*_{pred,ref}_mask.tif`、`*_recon.json` |
+| Fig. S1 参数量/MACs/耗时、背景强度误差、门控审计、全视野结果 | 出图 | `runs/E021_ladder/complexity.md`、`error_*`（背景强度）、`figures_fixed/.../qualitative_*`（含逐层门控占比说明） |
+
+Fig. 4 的两点口径写进图注而不是画线下限：0.03 Dice 的"主张地板"约束的是**臂与臂之间的差**，
+不是柱子的绝对高度，所以没有画成底部灰带（画成灰带会被读成"柱子低到这个值以下就无效"）。
 
 ---
 

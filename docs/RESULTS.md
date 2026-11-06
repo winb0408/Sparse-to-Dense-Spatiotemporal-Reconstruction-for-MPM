@@ -24,6 +24,7 @@
 | 单协议定性图（输入 / A0 / S1 / 密集真值 + 误差 + 支撑 + 深度剖面） | `figures_fixed/M2_FOVII_S1_vessels/qualitative_*_{y_k4,z_k4,yz_k2x2}.png` |
 | 五臂同输入对比（A0 / S0 / S1 / S2 / S2g，`y_k2`），**留出动物 M2 的全部四个体**（含最差卷） | `runs/E021_ladder/figures/qual_y_k2/` |
 | 稀疏采集构建自检图（掩膜、2D 阶梯、覆盖率） | `spur_mpm/figures/sparse/` |
+| **手册 §7 Fig. 4 性能–稀疏曲线**（Y/Z/YZ 三族 Dice★ vs 实测比例，虚线为无学习下限；同 25 % 预算三轴对照，含等上下文 `_c7` 版） | `runs/E021_ladder/figures/curves/curve_{y,z,yz}.png`、`curve_matched_25pct{,_c7}.png`；`python -m spur_mpm.scripts.ladder_curves` 从 `ladder.csv` 重绘 |
 | 每张定性图的逐臂数字（PSNR / Dice / Dice★）与几何 | 同级 `*.json` |
 | 每个 cell 的完整评估（逐窗 `samples.csv` + 汇总 `summary.json`） | `runs/E021_ladder/E021_*/eval_test/` |
 | 每个 cell 的实际配置（稀疏参数、上下文层数、训练超参） | `runs/E021_ladder/E021_*/config.yaml` |
@@ -78,8 +79,9 @@
 ## 环境
 
 conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -q`
-（**187 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
-`test_benchmark.py`、`test_ladder_report.py`、`test_skeleton.py` 的扩充，以及 `test_run_ladder_state.py`）。
+（**207 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
+`test_ladder_curves.py`、`test_benchmark.py`、`test_ladder_report.py`、`test_skeleton.py` 的扩充，
+以及 `test_run_ladder_state.py`）。
 
 ## 两个必须知道的口径陷阱
 
