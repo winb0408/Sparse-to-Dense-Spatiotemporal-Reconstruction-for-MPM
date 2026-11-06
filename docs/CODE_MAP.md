@@ -18,7 +18,7 @@
 | **稀疏采集构建** | **`spur_mpm/data/sparse.py`** | 本次交付的核心：稀疏梯度 + 真值核验 + 掩膜落盘 |
 | 稀疏构建 CLI | `spur_mpm/scripts/build_sparse.py` | 一条命令构建全部稀疏等级并**逐条核验** |
 | 稀疏构建出图 | `spur_mpm/scripts/sparse_figures.py` | 掩膜覆盖图 / 稀疏输入示意图（给人眼核验） |
-| 采样算子 | `spur_mpm/physics/sampling.py` | `SamplingSpec`、`make_mask`、`kept_rows/kept_planes` |
+| 采样算子 | `spur_mpm/physics/sampling.py` | `SamplingSpec`、`MODES`（公开的格点全集 `y/z/yz/xy/full`，图件直接引用它，不再另抄一份）、`make_mask`、`kept_rows/kept_planes` |
 | 前向观测模型 | `spur_mpm/physics/acquisition.py` | `Y = M · (H * R) + noise`，顺序固定：光学退化 → 采样 → 噪声 |
 | PSF | `spur_mpm/physics/psf.py` | 高斯 OTF；默认恒等（无 PSF 标定前不引入额外自由度） |
 | 网络输入构造 | `spur_mpm/data/observation.py` | 决定 Y / M / X0 物理热启动 / C_s / U 各是什么 |
@@ -116,6 +116,8 @@ PSNR 会系统性偏低而与结构好坏无关。分层结论一律用 `dice`/`
 | `spur_mpm/scripts/qualitative_figures.py` | 定性对比图（稀疏输入 / 各臂重建 / 密集真值），指标标在子图右下角。面板、窗宽、ROI 全部来自 `viewspec`；`--compare` 跑多协议一致性自检（`target_diff`/`fixed_view_diff` 必须为 0），不一致时非零退出。`consistency_fields` 负责报告里三项**重算**出来的校验：窗宽重派生（`window_diff`）、掩膜是否真是它挂名的协议（`mask_semantics`）、形状/体素间距对得上冻结 spec（`geometry`） |
 | `spur_mpm/scripts/sampling_diagram.py` | 采样图样与相位的示意图 |
 | `spur_mpm/scripts/profile_depth.py` | 按深度的指标曲线（PSNR 与 Dice 分列） |
+| `spur_mpm/scripts/framework_figure.py` | **Fig. 2**：网络管线示意 + 消融矩阵。矩阵**不手写**——每一格由 `models/registry.ARMS` 生成，`fig2_provenance.json` 逐格记录它取自 `ARMS['S1'].features` 之类的哪个字段；臂缺测量值直接 `KeyError`、冻结臂带数字直接 `RuntimeError`，空值写 `n/a` 而不四舍五入成 0。管线框里的块名、warm-start 模式串、格点模式（`physics/sampling.MODES`）和通道数都是**导入或数出来的**，不是散文里抄的 |
+| `spur_mpm/scripts/structure_figure.py` | **Fig. 5**：3D 掩膜/骨架 MIP、局部分叉放大、断裂（红）/伪连接（蓝）标记图、跨卷汇总。断点/伪连接只在容差 1 voxel 之外非空；空配对记 NaN 不记 1.0；分叉裁剪框冻结进 `crop_*.json`（删掉才会重选），保证同一体积重绘不跳位 |
 
 所有定性图都遵循同一约定：**未测量体素用青色 `#22d3ee` 画出**，灰度窗统一由密集
 参考的 1%–99.5% 分位决定，所以"暗"是测量暗，不是窗宽造成的错觉。§4.4.1 之后还多三条
@@ -196,5 +198,8 @@ python -m spur_mpm.scripts.qualitative_figures --compare runs/compare_y_z_yz.jso
 | `test_sparse_figures.py` | 稀疏图必须画在所有层都测到的平面上（`_common_plane`），没有共同平面时拒绝出图 |
 | `test_run_ladder_state.py` | 阶梯状态按 cell 目录名去重：`_c7` 单元格不能顶掉同臂同层的兄弟 |
 | `test_ladder_report.py` | 出表的**口径**：差异小于 1 dB / 0.03 Dice 必须打印"不可主张"、同预算换轴不足 0.03 Dice 不得写成"轴有影响"、缺测指标打印为 `–` 而不是 `nan` |
+| `test_framework_figure.py` | Fig. 2 的矩阵必须来自 `ARMS`：每格带出处、冻结臂带数字要抛错、缺测量值要抛错、空值只写 `n/a`；管线框里的模式串与格点列表必须跟着代码走（把 fact 改掉、渲染结果跟着变），不能在散文里硬编码 |
+| `test_structure_figure.py` | Fig. 5 里会撒谎的那部分：断点/伪连接图仅在容差外非空、空配对是 NaN 不是 1.0、分叉裁剪框在同一体积两次渲染之间不移动 |
+| `test_structure_report.py` | 整卷表的表头必须说清它引用的是**骨架**分量数（不是掩膜连通块数，两者在同一份 JSON 里差几个量级）；`--from-summary` 重排版不许再索要 `--arm/--out` |
 
 冻结的自监督测试移到了 `archive/selfsup_v1/tests/`，不在主测试集里跑。

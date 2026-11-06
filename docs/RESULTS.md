@@ -24,6 +24,8 @@
 | 单协议定性图（输入 / A0 / S1 / 密集真值 + 误差 + 支撑 + 深度剖面） | `figures_fixed/M2_FOVII_S1_vessels/qualitative_*_{y_k4,z_k4,yz_k2x2}.png` |
 | 五臂同输入对比（A0 / S0 / S1 / S2 / S2g，`y_k2`），**留出动物 M2 的全部四个体**（含最差卷） | `runs/E021_ladder/figures/qual_y_k2/` |
 | 稀疏采集构建自检图（掩膜、2D 阶梯、覆盖率） | `spur_mpm/figures/sparse/` |
+| **手册 §7 Fig. 2 网络管线 + 消融矩阵**（每一格都从 `models/registry.ARMS` 生成，每格旁边写明取自哪个字段；`n/a` 只出现在真为空的字段） | `spur_mpm/figures/framework/fig2_pipeline.png`、`fig2_ablation_matrix.png`；逐格来源审计在 `fig2_provenance.json`；`python -m spur_mpm.scripts.framework_figure` 重绘 |
+| **手册 §7 Fig. 5 3D 掩膜/骨架 + 局部分叉 + 断裂/伪连接标记**（四卷 × 两臂，含跨卷汇总；冻结裁剪框存 JSON，重绘不跳位） | `runs/E021_ladder/figures/structure/structure_{S1,A1}_M2_*_vessels.png`、`structure_cross_volume_{S1,A1}.png`；`python -m spur_mpm.scripts.structure_figure` 重绘 |
 | **手册 §7 Fig. 4 性能–稀疏曲线**（Y/Z/YZ 三族 Dice★ vs 实测比例，虚线为无学习下限；同 25 % 预算三轴对照，含等上下文 `_c7` 版） | `runs/E021_ladder/figures/curves/curve_{y,z,yz}.png`、`curve_matched_25pct{,_c7}.png`；`python -m spur_mpm.scripts.ladder_curves` 从 `ladder.csv` 重绘 |
 | 每张定性图的逐臂数字（PSNR / Dice / Dice★）与几何 | 同级 `*.json` |
 | 每个 cell 的完整评估（逐窗 `samples.csv` + 汇总 `summary.json`） | `runs/E021_ladder/E021_*/eval_test/` |
@@ -73,15 +75,17 @@
 |---|---|---|
 | 检查点 `best.pt` / `last.pt` / `resume.pt` | 每 cell ≈ 10 / 30 / 30 MB | `python -m spur_mpm.scripts.run_ladder --stage …`（见 CODE_MAP §6） |
 | 定性图的 float32 `.npz` 体数据转储 | 单目录 ≈ 370 MB | `python -m spur_mpm.scripts.qualitative_figures …` |
+| Fig. 5 的骨架缓存 `figures/structure/cache/*.npz` | ≈ 2 MB | 被 `*.npz` 规则排除；`python -m spur_mpm.scripts.structure_figure` 从导出的 TIFF 掩膜重算（图与 `crop_*.json` 已入库） |
 | `figures_fixed/M2_FOVII_S1_vessels_z101/`（z=101 旧图，该层在 2/3 协议里被跳过） | ≈ 370 MB | 保留在本地做对照，未推送 |
 | Dryad 3PM 原始数据与缓存 | 数十 GB | 见 `spur_mpm/scripts/prepare_data.py` 与日志 E000 |
 
 ## 环境
 
 conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -q`
-（**207 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
+（**245 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
 `test_ladder_curves.py`、`test_benchmark.py`、`test_ladder_report.py`、`test_skeleton.py` 的扩充，
-以及 `test_run_ladder_state.py`）。
+以及 `test_run_ladder_state.py`、`test_framework_figure.py`、`test_structure_figure.py`、
+`test_structure_report.py`）。
 
 ## 两个必须知道的口径陷阱
 

@@ -1822,3 +1822,98 @@ S1 则**合并**到 1130 / 7654 / 10475 / 19882（0.53–0.71 倍）。插值地
 也写了）。曲线照实画两条重合线，读者一眼就能看出"这条消融目前是空的"。
 
 测试总数 187 → **207**，全绿。
+
+### 13. 补上手册 §7 Fig. 2 与 Fig. 5：两张"没法靠平均数说清楚"的图
+
+手册 §7 里 Fig. 2（网络管线 + 消融矩阵）与 Fig. 5（3D 掩膜/骨架、局部分叉、断裂/伪连接
+标记）此前一直挂着"缺 / 部分"。这一轮两张都补齐，并且都按"图必须由代码生成，不能手填"
+来做——否则图会先于代码漂移。
+
+#### 13.1 Fig. 2：矩阵的每一格都写清出处
+
+`spur_mpm/scripts/framework_figure.py` → `spur_mpm/figures/framework/`
+
+| 文件 | 内容 |
+|---|---|
+| `fig2_pipeline.png` | 六段链路（输入稀疏 Y / M → 物理热启动 → Swin-UNet 主干 → X0 先验 → U 不确定性 → 门控融合）+ 三条喂入框，每个框的副标题都指向真实模块（`physics/acquisition.py::observe`、`physics/sampling.py`、`physics/wiener.py`、`models/uncertainty.py`、`models/prior_fusion.py`） |
+| `fig2_ablation_matrix.png` | 12 臂 × 11 列的消融矩阵（三组：无学习地板 / 有监督实测 / 已冻结的自监督），勾由 `ARMS[...].features` / `.fusion` / `.needs_training` 判定 |
+| `fig2_provenance.json` | 逐格审计：每一格写明 `field: "ARMS['S1'].features"` 与 `rule: "'x0' in arm.features"`，外加 `warm_start_modes`、`sampling_modes`、`features_per_arm`、`channels_source` 等管线事实 |
+
+**图会撒谎的三种方式，都做成硬失败：**臂缺测量值 → `KeyError("no measured numbers")`；
+冻结臂（Phase 1 没跑）却带着数字 → `RuntimeError("frozen")`；字段真是空 → 写 `n/a`，
+**绝不四舍五入成 0**。
+
+**这一轮真抓到一处漂移。** 管线第一个框写着 `lattices: y | z | yz`，而
+`physics/sampling.py` 认识五种格点（`y/z/yz/xy/full`）——这正是该文件自己警告过的
+"散文里抄一份列表"错误，会让图少报代码支持的采样方式。修法不是把字面串补长，而是把
+`_MODES` 提升为公开的 `MODES`（与既有的 `WARM_START_MODES`、`GEO_MODES` 同一惯例），
+让 `pipeline_facts()` 带出 `sampling_modes` + `sampling_modes_source`，框内文本改由
+`_lattice_text(facts)` 生成。三条测试钉住：取到的格点序列必须等于 `sampling.MODES`；
+把 fact 改成 `["y","q"]` 渲染结果必须跟着变成 `lattices: y | q`；`MODES` 里每个模式
+`SamplingSpec` 都必须接受。
+
+#### 13.2 Fig. 5：把"错在哪"画出来，而不是平均掉
+
+`spur_mpm/scripts/structure_figure.py` → `runs/E021_ladder/figures/structure/`（7.4 MB）
+
+一张整卷 clDice 会把两种相反的失败压成同一个中庸分数：**丢支**（参考骨架像素离任何预测
+骨架都超过 1 voxel）与**凭空搭桥**（预测骨架像素离任何参考骨架都超过 1 voxel）。两者
+在均值里互相抵消，在生物学上是相反的事——少一支是灌注缺失，多一条桥是假吻合。而且它们
+**属于不同的对象**：丢的是参考的性质，编的是预测的性质。所以这里画差集：
+
+- 参考掩膜 MIP + 骨架，重建掩膜 MIP + 骨架（只在真有评分层的 z 范围内画，标题写明该范围）；
+- 断裂图（红，画在参考 MIP 上）、伪连接图（蓝，画在预测 MIP 上），容差 1 voxel；
+- 参考分叉最密处的局部裁剪，参考与重建同窗并排，让人眼判分叉而不是靠计数；
+- 逐卷数字**连同覆盖率**：Dice / clDice / skelF1 / 分量 / 分叉 / 长度直接读
+  `structure_summary.json` 不改写，旁边一律打印评分层占比（本队列 34 %–72 % 的层被门控）；
+- 逐深度层 clDice，因为同一个均值说不出失败是均匀的还是压在深层。
+
+**裁剪框冻结进 `crop_*.json`**（每份 ~395 B，文件里自己写明"重绘复用这些索引，删掉
+JSON 才会重选"）。这是 `viewspec.py` 对稀疏协议图所做的事在结构图上的同一条约束：
+否则改一次分割阈值，图就会悄悄换成看另一个分叉点，而图注还写着"同一个分叉"。
+
+八张逐卷图（S1 / A1 × 四卷测试集）+ 两张跨卷汇总图。**空配对记 NaN 不记 1.0**：两张空
+骨架构不成"完全重合"，记 1.0 等于给最难的情况发满分。
+
+#### 13.3 顺带修掉的两个"读表会读错"的地方
+
+1. 整卷表的表头原来写 `components ref→pred`，而同一份 JSON 里有两个数量级不同的分量数：
+   **骨架** 26 连通碎片（`ref_n_components`，S1 卷一 1580）与**掩膜**连通块
+   （`n_components_ref`，同卷 1645）。同卷这两个数看着接近纯属巧合——跨卷时前者到
+   31094。表头改成 `skeleton components ref→pred`，并加脚注写明掩膜连通块在 JSON 的哪个
+   字段。`test_structure_report.py` 把这条钉住：故意把掩膜块数设成 7777/6666，断言表里
+   出现的是 11 → 12 而不是这两个数。
+2. `--from-summary`（无 GPU 重排版）此前仍强制 `--arm/--out`，于是"只想重排个 markdown"
+   也得先给一轮推理的参数。改成在真正做分析的那条分支里校验，缺失时报同一条错误。
+
+**同时发现 `E021_A0_y_k2/structure/structure_summary.json` 是 10-30 的旧产物**：只有一卷、
+用原始强度 Otsu（阈值 0.3457）而不是 vesselness + 逐层 Otsu，前景占 14.8 %（现行配方是
+1.78 %，四卷均值），因此它的 Dice 0.9346 / clDice 0.9391 与 S1、A1 的表**不可比**。已按同一配方
+（`--segment vesselness`、`--threshold_mode per_plane`、四卷、CPU）重算覆盖。重算前后差
+多少，同一卷 `M2_FOVI_S1_vessels` 上量得最清楚：
+
+| `M2_FOVI_S1_vessels` | Dice | clDice | 骨架 F1 | 前景占比 |
+|---|---|---|---|---|
+| 10-30 旧表（原始强度 Otsu 0.3457） | 0.9346 | 0.9391 | — | 14.8 % |
+| 现行配方（vesselness + 逐层 Otsu 0.0414） | 0.8755 | 0.7471 | 0.7107 | 2.2 % |
+
+掉得最狠的是 **clDice −0.19**：旧口径把大片亮背景也算作血管，中心线覆盖率自然虚高。
+四卷均值现在是：
+
+| 臂 | Dice | clDice | 骨架 F1 |
+|---|---|---|---|
+| A0（双线性地板） | 0.8392 | 0.7424 | 0.7163 |
+| A1（fill-first Wiener） | 0.8392 | 0.7424 | 0.7163 |
+| S1 | 0.8634 | 0.7725 | 0.7373 |
+
+即"插值地板吊打 S1"的印象完全来自口径：换成同一配方后方向反过来，S1 比地板高
+**ΔDice +0.024 / ΔclDice +0.030**。按本项目的取数纪律（跨鼠方差 ≈0.08 Dice），这个差距
+**刚好在可声称的边界上，不能当成结构优势来写**——它只说明"至少没有输给地板"，方向一致
+但幅度未超过噪声。这与板上 §4 的预算曲线（大街区上 S1 稳定领先 A0）不冲突，但两处口径
+不同（这里只有 `y_k2` 一档、四卷），要合并陈述得另做实验。
+
+顺带印证了 §12 里那条恒等式：新表上 A1 与 A0 四卷均值**逐位相同**（0.8392 / 0.7424 /
+0.7163），单位 PSF 下 fill-first Wiener 确实退化成双线性。
+
+测试总数 207 → **245**（`test_framework_figure.py` 19、`test_structure_figure.py` 14、
+`test_structure_report.py` 5，其余为既有），全绿。
