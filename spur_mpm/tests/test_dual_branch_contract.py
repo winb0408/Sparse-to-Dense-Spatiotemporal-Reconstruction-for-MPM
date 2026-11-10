@@ -193,6 +193,32 @@ def test_the_physics_controls_actually_change_the_output():
     assert not torch.allclose(outs[0], outs[2])
 
 
+def test_the_control_and_consistency_reach_the_model_and_the_fingerprint():
+    """A control run must be a *different* run in the provenance, not a rerun.
+
+    ``phys_control`` is a model-construction argument, so it can only come from
+    the config; if it stayed out of the config it would also stay out of the
+    config hash, and "the same experiment, once with the candidate zeroed" would
+    look like a duplicate of the headline run in every manifest.
+    """
+    from spur_mpm.common.config import config_hash, load_config
+    from spur_mpm.train import DEFAULTS
+
+    arm = get_arm("P2_DualW")
+    default = load_config(DEFAULTS)
+    zeroed = {"model": {**default["model"], "phys_control": "zeros"}}
+    mixed = {"model": {**default["model"]}}
+    assert config_hash(zeroed) != config_hash(mixed)
+
+    model = build_model(arm, 1, base=8, window=4, depths=(1, 1, 1),
+                        heads=(2, 4, 8), phys_control="zeros",
+                        consistency="hard")
+    assert model.phys_control == "zeros" and model.consistency == "hard"
+    # The arm record itself is untouched: a control is a launch flag, not a
+    # second arm that future readers have to reconcile.
+    assert get_arm("P2_DualW").consistency == "off"
+
+
 def test_an_unknown_control_is_refused():
     with pytest.raises(ValueError, match="phys_control"):
         _small("P2_DualW", phys_control="drop")

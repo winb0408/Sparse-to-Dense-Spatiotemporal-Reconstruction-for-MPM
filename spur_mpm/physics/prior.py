@@ -46,6 +46,7 @@ __all__ = [
     "mask_aware_inverse",
     "physics_prior",
     "prior_summary",
+    "psf_source_label",
 ]
 
 #: Where a non-identity ``H`` may legitimately come from (PR2 §2).
@@ -67,6 +68,17 @@ def _source_for(psf: PSFConfig, psf_source: str | None) -> str:
             "license different conclusions, and an unlabelled H is how a "
             "degradation stress test ends up in the main table")
     return psf_source
+
+
+def psf_source_label(psf: PSFConfig | None = None,
+                     psf_source: str | None = None) -> str:
+    """Resolved provenance label for ``H``, refused exactly as the prior refuses.
+
+    Public so a run summary can record *which* optical model produced the number
+    without computing a prior for the sake of a string, and without a second
+    copy of the labelling rule that could drift from this one.
+    """
+    return _source_for(PSFConfig() if psf is None else psf, psf_source)
 
 
 def physics_prior(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig | None = None,

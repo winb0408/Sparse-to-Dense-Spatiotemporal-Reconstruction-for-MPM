@@ -1955,3 +1955,62 @@ EDT，因此 Z 的 5 µm 与 XY 的 0.98 µm 在物理尺度上等价。
 `test_tolerance_sweep.py` 13 条测试把三件事钉住：轴向 1 体素在 1 µm 口径下必须判错、
 在 5 µm 口径下必须判对；横向 1 体素在 1 µm 口径下必须判对；spacing 缺失时必须拒绝出表
 而不是悄悄退回体素口径。
+
+---
+
+## SPUR-PR2-T0/T1/T2 — 执行第二轮 PR：冻结历史、物理语义分离、双分支残差模型（**无 GPU 结果**）
+
+日期 2026-11-10。分支 `feature/phase1-dual-prior-20261110`，基线 `PUR-MPM` 的 `ed060f0`。
+执行依据：GitHub 上的 PR #2 与方法计划；逐条状态见 `docs/PHASE1_PR2_ACCEPTANCE.md`。
+
+### 这一轮到底做了什么
+
+三件事，按 PR 要求的顺序，各自一个 commit：
+
+| T | 提交 | 内容 |
+|---|---|---|
+| T0 | `367e21c` | 冻结基线、盘点 `runs/`、出归档清单；**一个文件都没删** |
+| T1 | `31c8434` | 把 `I0` 与 `W0` 拆成两个算子；`wiener_fill_all` 先填满所有轴再 FFT；PSF 来源标注；新 `mask_aware_inverse`；旧函数语义锁死 |
+| T2 | `957a7df` | `DualPriorReconstructor`（双分支 + 残差 + 模型内 hard consistency）；注册 7 个 `P2_*` 臂；输出字典契约；Fig. 2 增加 `NOT_RUN` 栏 |
+
+另外补在 T2 之后（未单独提交时已并入本轮文档与收尾提交）：`psf_source` 穿过
+config → dataset → prior 的管路（此前非恒等 H 的实验根本启动不了）、把
+`phys_control` / `consistency` 纳入配置与 `config_hash`（否则控制组在 provenance
+里会和头条组长得一模一样）、评估与推理的 summary 记录 `psf_source`。
+
+### 三个被当成结论的东西，其实只是口径
+
+1. **identity PSF 下 `W0` 与 `I0` 逐位相等。** 在真实测试卷上验证过：两份
+   `summary.json` 除 `"arm"` 一行外完全相同（`docs/evidence/smoke_floors_20261110/`）。
+   所以本队列的 `P2_W0` 等于 `P2_I0`，`P2_DualW` 退化为 `P2_DualI`。
+   **本队列无法回答"Wiener 反卷积有没有用"**，能回答的只有缺口填充。
+2. **额外加 blur 再反卷积会变差**：PSNR 28.03 → 27.55，SSIM 0.750 → 0.629。
+   这不是"Wiener 有害"，是"按一个不存在的模糊去卷积"的必然结果。它的用处是
+   堵死了"调 σ 刷分"这条路。
+3. **`u_physics` 在 identity 下恒为零**，所以带门控的 `P2_DualWU` 此时等价于
+   `P2_DualW`，不启动。写进 RUNBOOK §2.1，免得下次有人把它当"U 没效果"。
+
+### 测试
+
+361 项，`EXIT=0`（日志 `docs/evidence/pytest_20261110_T0_T2.log`）。新增三组：
+
+- `test_physics_prior_contract.py`（30）：口径等式与拒绝面；
+- `test_dual_branch_contract.py`（38）：初始化 `R≡0`、两分支第 1 步有梯度、
+  consistency 精确、对照参数量相等、epoch 重抽 patch、真实窗口端到端反向；
+- `test_archive_safety.py`（21，T0）：归档工具的拒绝面。
+
+其中一个测试值得单独记：**零初始化会让第 0 步物理分支梯度为 0**。
+这不是 bug，但很容易被当成布线错误去"修"。所以把它写成断言（第 0 步全零、
+第 1 步两边都有），让"故意这样"和"接错了"在测试层面分开。
+
+### 没什么
+
+**没有任何真实训练结果。** 四张 A6000 全被其他用户占用（cwy / wxy / zzc / yingn）。
+带别人作业的卡不是基准设备，所以 `runs/E024_dual_prior/` 至今不存在。
+地板数只有 32×32 CPU 冒烟，不是头条数。
+
+### 留给验收的一个问题
+
+如果验收人认为应当**先标定 PSF 再进入消融**，那 `P2_DualW` 与 `P2_DualI` 在本
+队列上永远分不开，整个阶梯会退化。当前实现两条路都留好了（标定 H 走独立分组、
+独立目录），但主表该报哪一条需要人定。详见 `docs/PHASE1_PR2_ACCEPTANCE.md` §6。

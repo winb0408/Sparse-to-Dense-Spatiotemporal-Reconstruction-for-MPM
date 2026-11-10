@@ -89,10 +89,29 @@
 ## 环境
 
 conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -q`
-（**245 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
-`test_ladder_curves.py`、`test_benchmark.py`、`test_ladder_report.py`、`test_skeleton.py` 的扩充，
-以及 `test_run_ladder_state.py`、`test_framework_figure.py`、`test_structure_figure.py`、
-`test_structure_report.py`）。
+（**361 项，全绿**；日志 `docs/evidence/pytest_20261110_T0_T2.log`。上一轮为 245 项，
+本轮新增 `test_physics_prior_contract.py` 30 项、`test_dual_branch_contract.py` 38 项、
+`test_archive_safety.py` 21 项，其余为 `test_framework_figure.py` 等既有文件的扩充）。
+
+## PR2 物理先验 / 双分支：本文件不含新结果
+
+本文档描述的是 **E021/E023 那一代（`A*/S*/SS*`）** 的数字。PR2 新方法代（`P2_*`）
+**没有任何真实数据结果**：四张 GPU 全被其他用户占用，训练 `NOT_RUN`。
+
+已有的是协议层证据，不是方法层结论：
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| identity PSF 下 `P2_W0` 与 `P2_I0` | 真实测试卷上**逐位相同**（只有 `"arm"` 字段不同） | `docs/evidence/smoke_floors_20261110/` |
+| 非恒等 H（人为额外加 blur）再反卷积 | PSNR 28.03 → 27.55，SSIM 0.750 → 0.629，**变差** | 同上 |
+
+第二条**不能**读作"Wiener 有害"：真实 stack 已带自身光学，再按未标定的合成 PSF
+去卷积等于去掉不存在的模糊。它能读作的是——把 `synthetic_extra_degradation` 当调参
+旋钮不成立。方法口径见 [`docs/PHASE1_PR2_METHOD_SPEC.md`](PHASE1_PR2_METHOD_SPEC.md) §2，
+逐条状态见 [`docs/PHASE1_PR2_ACCEPTANCE.md`](PHASE1_PR2_ACCEPTANCE.md)。
+
+**新旧数字不可同列排名**：`A1` 是 `wiener_fill_first`（Z 未填洞），`P2_W0` 是
+`wiener_fill_all`；`S1` 的 `X0` 只是拼接通道，`P2_ResidualI` 是残差锚点。
 
 ## 两个必须知道的口径陷阱
 

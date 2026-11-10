@@ -30,6 +30,11 @@ physics:
     sigma_z_um: 0.0
     voxel_xy_um: 0.98
     voxel_z_um: 5.0
+  # Where a non-identity `psf` above came from: calibrated_optical |
+  # synthetic_extra_degradation. null is only legal while the PSF is identity;
+  # a blur without a label is refused at the first batch (PR2 §2), because the
+  # two sources license different conclusions.
+  psf_source: null
   lam: 0.01          # Wiener regularisation
   u_kind: geo        # geo | phys | mean   (U channel source)
   geo_mode: per_axis # per_axis | physical
@@ -56,6 +61,16 @@ model:
   window: 8
   depths: [2, 2, 2]
   heads: [4, 8, 16]
+  # PR2 dual-prior arms only; ignored by every legacy arm.
+  # phys_control destroys the physics candidate's information while keeping the
+  # architecture and the parameter count (none | zeros | shuffle). It is part of
+  # the config so a control run cannot look like a duplicate of the headline run
+  # in its own provenance.
+  phys_control: none
+  # null = take the arm's own consistency mode (off for every registered arm).
+  # Consistency lives inside the model, so training, evaluation and inference
+  # read the same value instead of three call sites having to agree.
+  consistency: null
 
 train:
   steps: 3000

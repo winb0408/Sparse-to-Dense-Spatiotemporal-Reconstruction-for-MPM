@@ -217,6 +217,50 @@ def test_an_unlabelled_non_identity_psf_is_refused():
     assert identity["metadata"]["psf_source"] == "identity"
 
 
+def test_the_item_config_carries_the_psf_source_to_the_prior():
+    """The label has to survive the config -> dataset -> prior path.
+
+    Without this the refusal above is unfalsifiable in practice: every non-
+    identity run would fail at the first batch, or worse, a default would be
+    invented at the point of use. Checked on the real item builder, because
+    that is the only caller that matters.
+    """
+    import numpy as np
+
+    from spur_mpm.data.datasets import ItemConfig, _make_item
+    from spur_mpm.data.geometry import VolumeGeometry
+
+    geom = VolumeGeometry(sample_id="s0", mouse_id="M1", session_id="a",
+                          fov_id="0", shape=(6, 16, 16),
+                          voxel_xy_um=0.98, z_step_um=5.0)
+    dense = np.random.default_rng(0).random((6, 16, 16)).astype(np.float32)
+    base = dict(sampling=SamplingSpec(mode="y", ky=2), psf=BLUR,
+                warm_start_kind="wiener_fill_all",
+                features=("y", "mask", "interp", "wiener", "phys_delta"))
+    with pytest.raises(ValueError, match="psf_source"):
+        _make_item(dense, geom, ItemConfig(**base), 0, 0, 0, 0)
+    ok = _make_item(dense, geom,
+                    ItemConfig(psf_source="synthetic_extra_degradation", **base),
+                    0, 0, 0, 0)
+    assert ok["inputs"].shape[0] == 5 * 6
+
+
+def test_the_resolved_source_label_is_public_and_refuses_the_same_way():
+    """A run summary must be able to record the label without a prior.
+
+    It has to be the *same* rule as the prior's, otherwise a summary can say
+    `identity` about a number computed with a blur.
+    """
+    from spur_mpm.physics.prior import psf_source_label
+
+    assert psf_source_label(PSFConfig()) == "identity"
+    assert psf_source_label(BLUR, "calibrated_optical") == "calibrated_optical"
+    with pytest.raises(ValueError, match="psf_source"):
+        psf_source_label(BLUR)
+    with pytest.raises(ValueError, match="unknown psf_source"):
+        psf_source_label(BLUR, "roughly_gaussian")
+
+
 def test_a_shape_mismatch_is_refused():
     _, obs = observation("y", ky=2)
     with pytest.raises(ValueError, match="disagree"):

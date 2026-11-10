@@ -37,6 +37,7 @@ from spur_mpm.metrics.statistics import summarise_by_group
 from spur_mpm.metrics.vessel import mask_vessel_metrics, segment_pair
 from spur_mpm.models.registry import build_model, eval_features, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
+from spur_mpm.physics.prior import psf_source_label
 from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.physics.sampling import SamplingSpec
 from spur_mpm.ssl.holdout import HoldoutSpec
@@ -163,6 +164,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         supervision="self" if withhold else "dense",
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
+        psf_source=cfg["physics"].get("psf_source"),
     )
     ds = VolumeWindowDataset(cache, sample_ids, item_cfg,
                              patch_hw=tuple(cfg["data"]["patch_hw"]),
@@ -178,7 +180,13 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         model = build_model(arm, context, base=int(cfg["model"]["base"]),
                             window=int(cfg["model"]["window"]),
                             depths=tuple(cfg["model"]["depths"]),
-                            heads=tuple(cfg["model"]["heads"])).to(device)
+                            heads=tuple(cfg["model"]["heads"]),
+                            # Must match the training run exactly: a control arm
+                            # scored with the physics candidate restored would be
+                            # a different model than the one that was trained.
+                            phys_control=str(cfg["model"].get("phys_control",
+                                                              "none")),
+                            consistency=cfg["model"].get("consistency")).to(device)
         payload = torch.load(ckpt, map_location=device, weights_only=False)
         model.load_state_dict(payload["model"])
         model.eval()
@@ -288,7 +296,12 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         "sampling": sampling.to_dict(),
         "context_depth": context,
         "physics": {"psf": psf.to_dict(), "lam": cfg["physics"]["lam"],
-                    "u_kind": cfg["physics"].get("u_kind", "geo")},
+                    "u_kind": cfg["physics"].get("u_kind", "geo"),
+                    # Which optical model this number may be attributed to. Under
+                    # `identity` the Wiener candidate equals interpolation, so a
+                    # summary without this field invites the wrong sentence.
+                    "psf_source": psf_source_label(
+                        psf, cfg["physics"].get("psf_source"))},
         "supervision": arm.supervision,
         "input_support": input_support,
         "consistency_projection": projection,

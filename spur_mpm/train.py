@@ -88,6 +88,9 @@ def build_components(cfg: dict, arm_name: str, seed: int):
         dual=arm.dual,
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
+        # Declared once, in the experiment config: a non-identity H without a
+        # source label is refused rather than silently treated as calibrated.
+        psf_source=cfg["physics"].get("psf_source"),
     )
 
     geom0 = cache.geometry(fold["train"][0])
@@ -214,14 +217,29 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
     model = build_model(arm, context, base=int(cfg["model"]["base"]),
                         window=int(cfg["model"]["window"]),
                         depths=tuple(cfg["model"]["depths"]),
-                        heads=tuple(cfg["model"]["heads"])).to(device)
+                        heads=tuple(cfg["model"]["heads"]),
+                        # The parameter-matched controls (phys_control) and the
+                        # consistency switch are part of the *model*, so they
+                        # must come from the config and land in the config
+                        # fingerprint -- otherwise two runs that differ only by
+                        # "the physics candidate was zeroed" look identical in
+                        # their provenance.
+                        phys_control=str(cfg["model"].get("phys_control", "none")),
+                        consistency=cfg["model"].get("consistency")).to(device)
 
     run_name = name or f"{cfg['experiment']}__{arm.name}__{sampling.tag}__s{seed}"
     run = RunDir(out_root, run_name, resume=resume)
     cfg = dict(cfg)
     cfg["model"].update({"arm": arm.name, "features": list(arm.features),
                          "context_depth": context,
-                         "n_parameters": count_parameters(model)})
+                         "n_parameters": count_parameters(model),
+                         # Resolved values, so the run directory says what the
+                         # model actually was rather than what the default was.
+                         "phys_control": str(cfg["model"].get("phys_control",
+                                                              "none")),
+                         "consistency": (arm.consistency
+                                         if cfg["model"].get("consistency") is None
+                                         else str(cfg["model"]["consistency"]))})
     run.write_config(cfg)
     run.write_provenance(collect_provenance(
         config=cfg,
