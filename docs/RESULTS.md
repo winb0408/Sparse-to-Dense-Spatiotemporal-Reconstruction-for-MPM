@@ -32,6 +32,7 @@
 | 每个 cell 的实际配置（稀疏参数、上下文层数、训练超参） | `runs/E021_ladder/E021_*/config.yaml` |
 | 代码地图与三个硬性图形约束 | [`docs/CODE_MAP.md`](CODE_MAP.md) |
 | **手册验收记录**（改了什么 / 怎么复现 / 测试输出 / 图在哪 / 前后差别） | [`docs/PHASE1_ACCEPTANCE_REPORT.md`](PHASE1_ACCEPTANCE_REPORT.md) |
+| **PR #1 审查意见逐条回复**（每条给状态 + 证据路径；未完成的写清代价） | [`docs/PHASE1_AUDIT_RESPONSE.md`](PHASE1_AUDIT_RESPONSE.md) |
 
 ## 一句话结论
 
