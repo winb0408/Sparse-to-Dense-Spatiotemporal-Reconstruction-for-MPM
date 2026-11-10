@@ -1,7 +1,13 @@
+# pytest spur_mpm/tests -o addopts="" -q   (2026-11-10, feature/phase1-dual-prior-20261110 @ f54b340)
+# env: conda threePM, python 3.10.19, torch 2.6.0+cu124
+# -o addopts="" is deliberate: tests/pytest.ini sets addopts=-q, and adding another -q
+# from the command line makes it -qq, which suppresses the summary line and leaves the
+# only evidence as a count of dots.
 ........................................................................ [ 19%]
 ........................................................................ [ 39%]
 ........................................................................ [ 59%]
 ........................................................................ [ 79%]
 ........................................................................ [ 99%]
 ..                                                                       [100%]
+362 passed in 34.76s
 EXIT=0

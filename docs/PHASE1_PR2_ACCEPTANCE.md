@@ -7,7 +7,7 @@
 
 ## 一句话状态
 
-代码与单测已完成并通过（361 项全绿，`docs/evidence/pytest_20261110_T0_T2.log`）；
+代码与单测已完成并通过（362 项全绿，`docs/evidence/pytest_20261110_T0_T2.log`）；
 **全部 GPU 训练与真实数据头条结果 `NOT_RUN`**——四张 A6000 都被其他用户的作业占用，
 带别人作业的卡不是基准设备。零参数地板已在真实数据上做过 CPU 冒烟（见 §3）。
 
@@ -85,7 +85,7 @@
 
 | 项 | 值 |
 |---|---|
-| 全量回归 | 361 项，`EXIT=0`，`docs/evidence/pytest_20261110_T0_T2.log` |
+| 全量回归 | 362 项，`EXIT=0`，`docs/evidence/pytest_20261110_T0_T2.log`（日志自带 `362 passed` 汇总行，不需要数点） |
 | 新增 `test_physics_prior_contract.py` | 30 |
 | 新增 `test_dual_branch_contract.py` | 38 |
 | 新增 `test_archive_safety.py`（T0 提交） | 21 |
@@ -95,7 +95,10 @@
 复现命令：
 
 ```bash
-python -m pytest spur_mpm/tests -q; echo "EXIT=$?"
+# `-o addopts=""` overwrites pytest.ini's own `-q`; passing `-q` on top of it
+# makes `-qq`, which drops the "N passed" line and leaves "count the dots" as
+# the only evidence.
+python -m pytest spur_mpm/tests -o addopts="" -q; echo "EXIT=$?"
 python -m spur_mpm.scripts.framework_figure \
   --benchmark runs/E021_ladder/benchmark_supervised.json \
   --complexity runs/E021_ladder/complexity.json

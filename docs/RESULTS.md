@@ -88,8 +88,10 @@
 
 ## 环境
 
-conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -q`
-（**361 项，全绿**；日志 `docs/evidence/pytest_20261110_T0_T2.log`。上一轮为 245 项，
+conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -o addopts="" -q`
+（**362 项，全绿**；日志 `docs/evidence/pytest_20261110_T0_T2.log`。`-o addopts=""` 是必需的：
+`pytest.ini` 已经带 `-q`，命令行再加一个 `-q` 会变成 `-qq`、把 `362 passed` 那行一起吞掉，
+只留下点阵。上一轮为 245 项，
 本轮新增 `test_physics_prior_contract.py` 30 项、`test_dual_branch_contract.py` 38 项、
 `test_archive_safety.py` 21 项，其余为 `test_framework_figure.py` 等既有文件的扩充）。
 

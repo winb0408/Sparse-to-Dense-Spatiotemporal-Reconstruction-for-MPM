@@ -1992,7 +1992,9 @@ config → dataset → prior 的管路（此前非恒等 H 的实验根本启动
 
 ### 测试
 
-361 项，`EXIT=0`（日志 `docs/evidence/pytest_20261110_T0_T2.log`）。新增三组：
+362 项，`EXIT=0`（日志 `docs/evidence/pytest_20261110_T0_T2.log`；跑法必须带
+`-o addopts=""`，否则 `pytest.ini` 的 `-q` 与命令行的 `-q` 叠加成 `-qq`，`362 passed`
+那行被吞掉，日志里只剩点阵——此前自报的"361 项"就是数点数的产物，实际 362）。新增三组：
 
 - `test_physics_prior_contract.py`（30）：口径等式与拒绝面；
 - `test_dual_branch_contract.py`（38）：初始化 `R≡0`、两分支第 1 步有梯度、
