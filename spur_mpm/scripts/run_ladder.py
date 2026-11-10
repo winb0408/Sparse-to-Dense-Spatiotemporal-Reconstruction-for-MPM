@@ -144,12 +144,27 @@ def cell_name(arm: str, level: str, context: int | None = None) -> str:
     return f"{name}_c{int(context)}"
 
 
-def _free_gpus() -> list[str]:
-    """Indices of GPUs with no compute process, least-used memory first."""
+def _free_gpus(run=subprocess.run) -> list[str]:
+    """Indices of GPUs with no compute process, least-used memory first.
+
+    "Free" means *no compute process of anyone's*, not "enough memory left".
+    Free memory on a card another user is training on is not ours to take: the
+    job that owns it may ask for more later and be killed by our allocation, and
+    any timing we measure beside it is meaningless (see ``scripts/benchmark.py``).
+
+    ``run`` is injected so the parsing can be tested without ``nvidia-smi``.
+    Two failure modes return ``[]`` on purpose -- "I cannot tell" must read as
+    "nothing is free", because the caller turns ``[]`` into a refusal:
+
+    * ``nvidia-smi`` missing or failing;
+    * a compute process whose GPU uuid is not in the index/uuid map. The old
+      code kept the uuid as if it were an index, so an unmappable process
+      excluded nothing and the card was handed out as free.
+    """
     try:
-        out = subprocess.run(["nvidia-smi", "--query-gpu=index,memory.used",
-                              "--format=csv,noheader,nounits"],
-                             capture_output=True, text=True, check=True).stdout
+        out = run(["nvidia-smi", "--query-gpu=index,memory.used",
+                   "--format=csv,noheader,nounits"],
+                  capture_output=True, text=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return []
     used: dict[str, int] = {}
@@ -158,20 +173,21 @@ def _free_gpus() -> list[str]:
         used[idx] = int(mem)
     busy = set()
     try:
-        procs = subprocess.run(["nvidia-smi", "--query-compute-apps=gpu_uuid",
-                                "--format=csv,noheader"],
-                               capture_output=True, text=True, check=True).stdout
-        busy = {u.strip() for u in procs.split() if u.strip()}
+        procs = run(["nvidia-smi", "--query-compute-apps=gpu_uuid",
+                     "--format=csv,noheader"],
+                    capture_output=True, text=True, check=True).stdout
+        busy = [u.strip() for u in procs.split() if u.strip()]
         if busy:
-            uuid_out = subprocess.run(
-                ["nvidia-smi", "--query-gpu=index,uuid",
-                 "--format=csv,noheader"], capture_output=True, text=True,
-                check=True).stdout
+            uuid_out = run(["nvidia-smi", "--query-gpu=index,uuid",
+                            "--format=csv,noheader"],
+                           capture_output=True, text=True, check=True).stdout
             by_uuid = {u.strip(): i.strip() for i, u in
                        (line.split(",") for line in uuid_out.strip().splitlines())}
-            busy = {by_uuid.get(u, u) for u in busy}
+            if any(u not in by_uuid for u in busy):
+                return []           # a running job we cannot place: assume all busy
+            busy = {by_uuid[u] for u in busy}
     except (OSError, subprocess.CalledProcessError):
-        pass
+        return []                   # cannot enumerate processes: assume all busy
     free = [i for i in used if i not in busy]
     return sorted(free, key=lambda i: used[i])
 
