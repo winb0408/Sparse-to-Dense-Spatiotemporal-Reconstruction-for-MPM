@@ -28,7 +28,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from spur_mpm.common.config import apply_overrides, load_config
-from spur_mpm.common.tensors import select_centre
+from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.data.split import read_split
 from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
@@ -193,7 +193,8 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         for batch in loader:
             if model is not None:
                 x = batch["inputs"].to(device)
-                pred = select_centre(model(x).float(), batch["center_index"])
+                pred = select_centre(as_reconstruction(model(x)).float(),
+                                     batch["center_index"])
                 pred = pred.cpu()
             else:
                 # Use the same query-centred prior as inference. This also

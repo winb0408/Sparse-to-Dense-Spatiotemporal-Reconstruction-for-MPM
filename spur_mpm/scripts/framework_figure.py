@@ -65,7 +65,7 @@ from spur_mpm.physics.sampling import MODES
 from spur_mpm.physics.wiener import WARM_START_MODES
 
 __all__ = [
-    "NA", "FROZEN", "REGISTRY", "ARCHIVE", "NUM_SOURCES",
+    "NA", "FROZEN", "NOT_RUN", "REGISTRY", "ARCHIVE", "NUM_SOURCES",
     "Column", "Number", "Cell", "Row", "Block", "COLUMNS", "GROUPS",
     "load_numbers", "format_number", "group_of", "cell_for", "matrix_row",
     "matrix_rows", "matrix_blocks", "pipeline_facts", "provenance",
@@ -83,11 +83,15 @@ NUM_SOURCES: tuple[Path, ...] = (BENCHMARK, COMPLEXITY)
 
 NA = "n/a"
 FROZEN = "frozen"
+#: A PR2 arm that exists in code and has no real-data number yet. Saying
+#: "NOT_RUN" is the only honest cell: "n/a" would read as "not applicable".
+NOT_RUN = "NOT_RUN"
 
 INK = "#1f3864"          # measured / present
 INK_2 = "#2f5d8c"
 OPT = "#a15c00"          # optional block
 GREY = "#9d9d9d"         # frozen arm
+INK_3 = "#7f9ac4"        # implemented, not yet run
 RULE = "#d9dde3"
 
 _TICKED = ("y", "mask", "x0", "uncertainty")
@@ -213,6 +217,8 @@ GROUPS: tuple[tuple[str, str], ...] = (
     ("floors", "no-learning floors  (needs_training = False) - the reference a "
                "network has to beat"),
     ("supervised", "supervised - measured in Phase 1"),
+    ("planned", "PR2 dual-prior - implemented in code, real-data run NOT_RUN "
+                "(no free GPU; see docs/PHASE1_PR2_ACCEPTANCE.md)"),
     ("frozen", "self-supervised - frozen 2026-10-30, NOT measured in Phase 1 "
                "(archive/selfsup_v1)"),
 )
@@ -235,6 +241,7 @@ class Row:
     group: str
     cells: dict[str, Cell]
     frozen: bool
+    planned: bool = False
 
     def cell(self, key: str) -> Cell:
         return self.cells[key]
@@ -261,7 +268,7 @@ def group_of(arm: Arm) -> str:
 
 def cell_for(arm: Arm, column: Column,
              numbers: dict[str, dict[str, Number]] | None = None,
-             frozen: bool = False) -> Cell:
+             frozen: bool = False, planned: bool = False) -> Cell:
     """One matrix cell, derived from ``arm`` and the loaded numbers."""
     reg = f"ARMS['{arm.name}'].{column.field}"
     if column.kind == "tick":
@@ -277,6 +284,12 @@ def cell_for(arm: Arm, column: Column,
         # Not "n/a": the arm was not measured this phase, which is a scope
         # statement, not a missing value.
         return Cell(FROZEN, None, ARCHIVE, "-", "self-supervised arm is frozen")
+    if planned:
+        # Also not "n/a": the arm exists in code and has simply not been run on
+        # real data. Drawing a number here would be the one thing this figure
+        # is built to prevent.
+        return Cell(NOT_RUN, None, REGISTRY, "-",
+                    "PR2 arm implemented; real-data experiment NOT_RUN")
     num = (numbers or {}).get(arm.name, {}).get(column.field)
     return Cell(format_number(num, column.field), None,
                 num.source if num else "no source",
@@ -285,12 +298,14 @@ def cell_for(arm: Arm, column: Column,
 
 
 def matrix_row(arm: Arm, numbers: dict[str, dict[str, Number]],
-               frozen: bool | None = None) -> Row:
+               frozen: bool | None = None, planned: bool = False) -> Row:
     """One arm's row. ``frozen`` defaults to what the registry says it is."""
     if frozen is None:
         frozen = group_of(arm) == "frozen"
-    cells = {c.key: cell_for(arm, c, numbers, frozen=frozen) for c in COLUMNS}
-    return Row(arm=arm, group=group_of(arm), cells=cells, frozen=frozen)
+    cells = {c.key: cell_for(arm, c, numbers, frozen=frozen, planned=planned)
+             for c in COLUMNS}
+    return Row(arm=arm, group="planned" if planned else group_of(arm),
+               cells=cells, frozen=frozen, planned=planned)
 
 
 def matrix_rows(arms: dict[str, Arm] | None = None,
@@ -307,6 +322,12 @@ def matrix_rows(arms: dict[str, Arm] | None = None,
     numbers = load_numbers() if numbers is None else numbers
     rows: list[Row] = []
     for arm in arms.values():
+        if arm.family == "pr2" and arm.name not in numbers:
+            # Implemented, unmeasured: its own band with NOT_RUN cells. The
+            # moment a real number exists this branch stops firing and the arm
+            # joins the measured band -- no list to maintain by hand.
+            rows.append(matrix_row(arm, numbers, planned=True))
+            continue
         frozen = group_of(arm) == "frozen"
         if frozen and arm.name in numbers:
             raise RuntimeError(
@@ -672,9 +693,10 @@ def render_matrix(rows: Sequence[Row], path: Path, dpi: int = 200) -> Path:
 
     for bi, block in enumerate(blocks):
         band_colour = {"floors": "#eef1f5", "supervised": "#e7eefa",
-                       "frozen": "#f4f4f4"}[block.key]
-        strip = {"floors": INK_2, "supervised": INK, "frozen": GREY}[block.key]
-        band_hh = band_h * (1.15 if block.key == "frozen" else 1.0)
+                       "planned": "#eef2f9", "frozen": "#f4f4f4"}[block.key]
+        strip = {"floors": INK_2, "supervised": INK, "frozen": GREY,
+                 "planned": INK_3}[block.key]
+        band_hh = band_h * (1.15 if block.key in ("frozen", "planned") else 1.0)
         ax.add_patch(Rectangle((margin, y - band_hh), total_w - 2 * margin, band_hh,
                                facecolor=band_colour, edgecolor="none"))
         ax.add_patch(Rectangle((margin, y - band_hh), 0.05, band_hh,

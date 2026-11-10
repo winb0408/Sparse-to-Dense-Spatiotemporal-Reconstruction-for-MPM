@@ -32,7 +32,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from spur_mpm.common.config import apply_overrides, deep_merge, load_config
-from spur_mpm.common.tensors import select_centre
+from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.models.registry import build_model, eval_features, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
@@ -98,8 +98,9 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
     with torch.no_grad():
         for batch in loader:
             if model is not None:
-                pred = select_centre(model(batch["inputs"].to(device)).float(),
-                                     batch["center_index"])
+                pred = select_centre(
+                    as_reconstruction(model(batch["inputs"].to(device))).float(),
+                    batch["center_index"])
                 pred = pred[0].cpu().numpy()
             else:
                 # Baseline arm: the physics warm start for the centre plane.

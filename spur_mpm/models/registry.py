@@ -26,7 +26,7 @@ from dataclasses import dataclass, replace
 
 import torch
 
-__all__ = ["Arm", "ARMS", "get_arm", "build_model", "TRAINED_ARMS",
+__all__ = ["Arm", "ARMS", "get_arm", "build_model", "TRAINED_ARMS", "PR2_ARMS",
            "BASELINE_FEATURES", "eval_features"]
 
 _BASE_FEATURES = ("y", "mask")
@@ -44,12 +44,30 @@ class Arm:
     # Two branches on complementary halves of the acquisition (E012). Only the
     # network and the objective change; the data pipeline stays shared.
     dual: bool = False
+    # --- PR2 (dual prior) fields; empty/False = legacy behaviour, so every old
+    # arm record keeps its meaning and its checkpoints keep loading.
+    #: Features the observation branch reads. Non-empty => the PR2 model.
+    obs_features: tuple[str, ...] = ()
+    #: Features the physics branch reads (empty => single-branch residual).
+    phys_features: tuple[str, ...] = ()
+    #: ``D_raw = I0 + R`` (True) or ``D_raw = R`` (False, S0 semantics).
+    residual: bool = False
+    #: Gate the physics branch by (mask, u_sampling, u_physics).
+    use_gate: bool = False
+    #: ``off`` | ``hard`` observation consistency, identical in train/eval/infer.
+    consistency: str = "off"
+    #: Which P2 experiment family this arm belongs to (provenance for figures).
+    family: str = ""
 
     def to_dict(self) -> dict:
         return {"name": self.name, "features": list(self.features),
                 "warm_start": self.warm_start, "supervision": self.supervision,
                 "fusion": self.fusion, "needs_training": self.needs_training,
-                "description": self.description, "dual": self.dual}
+                "description": self.description, "dual": self.dual,
+                "obs_features": list(self.obs_features),
+                "phys_features": list(self.phys_features),
+                "residual": self.residual, "use_gate": self.use_gate,
+                "consistency": self.consistency, "family": self.family}
 
 
 ARMS: dict[str, Arm] = {
@@ -82,7 +100,62 @@ ARMS: dict[str, Arm] = {
     "SS1c": Arm("SS1c", _BASE_FEATURES + ("x0",), "wiener", "self", dual=True,
                 description="dual-branch complementary MMS: each branch rebuilds "
                             "the rows the other one withheld"),
+
+    # ------------------------------------------------------------------
+    # PR2: observation branch + physics-prior branch (plan §6).
+    #
+    # These coexist with the arms above and change none of them. The names are
+    # P2_* precisely so that a result can be traced to a method generation: an
+    # S1 number and a P2_DualW number were produced by different code, on
+    # different definitions of the prior, and are not interchangeable.
+    # ------------------------------------------------------------------
+    "P2_I0": Arm("P2_I0", _BASE_FEATURES, "bilinear", "none", needs_training=False,
+                 family="pr2",
+                 description="pure linear interpolation: I0 with no FFT and no "
+                             "network (the reference re-computation of A0)"),
+    "P2_W0": Arm("P2_W0", _BASE_FEATURES, "wiener_fill_all", "none",
+                 needs_training=False, family="pr2",
+                 description="fill-first Wiener W0 with no network; needs a "
+                             "labelled H to mean anything beyond interpolation"),
+    "P2_Direct": Arm("P2_Direct", _BASE_FEATURES, "bilinear", "dense",
+                     obs_features=("y", "mask"), family="pr2",
+                     description="Y+M -> image, no residual, no physics branch "
+                                 "(the S0 semantics under the PR2 model)"),
+    "P2_ResidualI": Arm("P2_ResidualI", _BASE_FEATURES + ("interp",), "bilinear",
+                        "dense", obs_features=("y", "mask", "interp"),
+                        residual=True, family="pr2",
+                        description="D_raw = I0 + R(Y, M, I0): what the residual "
+                                    "parameterisation alone buys"),
+    "P2_DualI": Arm("P2_DualI", _BASE_FEATURES + ("interp",), "bilinear", "dense",
+                    obs_features=("y", "mask"), phys_features=("interp",),
+                    residual=True, family="pr2",
+                    description="two branches, physics branch sees I0 only: the "
+                                "capacity/structure control for P2_DualW"),
+    "P2_DualW": Arm("P2_DualW",
+                    _BASE_FEATURES + ("interp", "wiener", "phys_delta"),
+                    "wiener_fill_all", "dense",
+                    obs_features=("y", "mask"),
+                    phys_features=("interp", "wiener", "phys_delta", "mask"),
+                    residual=True, family="pr2",
+                    description="two branches, physics branch sees I0, W0 and "
+                                "W0-I0: does the Wiener candidate add anything "
+                                "beyond I0 and capacity"),
+    "P2_DualWU": Arm("P2_DualWU",
+                     _BASE_FEATURES + ("interp", "wiener", "phys_delta",
+                                       "u_sampling", "u_physics"),
+                     "wiener_fill_all", "dense",
+                     obs_features=("y", "mask", "u_sampling"),
+                     phys_features=("interp", "wiener", "phys_delta", "mask",
+                                    "u_physics"),
+                     residual=True, use_gate=True, family="pr2",
+                     description="P2_DualW with the fusion gated by M, u_sampling "
+                                 "and u_physics (conditional: only meaningful "
+                                 "once u_physics is not identically zero, i.e. "
+                                 "under a non-identity H)"),
 }
+
+#: Arms whose numbers come from the PR2 model generation.
+PR2_ARMS = tuple(a.name for a in ARMS.values() if a.family == "pr2")
 
 TRAINED_ARMS = tuple(a.name for a in ARMS.values() if a.needs_training)
 BASELINE_ARMS = tuple(a.name for a in ARMS.values() if not a.needs_training)
@@ -96,13 +169,22 @@ def get_arm(name: str) -> Arm:
 
 def build_model(arm: Arm | str, context_depth: int, base: int = 48,
                 window: int = 8, depths: tuple[int, ...] = (2, 2, 2),
-                heads: tuple[int, ...] = (4, 8, 16)) -> torch.nn.Module:
+                heads: tuple[int, ...] = (4, 8, 16),
+                phys_control: str = "none",
+                consistency: str | None = None,
+                collect_aux: bool = False) -> torch.nn.Module:
     """Build the network for an arm.
 
     Inputs are ``len(features) * context_depth`` channels; output is
     ``context_depth`` channels (one per plane) and the caller selects the
     centre plane. With fusion on, the stem replaces the first conv and the
     backbone width stays at ``base``, so parameter counts stay comparable.
+
+    ``phys_control`` (``none`` | ``zeros`` | ``shuffle``) builds the same
+    parameter-matched PR2 model with the physics candidate's information
+    destroyed; ``consistency`` overrides the arm's observation-consistency mode
+    (it must be the same value in training, evaluation and inference -- the
+    default reads it from the arm so there is one place to get it wrong).
     """
     from spur_mpm.models.prior_fusion import PriorFusionStem
     from spur_mpm.models.swin_unet_2d import SwinUNet2D
@@ -111,6 +193,17 @@ def build_model(arm: Arm | str, context_depth: int, base: int = 48,
         arm = get_arm(arm)
     if not arm.needs_training:
         raise ValueError(f"arm {arm.name} has no network; use the baseline path")
+    if arm.obs_features:
+        from spur_mpm.models.dual_prior_reconstructor import (
+            DualPriorReconstructor,
+        )
+        return DualPriorReconstructor(
+            features=tuple(arm.features), obs_features=tuple(arm.obs_features),
+            phys_features=tuple(arm.phys_features), t=context_depth, base=base,
+            window=window, depths=tuple(depths), heads=tuple(heads),
+            residual=bool(arm.residual), use_gate=bool(arm.use_gate),
+            consistency=arm.consistency if consistency is None else consistency,
+            phys_control=phys_control, collect_aux=collect_aux)
     if arm.fusion and "x0" not in arm.features:
         raise ValueError(f"arm {arm.name}: fusion requires x0 in the feature set")
     if arm.dual:

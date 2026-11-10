@@ -34,7 +34,7 @@ from spur_mpm.common.config import apply_overrides, config_hash, load_config
 from spur_mpm.common.provenance import collect_provenance
 from spur_mpm.common.runlog import RunDir
 from spur_mpm.common.seeding import seed_worker, set_seed
-from spur_mpm.common.tensors import select_centre as _select_centre
+from spur_mpm.common.tensors import as_reconstruction, select_centre as _select_centre
 from spur_mpm.data.datasets import (
     ItemConfig,
     SparseVolumeDataset,
@@ -150,7 +150,8 @@ def validate(model, loader, device, *, supervision: str, rho: str,
             pred = 0.5 * (_select_centre(out_a.float(), batch["center_index"]) +
                           _select_centre(out_b.float(), batch["center_index"]))
         else:
-            pred = _select_centre(out.float(), batch["center_index"])
+            pred = _select_centre(as_reconstruction(out).float(),
+                                  batch["center_index"])
         if use_dense:
             target = batch["target"].to(device)
             ps.append(float(psnr(pred, target)))
@@ -265,10 +266,20 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
         start, best = ck["step"], ck["best"]
         print(f"[{run_name}] resumed at step {start} (best={best:.4f})", flush=True)
 
+    # The patch draw depends on (seed, epoch, index); bumping the epoch before
+    # each pass is what makes successive epochs different patches instead of the
+    # same patches in a different order (see SparseVolumeDataset.set_epoch).
+    # Resuming starts at the epoch the recorded step count falls in, so a
+    # resumed run does not replay the first epoch's patches.
+    epoch = start // max(1, len(train_loader))
+
     def batches():
+        nonlocal epoch
         while True:
+            train_ds.set_epoch(epoch)
             for b in train_loader:
                 yield b
+            epoch += 1
 
     step = start
     model.train()
@@ -300,7 +311,7 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
         else:
             with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
                 out = model(x)
-            out = out.float()
+            out = as_reconstruction(out).float()
             pred = _select_centre(out, batch["center_index"])
 
             if arm.supervision == "self":

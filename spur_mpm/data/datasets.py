@@ -358,6 +358,8 @@ class SparseVolumeDataset(Dataset):
             raise ValueError(f"context_depth must be odd, got {self.depth}")
         self.patches_per_epoch = int(patches_per_epoch)
         self.seed = int(seed)
+        #: Bumped by the trainer once per pass over the loader; see set_epoch.
+        self.epoch = 0
         self._check_fits()
 
     def _check_fits(self) -> None:
@@ -373,12 +375,30 @@ class SparseVolumeDataset(Dataset):
             if not geom.shape:
                 geom.shape = tuple(arr.shape)
 
+    def set_epoch(self, epoch: int) -> None:
+        """Change which patches this dataset yields for the same indices.
+
+        Without this, item ``i`` was the same patch at every epoch for the whole
+        run: the loader shuffled the *order* of a fixed set of
+        ``patches_per_epoch`` patches, so a 3000-step run with 1000 patches per
+        epoch saw 1000 distinct patches 3 times. That is not a wrong number in
+        any single row, which is why it survived -- but it does mean the
+        "random patches" in every run log overstated how much of each volume was
+        visited, and the epoch count was not the coverage it looks like.
+
+        The seed stays ``(run seed, epoch, index)``, so the draw is reproducible
+        across workers and across processes: nothing here depends on how the
+        DataLoader split the work.
+        """
+        self.epoch = int(epoch)
+
     def __len__(self) -> int:
         return self.patches_per_epoch
 
     def __getitem__(self, index: int) -> dict:
         rng = np.random.default_rng(
-            np.random.SeedSequence([self.seed, index]).generate_state(1)[0])
+            np.random.SeedSequence([self.seed, self.epoch, index])
+            .generate_state(1)[0])
         si = int(rng.integers(len(self.sample_ids)))
         sid = self.sample_ids[si]
         geom = self.cache.geometry(sid)
@@ -392,7 +412,7 @@ class SparseVolumeDataset(Dataset):
         raw = stack_patch(arr, z0, y0, x0, d, h, w)
         dense = self.cache.calibration.apply(raw).astype(np.float32)
         holdout_seed = int(np.random.SeedSequence(
-            [self.seed, index, 77]).generate_state(1)[0])
+            [self.seed, self.epoch, index, 77]).generate_state(1)[0])
 
         item = _make_item(dense, geom, self.cfg, z0, y0, x0, holdout_seed)
         item["sample_id"] = sid
