@@ -201,6 +201,11 @@ class ItemConfig:
     u_kind: str = "geo"
     geo_mode: str = "per_axis"
     check_leakage: bool = True
+    # Provenance of a non-identity PSF (PR2 §2). ``None`` is correct for the
+    # real Dryad stacks, whose optics are already in the data; a degradation
+    # stress test must say so here or the physics prior refuses to run, so a
+    # synthetic blur cannot reach a table without a label.
+    psf_source: str | None = None
 
     def to_dict(self) -> dict:
         return {"sampling": self.sampling.to_dict(), "psf": self.psf.to_dict(),
@@ -208,7 +213,8 @@ class ItemConfig:
                 "lam": self.lam, "features": list(self.features),
                 "supervision": self.supervision, "dual": self.dual,
                 "holdout": self.holdout.to_dict() if self.holdout else None,
-                "u_kind": self.u_kind, "geo_mode": self.geo_mode}
+                "u_kind": self.u_kind, "geo_mode": self.geo_mode,
+                "psf_source": self.psf_source}
 
 
 def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
@@ -249,7 +255,9 @@ def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
     obs = dict(psf=cfg.psf, lam=cfg.lam, warm_start_kind=cfg.warm_start_kind,
                u_kind=cfg.u_kind, geo_mode=cfg.geo_mode,
                ky=spec.ky, kz=spec.kz,
-               voxel_xy_um=geometry.voxel_xy_um, voxel_z_um=geometry.z_step_um)
+               voxel_xy_um=geometry.voxel_xy_um, voxel_z_um=geometry.z_step_um,
+               psf_source=cfg.psf_source,
+               valid_z=None if valid_z is None else torch.as_tensor(valid_z, dtype=torch.bool))
 
     if cfg.dual:
         if cfg.holdout is None:
