@@ -1,0 +1,8 @@
+{
+  "sample": "M2_FOVI_S1_vessels",
+  "groups": [
+    {"level": "y_k4",     "overrides": ["sampling.mode=y",  "sampling.ky=4", "sampling.kz=1"], "arms": {"A0": null}},
+    {"level": "z_k4",     "overrides": ["sampling.mode=z",  "sampling.ky=1", "sampling.kz=4", "data.context_slices=7"], "arms": {"A0": null}},
+    {"level": "yz_k2x2",  "overrides": ["sampling.mode=yz", "sampling.ky=2", "sampling.kz=2", "data.context_slices=3"], "arms": {"A0": null}}
+  ]
+}

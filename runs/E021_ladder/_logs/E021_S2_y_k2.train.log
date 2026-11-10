@@ -1,0 +1,24 @@
+/data2/wjb/anaconda3/envs/threePM/bin/python -m spur_mpm.train --arm S2 --name E021_S2_y_k2 --out-root runs/E021_ladder --set experiment=E021_S2_y_k2 --set data.index=data_local/dryad_cache/index_cohort.json --set data.split=spur_mpm/experiments/E020_cohort/split.json --set data.fold=0 --set sampling.mode=y --set sampling.ky=2 --set sampling.kz=1 --set sampling.pattern=grid --set sampling.seed=0
+
+[E021_S2_y_k2] arm=S2 params=2,552,737 context=1 sampling=y_k2 device=cuda
+[E021_S2_y_k2] step 500: dense_psnr=28.6905 densePSNR=28.69
+[E021_S2_y_k2] step 1000: dense_psnr=29.2801 densePSNR=29.28
+[E021_S2_y_k2] step 1500: dense_psnr=29.7159 densePSNR=29.72
+[E021_S2_y_k2] step 2000: dense_psnr=29.6256 densePSNR=29.63
+[E021_S2_y_k2] step 2500: dense_psnr=30.1388 densePSNR=30.14
+[E021_S2_y_k2] step 3000: dense_psnr=30.2085 densePSNR=30.21
+{
+  "run": "runs/E021_ladder/E021_S2_y_k2",
+  "arm": "S2",
+  "best": 30.20847396461331,
+  "final": {
+    "n_val": 98,
+    "dense_psnr": 30.20847396461331,
+    "dense_ssim": 0.7870109324552574,
+    "select_metric": "dense_psnr",
+    "select_value": 30.20847396461331,
+    "select_maximise": true
+  },
+  "problems": [],
+  "config_hash": "696248e71cdc89433513d89698ec5d0970f81f2e9e9a723bff65e6b35d8ab183"
+}

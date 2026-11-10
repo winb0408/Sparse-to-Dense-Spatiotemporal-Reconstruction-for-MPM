@@ -1,0 +1,431 @@
+{
+  "sample_id": "M2_FOVI_S2_vessels",
+  "fold": 0,
+  "sampling": "y_k2",
+  "sampling_fraction": 0.5,
+  "mask_geometry": {
+    "measured_fraction": 0.5,
+    "kept_y_rows": 128,
+    "y_period": 2,
+    "x_dense": true,
+    "y_dense": false,
+    "z_dense": true,
+    "z_planes_measured": 152,
+    "z_planes_total": 152,
+    "row_pattern": "10101010",
+    "per_plane_fraction": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5
+    ]
+  },
+  "input_support": "full",
+  "consistency_projection": "none",
+  "context_depth": 1,
+  "view_spec": {
+    "sample_id": "M2_FOVI_S2_vessels",
+    "shape": [
+      152,
+      256,
+      256
+    ],
+    "voxel_um": [
+      5.0,
+      0.98,
+      0.98
+    ],
+    "z_view": 76,
+    "y_view": 128,
+    "x_view": 128,
+    "roi": [
+      69,
+      160,
+      96
+    ],
+    "mip_z": [
+      0,
+      152
+    ],
+    "zoom": 96,
+    "windows": {
+      "XY primary": [
+        0.05337649583816528,
+        0.33395017832517604
+      ],
+      "XZ": [
+        0.04406474176794291,
+        0.9690020641684529
+      ],
+      "YZ": [
+        0.04208254814147949,
+        0.9740372240543365
+      ],
+      "Zoom": [
+        0.048954229429364206,
+        0.4240212239325036
+      ],
+      "MIP-z": [
+        0.3293948471546173,
+        1.0
+      ]
+    },
+    "fingerprint": {
+      "files": {
+        "index": {
+          "path": "data_local/dryad_cache/index_cohort.json",
+          "bytes": 8060,
+          "mtime": 1793370347
+        },
+        "split": {
+          "path": "spur_mpm/experiments/E020_cohort/split.json",
+          "bytes": 949,
+          "mtime": 1793370331
+        }
+      },
+      "config_sha256": "6627ebc075676a2ad2ba2bb653f92191afcf87ca16b6246c40e8a0eb318d84f4"
+    },
+    "projection": "MIP-z over the recorded z range (one fixed column); XY, XZ, YZ, Zoom are single slices"
+  },
+  "columns": [
+    {
+      "key": "XY primary",
+      "axis": "xy",
+      "coord": 76,
+      "role": "fixed",
+      "note": "z=76"
+    },
+    {
+      "key": "XZ",
+      "axis": "xz",
+      "coord": 128,
+      "role": "fixed",
+      "note": "y=128"
+    },
+    {
+      "key": "YZ",
+      "axis": "yz",
+      "coord": 128,
+      "role": "fixed",
+      "note": "x=128"
+    },
+    {
+      "key": "Zoom",
+      "axis": "zoom",
+      "coord": 76,
+      "role": "fixed",
+      "note": "z=76"
+    },
+    {
+      "key": "MIP-z",
+      "axis": "mipz",
+      "coord": 0,
+      "role": "fixed",
+      "note": "z 0-152"
+    },
+    {
+      "key": "XZ measured row",
+      "axis": "xz",
+      "coord": 128,
+      "role": "diagnostic",
+      "note": "y=128, 0% measured"
+    },
+    {
+      "key": "XZ skipped row",
+      "axis": "xz",
+      "coord": 127,
+      "role": "diagnostic",
+      "note": "y=127, 0% measured"
+    }
+  ],
+  "windows": {
+    "XY primary": [
+      0.05337649583816528,
+      0.33395017832517604
+    ],
+    "XZ": [
+      0.04406474176794291,
+      0.9690020641684529
+    ],
+    "YZ": [
+      0.04208254814147949,
+      0.9740372240543365
+    ],
+    "Zoom": [
+      0.048954229429364206,
+      0.4240212239325036
+    ],
+    "MIP-z": [
+      0.3293948471546173,
+      1.0
+    ],
+    "XZ measured row": [
+      0.04406474176794291,
+      0.9690020641684529
+    ],
+    "XZ skipped row": [
+      0.042122472263872626,
+      0.993036217391491
+    ]
+  },
+  "arms": [
+    {
+      "arm": "A0",
+      "checkpoint": null,
+      "supervision": "none",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 27.4019832611084,
+        "mae": 0.02287767082452774,
+        "ssim": 0.6745965657265562,
+        "e_measured": 0.0,
+        "e_missing": 0.045755339737393354,
+        "dice": 0.6534527293154437,
+        "cl_dice": 0.6397059022674294,
+        "pred_fraction": 0.29730355112176193,
+        "ref_fraction": 0.2646432173879523,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 669.2565789473684,
+        "n_components_ref": 1008.25,
+        "n_empty": 0.0,
+        "dice_area": 0.6520909582509998
+      }
+    },
+    {
+      "arm": "S0",
+      "checkpoint": "runs/E021_ladder/E021_S0_y_k2/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 28.838193893432617,
+        "mae": 0.02023438736796379,
+        "ssim": 0.7477864721103719,
+        "e_measured": 0.002131247536836829,
+        "e_missing": 0.038337526426307465,
+        "dice": 0.6336275236490408,
+        "cl_dice": 0.6200176243829126,
+        "pred_fraction": 0.17875912314967105,
+        "ref_fraction": 0.2646432173879523,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 1094.717105263158,
+        "n_components_ref": 1008.25,
+        "n_empty": 0.0,
+        "dice_area": 0.6658880075995074
+      }
+    },
+    {
+      "arm": "S1",
+      "checkpoint": "runs/E021_ladder/E021_S1_y_k2/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 28.831222534179688,
+        "mae": 0.02008180320262909,
+        "ssim": 0.7471417220015275,
+        "e_measured": 0.0018530404451762717,
+        "e_missing": 0.03831057301967552,
+        "dice": 0.630182241514366,
+        "cl_dice": 0.6160116534948861,
+        "pred_fraction": 0.17477176063939145,
+        "ref_fraction": 0.2646432173879523,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 1118.2236842105262,
+        "n_components_ref": 1008.25,
+        "n_empty": 0.0,
+        "dice_area": 0.6668033148203546
+      }
+    },
+    {
+      "arm": "S2",
+      "checkpoint": "runs/E021_ladder/E021_S2_y_k2/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 28.81831169128418,
+        "mae": 0.020269419997930527,
+        "ssim": 0.7470673550116388,
+        "e_measured": 0.002193461000723274,
+        "e_missing": 0.03834537583354272,
+        "dice": 0.6328711812167074,
+        "cl_dice": 0.6191946550898421,
+        "pred_fraction": 0.17799538060238487,
+        "ref_fraction": 0.2646432173879523,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 1099.7105263157894,
+        "n_components_ref": 1008.25,
+        "n_empty": 0.0,
+        "dice_area": 0.6657605273544775
+      }
+    },
+    {
+      "arm": "S2g",
+      "checkpoint": "runs/E021_ladder/E021_S2g_y_k2/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 28.808801651000977,
+        "mae": 0.020576775074005127,
+        "ssim": 0.7487366113223528,
+        "e_measured": 0.0027996309861344727,
+        "e_missing": 0.038353920227995046,
+        "dice": 0.6321652436315008,
+        "cl_dice": 0.6181280020222981,
+        "pred_fraction": 0.17679495560495476,
+        "ref_fraction": 0.2646432173879523,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 1126.625,
+        "n_components_ref": 1008.25,
+        "n_empty": 0.0,
+        "dice_area": 0.6662272814094304
+      }
+    }
+  ]
+}

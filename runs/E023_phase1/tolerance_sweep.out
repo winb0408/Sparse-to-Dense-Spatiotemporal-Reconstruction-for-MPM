@@ -1,0 +1,7 @@
+S1 M2_FOVII_S1_vessels: 0um=0.607 0.98um=0.840 1um=0.840 5um=0.962 10um=0.987
+S1 M2_FOVII_S2_vessels: 0um=0.426 0.98um=0.684 1um=0.684 5um=0.925 10um=0.977
+S1 M2_FOVI_S1_vessels: 0um=0.472 0.98um=0.717 1um=0.717 5um=0.921 10um=0.984
+S1 M2_FOVI_S2_vessels: 0um=0.300 0.98um=0.539 1um=0.539 5um=0.896 10um=0.986
+A1 M2_FOVII_S1_vessels: 0um=0.510 0.98um=0.812 1um=0.812 5um=0.952 10um=0.981
+A1 M2_FOVII_S2_vessels: 0um=0.372 0.98um=0.678 1um=0.678 5um=0.926 10um=0.976
+A1 M2_FOVI_S1_vessels: 0um=0.389 0.98um=0.672 1um=0.672 5um=0.904 10um=0.981

@@ -1,0 +1,26 @@
+/data2/wjb/anaconda3/envs/threePM/bin/python -m spur_mpm.train --arm S1 --name E021_S1_y_k2 --out-root runs/E021_ladder --set experiment=E021_S1_y_k2 --set data.index=data_local/dryad_cache/index_cohort.json --set data.split=spur_mpm/experiments/E020_cohort/split.json --set data.fold=0 --set sampling.mode=y --set sampling.ky=2 --set sampling.kz=1 --set sampling.pattern=grid --set sampling.seed=0
+
+[E021_S1_y_k2] arm=S1 params=2,552,305 context=1 sampling=y_k2 device=cuda
+/data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:227: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn(
+[E021_S1_y_k2] step 500: dense_psnr=25.2551 densePSNR=25.26
+[E021_S1_y_k2] step 1000: dense_psnr=29.6483 densePSNR=29.65
+[E021_S1_y_k2] step 1500: dense_psnr=29.9643 densePSNR=29.96
+[E021_S1_y_k2] step 2000: dense_psnr=30.0875 densePSNR=30.09
+[E021_S1_y_k2] step 2500: dense_psnr=30.3732 densePSNR=30.37
+[E021_S1_y_k2] step 3000: dense_psnr=30.4087 densePSNR=30.41
+{
+  "run": "runs/E021_ladder/E021_S1_y_k2",
+  "arm": "S1",
+  "best": 30.40868478891801,
+  "final": {
+    "n_val": 98,
+    "dense_psnr": 30.40868478891801,
+    "dense_ssim": 0.796764361006873,
+    "select_metric": "dense_psnr",
+    "select_value": 30.40868478891801,
+    "select_maximise": true
+  },
+  "problems": [],
+  "config_hash": "c8fc16094af8dd9bbc1917860e4519f1d9d1ebc43ddd5971c0fe68edde1bb4a3"
+}

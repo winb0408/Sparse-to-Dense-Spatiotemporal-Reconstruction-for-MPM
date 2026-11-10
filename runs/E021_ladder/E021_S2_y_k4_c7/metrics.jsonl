@@ -1,0 +1,6 @@
+{"n_val": 98, "dense_psnr": 23.816027913774764, "dense_ssim": 0.3643447072530279, "select_metric": "dense_psnr", "select_value": 23.816027913774764, "select_maximise": true, "step": 500, "arm": "S2"}
+{"n_val": 98, "dense_psnr": 26.3074951171875, "dense_ssim": 0.4742793165603463, "select_metric": "dense_psnr", "select_value": 26.3074951171875, "select_maximise": true, "step": 1000, "arm": "S2"}
+{"n_val": 98, "dense_psnr": 27.071583533773616, "dense_ssim": 0.5805653267521032, "select_metric": "dense_psnr", "select_value": 27.071583533773616, "select_maximise": true, "step": 1500, "arm": "S2"}
+{"n_val": 98, "dense_psnr": 27.832652189293686, "dense_ssim": 0.635767118663204, "select_metric": "dense_psnr", "select_value": 27.832652189293686, "select_maximise": true, "step": 2000, "arm": "S2"}
+{"n_val": 98, "dense_psnr": 27.977118492126465, "dense_ssim": 0.6500203132021184, "select_metric": "dense_psnr", "select_value": 27.977118492126465, "select_maximise": true, "step": 2500, "arm": "S2"}
+{"n_val": 98, "dense_psnr": 27.98189338372678, "dense_ssim": 0.6503260713450763, "select_metric": "dense_psnr", "select_value": 27.98189338372678, "select_maximise": true, "step": 3000, "arm": "S2"}

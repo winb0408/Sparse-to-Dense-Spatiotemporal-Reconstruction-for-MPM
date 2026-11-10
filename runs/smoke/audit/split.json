@@ -1,0 +1,90 @@
+{
+  "config": {
+    "group_field": "mouse_id",
+    "mode": "lomo",
+    "val_groups": 1,
+    "seed": 0,
+    "test_groups": []
+  },
+  "folds": [
+    {
+      "fold": 0,
+      "test": [
+        "SYN_M1_FOV1",
+        "SYN_M1_FOV2"
+      ],
+      "groups": {
+        "test": [
+          "mouse_id:M1"
+        ],
+        "val": [
+          "mouse_id:M2"
+        ],
+        "train": [
+          "mouse_id:M3"
+        ]
+      },
+      "val": [
+        "SYN_M2_FOV1",
+        "SYN_M2_FOV2"
+      ],
+      "train": [
+        "SYN_M3_FOV1",
+        "SYN_M3_FOV2"
+      ]
+    },
+    {
+      "fold": 1,
+      "test": [
+        "SYN_M2_FOV1",
+        "SYN_M2_FOV2"
+      ],
+      "groups": {
+        "test": [
+          "mouse_id:M2"
+        ],
+        "val": [
+          "mouse_id:M3"
+        ],
+        "train": [
+          "mouse_id:M1"
+        ]
+      },
+      "val": [
+        "SYN_M3_FOV1",
+        "SYN_M3_FOV2"
+      ],
+      "train": [
+        "SYN_M1_FOV1",
+        "SYN_M1_FOV2"
+      ]
+    },
+    {
+      "fold": 2,
+      "test": [
+        "SYN_M3_FOV1",
+        "SYN_M3_FOV2"
+      ],
+      "groups": {
+        "test": [
+          "mouse_id:M3"
+        ],
+        "val": [
+          "mouse_id:M2"
+        ],
+        "train": [
+          "mouse_id:M1"
+        ]
+      },
+      "val": [
+        "SYN_M2_FOV1",
+        "SYN_M2_FOV2"
+      ],
+      "train": [
+        "SYN_M1_FOV1",
+        "SYN_M1_FOV2"
+      ]
+    }
+  ],
+  "fingerprint": "2f41252dba883111e6d4d94dc235f5f5522cf587aec901d8ede72672d87d77ac"
+}

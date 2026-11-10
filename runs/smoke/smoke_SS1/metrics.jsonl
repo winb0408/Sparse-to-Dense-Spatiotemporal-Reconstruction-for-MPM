@@ -1,0 +1,2 @@
+{"dense_psnr": 6.342908422152202, "dense_ssim": 0.010883905735681765, "n_val": 24, "holdout_loss": 0.41674642637372017, "select_metric": "holdout_loss", "select_value": 0.41674642637372017, "select_maximise": false, "step": 10, "arm": "SS1"}
+{"dense_psnr": 11.506626884142557, "dense_ssim": 0.0875224123398463, "n_val": 24, "holdout_loss": 0.23907583331068358, "select_metric": "holdout_loss", "select_value": 0.23907583331068358, "select_maximise": false, "step": 20, "arm": "SS1"}

@@ -1,0 +1,11 @@
+=== y_k4 (context 7, z_view 100) 2026-11-04 03:42
+rc=0
+=== z_k4 (context 7, z_view 100) 2026-11-04 03:44
+rc=0
+=== yz_k2x2 (context 7, z_view 100) 2026-11-04 03:46
+rc=0
+=== compare (z_view 100) 2026-11-04 03:48
+rc=0
+consistency ok: dense reference and fixed views identical across 3 protocols
+ALL_DONE
+REFIX_DONE

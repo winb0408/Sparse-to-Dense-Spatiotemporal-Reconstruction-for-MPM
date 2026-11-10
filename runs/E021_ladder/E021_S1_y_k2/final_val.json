@@ -1,0 +1,8 @@
+{
+  "n_val": 98,
+  "dense_psnr": 30.40868478891801,
+  "dense_ssim": 0.796764361006873,
+  "select_metric": "dense_psnr",
+  "select_value": 30.40868478891801,
+  "select_maximise": true
+}

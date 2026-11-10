@@ -1,0 +1,110 @@
+{
+  "target_diff": 0.0,
+  "fixed_view_diff": 0.0,
+  "groups": [
+    {
+      "level": "y_k4",
+      "target_diff": 0.0,
+      "view_diff": 0.0,
+      "input_diff": 0.0,
+      "shape_mismatch": false,
+      "view_mismatch": false
+    },
+    {
+      "level": "z_k4",
+      "target_diff": 0.0,
+      "view_diff": 0.0,
+      "input_diff": 0.0,
+      "shape_mismatch": false,
+      "view_mismatch": false
+    },
+    {
+      "level": "yz_k2x2",
+      "target_diff": 0.0,
+      "view_diff": 0.0,
+      "input_diff": 0.0,
+      "shape_mismatch": false,
+      "view_mismatch": false
+    }
+  ],
+  "sample_id": "M2_FOVII_S1_vessels",
+  "view_spec": {
+    "sample_id": "M2_FOVII_S1_vessels",
+    "shape": [
+      203,
+      256,
+      256
+    ],
+    "voxel_um": [
+      5.0,
+      0.98,
+      0.98
+    ],
+    "z_view": 101,
+    "y_view": 128,
+    "x_view": 128,
+    "roi": [
+      160,
+      0,
+      96
+    ],
+    "mip_z": [
+      0,
+      203
+    ],
+    "zoom": 96,
+    "windows": {
+      "XY primary": [
+        0.09006384015083313,
+        0.7522345185279846
+      ],
+      "XZ": [
+        0.061049906667321914,
+        1.0
+      ],
+      "YZ": [
+        0.052993076667189595,
+        1.0
+      ],
+      "Zoom": [
+        0.0905548069626093,
+        0.956207180023193
+      ],
+      "MIP-z": [
+        0.8218685388565063,
+        1.0
+      ]
+    },
+    "fingerprint": {
+      "files": {
+        "index": {
+          "path": "data_local/dryad_cache/index_cohort.json",
+          "bytes": 8060,
+          "mtime": 1793370347
+        },
+        "split": {
+          "path": "spur_mpm/experiments/E020_cohort/split.json",
+          "bytes": 949,
+          "mtime": 1793370331
+        }
+      },
+      "config_sha256": "6627ebc075676a2ad2ba2bb653f92191afcf87ca16b6246c40e8a0eb318d84f4"
+    },
+    "projection": "none (single XY/XZ/YZ slices; mip_z kept for a future projection)"
+  },
+  "protocols": [
+    "y_k4",
+    "z_k4",
+    "yz_k2x2"
+  ],
+  "measured_fraction": {
+    "y_k4": 0.25,
+    "z_k4": 0.2512315270935961,
+    "yz_k2x2": 0.2512315270935961
+  },
+  "context_depth": {
+    "y_k4": 7,
+    "z_k4": 7,
+    "yz_k2x2": 7
+  }
+}

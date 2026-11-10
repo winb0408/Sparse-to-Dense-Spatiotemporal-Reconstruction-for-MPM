@@ -1,0 +1,438 @@
+{
+  "sample_id": "M2_FOVII_S1_vessels",
+  "fold": 0,
+  "sampling": "yz_k2x2",
+  "sampling_fraction": 0.25,
+  "mask_geometry": {
+    "measured_fraction": 0.2512,
+    "kept_y_rows": 128,
+    "y_period": 2,
+    "x_dense": false,
+    "y_dense": false,
+    "z_dense": false,
+    "z_planes_measured": 102,
+    "z_planes_total": 203,
+    "row_pattern": "10101010",
+    "per_plane_fraction": [
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5,
+      0.0,
+      0.5
+    ]
+  },
+  "input_support": "full",
+  "consistency_projection": "none",
+  "context_depth": 7,
+  "view_spec": {
+    "sample_id": "M2_FOVII_S1_vessels",
+    "shape": [
+      203,
+      256,
+      256
+    ],
+    "voxel_um": [
+      5.0,
+      0.98,
+      0.98
+    ],
+    "z_view": 101,
+    "y_view": 128,
+    "x_view": 128,
+    "roi": [
+      160,
+      0,
+      96
+    ],
+    "mip_z": [
+      0,
+      203
+    ],
+    "zoom": 96,
+    "windows": {
+      "XY primary": [
+        0.09006384015083313,
+        0.7522345185279846
+      ],
+      "XZ": [
+        0.061049906667321914,
+        1.0
+      ],
+      "YZ": [
+        0.052993076667189595,
+        1.0
+      ],
+      "Zoom": [
+        0.0905548069626093,
+        0.956207180023193
+      ],
+      "MIP-z": [
+        0.8218685388565063,
+        1.0
+      ]
+    },
+    "fingerprint": {
+      "files": {
+        "index": {
+          "path": "data_local/dryad_cache/index_cohort.json",
+          "bytes": 8060,
+          "mtime": 1793370347
+        },
+        "split": {
+          "path": "spur_mpm/experiments/E020_cohort/split.json",
+          "bytes": 949,
+          "mtime": 1793370331
+        }
+      },
+      "config_sha256": "d08a74026ef112380e269f23898fc156fba20eb7517c180a8bbab62a502daf75"
+    },
+    "projection": "none (single XY/XZ/YZ slices; mip_z kept for a future projection)"
+  },
+  "columns": [
+    {
+      "key": "XY primary",
+      "axis": "xy",
+      "coord": 101,
+      "role": "fixed",
+      "note": "z=101"
+    },
+    {
+      "key": "XZ",
+      "axis": "xz",
+      "coord": 128,
+      "role": "fixed",
+      "note": "y=128"
+    },
+    {
+      "key": "YZ",
+      "axis": "yz",
+      "coord": 128,
+      "role": "fixed",
+      "note": "x=128"
+    },
+    {
+      "key": "Zoom",
+      "axis": "zoom",
+      "coord": 101,
+      "role": "fixed",
+      "note": "z=101"
+    },
+    {
+      "key": "MIP-z",
+      "axis": "mipz",
+      "coord": 0,
+      "role": "fixed",
+      "note": "z 0-203"
+    },
+    {
+      "key": "XY measured plane",
+      "axis": "xy",
+      "coord": 100,
+      "role": "diagnostic",
+      "note": "z=100, 50% of voxels measured"
+    },
+    {
+      "key": "XY skipped plane",
+      "axis": "xy",
+      "coord": 101,
+      "role": "diagnostic",
+      "note": "z=101, 0% measured"
+    },
+    {
+      "key": "XZ measured row",
+      "axis": "xz",
+      "coord": 128,
+      "role": "diagnostic",
+      "note": "y=128, 0% measured"
+    },
+    {
+      "key": "XZ skipped row",
+      "axis": "xz",
+      "coord": 127,
+      "role": "diagnostic",
+      "note": "y=127, 0% measured"
+    }
+  ],
+  "windows": {
+    "XY primary": [
+      0.09006384015083313,
+      0.7522345185279846
+    ],
+    "XZ": [
+      0.061049906667321914,
+      1.0
+    ],
+    "YZ": [
+      0.052993076667189595,
+      1.0
+    ],
+    "Zoom": [
+      0.0905548069626093,
+      0.956207180023193
+    ],
+    "MIP-z": [
+      0.8218685388565063,
+      1.0
+    ],
+    "XY measured plane": [
+      0.08718640357255936,
+      0.7375793412327751
+    ],
+    "XY skipped plane": [
+      0.09006384015083313,
+      0.7522345185279846
+    ],
+    "XZ measured row": [
+      0.061049906667321914,
+      1.0
+    ],
+    "XZ skipped row": [
+      0.06085783615708351,
+      1.0
+    ]
+  },
+  "arms": [
+    {
+      "arm": "A0",
+      "checkpoint": null,
+      "supervision": "none",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 24.98563575744629,
+        "mae": 0.03682614862918854,
+        "ssim": 0.5156488876624647,
+        "e_measured": 0.0,
+        "e_missing": 0.04954340674093204,
+        "dice": 0.6976192543966606,
+        "cl_dice": 0.6924397367468985,
+        "pred_fraction": 0.14793456129252616,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 462.76354679802955,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0,
+        "dice_area": 0.7098451083666912
+      }
+    },
+    {
+      "arm": "S1",
+      "checkpoint": "runs/E021_ladder/E021_S1_yz_k2x2_c7/best.pt",
+      "supervision": "dense",
+      "input_is_branch_union": false,
+      "metrics_on_shown_crop": {
+        "psnr": 25.893207550048828,
+        "mae": 0.03396260365843773,
+        "ssim": 0.5713896118654993,
+        "e_measured": 0.007179193212376798,
+        "e_missing": 0.04296197984459365,
+        "dice": 0.6742100428286261,
+        "cl_dice": 0.6645013845203862,
+        "pred_fraction": 0.0835691555380234,
+        "ref_fraction": 0.163758226216133,
+        "tolerance_vox": 0.0,
+        "n_components_pred": 296.8423645320197,
+        "n_components_ref": 490.8768472906404,
+        "n_empty": 0.0,
+        "dice_area": 0.7333032430758849
+      }
+    }
+  ]
+}

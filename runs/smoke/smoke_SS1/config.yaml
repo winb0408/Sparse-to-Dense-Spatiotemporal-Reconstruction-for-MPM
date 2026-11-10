@@ -1,0 +1,74 @@
+experiment: SPUR-E003
+data:
+  index: data_local/cache/index.json
+  split: runs/smoke/audit/split.json
+  fold: 2
+  patch_hw:
+  - 64
+  - 64
+  context_slices: 1
+  context_z_um: null
+sampling:
+  mode: y
+  ky: 2
+  kz: 1
+  pattern: grid
+  seed: 0
+physics:
+  psf:
+    sigma_xy_um: 0.0
+    sigma_z_um: 0.0
+    voxel_xy_um: 0.98
+    voxel_z_um: 5.0
+  lam: 0.01
+  u_kind: geo
+  geo_mode: per_axis
+noise:
+  poisson_photons: 0.0
+  gaussian_sigma: 0.0
+  seed: 0
+selfsupervision:
+  ratio: 0.5
+  geometry: row
+model:
+  arm: SS1
+  base: 48
+  window: 8
+  depths:
+  - 2
+  - 2
+  - 2
+  heads:
+  - 4
+  - 8
+  - 16
+  features:
+  - y
+  - mask
+  - x0
+  context_depth: 1
+  n_parameters: 2552305
+train:
+  steps: 20
+  batch: 2
+  lr: 0.0002
+  weight_decay: 0.0001
+  warmup_steps: 100
+  accum: 1
+  amp: true
+  patches_per_epoch: 1000
+  num_workers: 0
+  val_every: 10
+  log_every: 10
+  ckpt_every: 500
+loss:
+  l1: 1.0
+  ms_ssim: 0.5
+  rho: charbonnier
+  dc_weight: 0.0
+eval:
+  z_stride: 1
+run:
+  seed: 0
+  device: cpu
+  out_root: runs

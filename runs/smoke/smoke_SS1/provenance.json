@@ -1,0 +1,46 @@
+{
+  "artifact_hashes": {
+    "index": "399d5065f77be8274be8e38d9554eb65183b060d63966b66f32a452c697e8e16",
+    "split": "21fce891ef3fe02e89d9fa8cdb3c1bc86809dac9fe8feb50bc048fdb975fd2c3"
+  },
+  "config_hash": "6bde0893c2387e137b93c65c78c4e1be67d4e04ce3ce5dd8588832269b821863",
+  "environment": {
+    "cuda": "12.4",
+    "numpy": "2.2.6",
+    "python": "3.10.19",
+    "scikit_image": "0.25.2",
+    "torch": "2.6.0+cu124"
+  },
+  "git": {
+    "branch": "HEAD",
+    "commit": "HEAD",
+    "dirty": true,
+    "n_dirty_files": 7
+  },
+  "hardware": {
+    "cpu_count": 64,
+    "gpus": [
+      {
+        "index": 0,
+        "name": "NVIDIA RTX A6000",
+        "total_memory_gb": 51.0
+      },
+      {
+        "index": 1,
+        "name": "NVIDIA RTX A6000",
+        "total_memory_gb": 51.0
+      },
+      {
+        "index": 2,
+        "name": "NVIDIA RTX A6000",
+        "total_memory_gb": 51.0
+      },
+      {
+        "index": 3,
+        "name": "NVIDIA RTX A6000",
+        "total_memory_gb": 51.0
+      }
+    ],
+    "platform": "Linux-5.4.0-42-generic-x86_64-with-glibc2.31"
+  }
+}
