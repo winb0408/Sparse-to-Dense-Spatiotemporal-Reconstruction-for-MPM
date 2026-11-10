@@ -33,6 +33,7 @@
 | 代码地图与三个硬性图形约束 | [`docs/CODE_MAP.md`](CODE_MAP.md) |
 | **手册验收记录**（改了什么 / 怎么复现 / 测试输出 / 图在哪 / 前后差别） | [`docs/PHASE1_ACCEPTANCE_REPORT.md`](PHASE1_ACCEPTANCE_REPORT.md) |
 | **PR #1 审查意见逐条回复**（每条给状态 + 证据路径；未完成的写清代价） | [`docs/PHASE1_AUDIT_RESPONSE.md`](PHASE1_AUDIT_RESPONSE.md) |
+| **骨架容差敏感性**（同一对掩膜、物理口径重算；解释"1 体素"在 Z 方向等于 5 µm） | `runs/E021_ladder/tolerance_sweep/tolerance_sweep.{md,json}`；`python -m spur_mpm.scripts.tolerance_sweep` 重算 |
 
 ## 一句话结论
 
@@ -50,6 +51,11 @@
   不能互相背书。
 - **可主张（量级明显，Dice 看不见）**：拓扑分量的方向相反——插值把血管打碎到参考的
   1.1–1.7 倍，S1 合并到 0.53–0.71 倍。两种错误性质不同，别用 Dice 排序。
+- **骨架分数的容差依赖**（`runs/E021_ladder/tolerance_sweep/`）：表的
+  `tolerance_vox=1` 是各向同性的，而体素是 Z 5 µm / XY 0.98 µm，所以它实际宽容了纵深
+  5 µm 的错位；换成物理口径后同一个"1"变成 0.98 µm，S1 的骨架 F1 从 0.7373 掉到 0.6951。
+  S1 相对地板的优势也随容差放宽塌缩：0 µm +0.066 → 1 µm +0.022 → 10 µm +0.004。**引用
+  骨架 F1 时必须写明容差及其口径**，否则同一份数据可以读出"明显更准"或"基本一样"。
 - 门槛：跨动物方差约 2.8 dB / 0.08 Dice，所以 < 1 dB 与 < 0.03 Dice 的差异不写结论。
 
 ## 引用整卷结构分数时必须一起引用的东西
