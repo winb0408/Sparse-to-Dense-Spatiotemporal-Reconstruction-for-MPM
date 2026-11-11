@@ -103,7 +103,8 @@ conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mp
 [`docs/PHASE1_PR2_E024_RESULTS.md`](PHASE1_PR2_E024_RESULTS.md)：**8 个臂全部落地**
 （地板 2 + residual 2 + dual 2 + 参数匹配对照 2），定性图在
 `runs/E024_dual_prior/figures/qual_y_k2/`，主结论是**否定**的（identity PSF 下
-物理分支没有可测量的独立贡献）。整卷 3D 骨架报告仍在跑，该文档没有引用骨架数字。
+物理分支没有可测量的独立贡献）。整卷 3D 骨架报告两臂八卷已落盘：均值 Dice 0.8392→0.8744，
+但四卷中三卷的 Δ 低于声称阈值、且与窗口级 Dice **符号相反**（两把尺子），故不下结论。
 **新旧两代的数字不可同列排名**（见文末两条口径陷阱）。
 
 PR2 的协议层证据（不依赖训练，已全部完成）：

@@ -1,0 +1,63 @@
+{
+  "sample_id": "M2_FOVII_S2_vessels",
+  "arm": "P2_DualW",
+  "checkpoint": "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/best.pt",
+  "shape": [
+    202,
+    512,
+    512
+  ],
+  "geometry": {
+    "sample_id": "M2_FOVII_S2_vessels",
+    "mouse_id": "2",
+    "session_id": "2",
+    "fov_id": "II",
+    "channel": "vessels",
+    "axes": "ZYX",
+    "shape": [
+      202,
+      512,
+      512
+    ],
+    "dtype": "uint16",
+    "voxel_xy_um": 0.98,
+    "z_step_um": 5.0,
+    "excitation_nm": 1340,
+    "power_mw": null,
+    "dwell_time_us": null,
+    "depth_origin_um": null,
+    "source": "/ssd1/wjb/Data/Dryad_3PM/wetransfer_data-3p_2025-11-21_1143/Data 3P/Mouse 2 FOV II/Mouse 2 FOV II Vessels Session 2.tif",
+    "extra": {},
+    "depth_span_um": 1005.0
+  },
+  "sampling": {
+    "mode": "y",
+    "ky": 2,
+    "kz": 1,
+    "pattern": "grid",
+    "seed": 0,
+    "ideal_fraction": 0.5
+  },
+  "context_depth": 1,
+  "physics": {
+    "psf": {
+      "sigma_xy_um": 0.0,
+      "sigma_z_um": 0.0,
+      "voxel_xy_um": 0.98,
+      "voxel_z_um": 5.0,
+      "sigma_xy_px": 0.0,
+      "sigma_z_px": 0.0,
+      "is_identity": true
+    },
+    "lam": 0.01,
+    "psf_source": "identity"
+  },
+  "timing": {
+    "wall_seconds": 188.388,
+    "n_planes": 202,
+    "ms_per_plane": 932.615,
+    "device": "cuda:0",
+    "includes": "index/cache load, per-sample window construction, per-plane forward pass, stacking, np.save of volume, mask and warm start"
+  },
+  "notes": "virtual sparse input; not a hardware acquisition. Volume built by stacking centre-plane predictions; see *.mask.npy for the measured support of each plane."
+}

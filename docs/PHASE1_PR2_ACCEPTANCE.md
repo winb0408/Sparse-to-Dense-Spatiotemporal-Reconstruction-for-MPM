@@ -148,10 +148,13 @@ python -m spur_mpm.scripts.framework_figure \
 - `z_k4` / `yz_k2x2` 等成本协议：`NOT_RUN`
 - 延迟 / 吞吐 / 峰值显存作为**性能**数字：`NOT_RUN`（四张卡都有别人的作业在跑，
   共卡条件下的这些数字不可比也不可复现；`scripts.benchmark` 本轮刻意不跑）
-- 整卷 3D 骨架报告：`RUNNING`（`P2_I0` 四卷已落盘，`structure_summary.{md,json}` 在
-  `runs/E024_dual_prior/structure_P2_I0/`；`P2_DualW` 四卷在跑）——结果文档 §8.2 只引用了
-  地板臂数字，**没有任何两臂比较结论**；并列表工具 `scripts/compare_structure.py` 已就绪
-  （4 项单测）
+- 整卷 3D 骨架报告：`DONE`（两臂八卷全部落盘，`structure_P2_I0/`、`structure_P2_DualW/`；
+  并列表 `runs/E024_dual_prior/structure_compare.md`，工具 `scripts/compare_structure.py`
+  + 4 项单测）。数字见 `docs/PHASE1_PR2_E024_RESULTS.md` §8.2：均值 Dice 0.8392 → 0.8744
+  （+0.0352），但**四卷中有三卷的 Δ 低于 0.03 声称阈值、且单动物**，故该节不下结论；
+  该节同时记录了与窗口级 Dice 的**符号相反**及其原因（两把尺子）
+- 整卷骨架在**同一操作点**上的受控重算：`NOT_RUN`（判定符号相反是操作点还是结构差异所需；
+  未跑，故不得写"训练臂结构更好"）
 - 定性图：`DONE`（`runs/E024_dual_prior/figures/qual_y_k2/`，6 列同 ViewSpec，
   读法与三条注意事项见 `docs/PHASE1_PR2_E024_RESULTS.md` §8.1）
 - `P2_DualWU` / `P2_DualWUT` / `P2_TopoConf`：`TODO`（前者需标定 H，后两者属 T3/T5）
