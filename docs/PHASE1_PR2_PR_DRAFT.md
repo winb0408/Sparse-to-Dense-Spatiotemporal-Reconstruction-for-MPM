@@ -2,8 +2,9 @@
 
 **Base:** `PUR-MPM`  
 **Head:** `feature/phase1-dual-prior-20261110`  
-**状态：** Draft。T0/T1/T2 的代码与单测已完成（396 项全绿）；**真实数据实验进行中（首次）**
-（四张 GPU 被其他用户占用）。未完成真实训练验收前不得合并。
+**状态：** Draft。T0/T1/T2 的代码与单测已完成（396 项全绿）；**E024 的 8 个臂已在真实数据上跑完**
+（fold 0 / `y_k2` / 758 窗口），主结论是**否定**的：identity PSF 下物理分支没有可测量的独立贡献。
+整卷 3D 骨架报告仍在跑，本文不引用任何骨架数字。验收人复核前不得合并。
 
 > 本文件即 PR 描述正文；下文链接均为**仓库根目录相对路径**（GitHub 上可直接点开）。
 
@@ -13,13 +14,59 @@
 | T1 物理语义分离 | `UNIT_TESTED` | `test_physics_prior_contract.py`（30）、`physics/prior.py` |
 | T2 双分支残差模型 | `UNIT_TESTED` | `test_dual_branch_contract.py`（38）、`models/dual_prior_reconstructor.py` |
 | T3 结构/拓扑损失 | `TODO` | — |
-| T4 真实实验（E024） | `RUNNING`（首次真实训练；结果落地后回填） | 脚本 `spur_mpm/experiments/run_e024.sh`，说明 `docs/PHASE1_PR2_RUNBOOK.md` |
+| T4 真实实验（E024） | `GPU_VALIDATED`：8 臂全部落地（fold 0 / `y_k2` / s0 / 758 窗口） | `docs/PHASE1_PR2_E024_RESULTS.md`、`runs/E024_dual_prior/` |
 | T5 不确定性与任务适配器 | `TODO`（`U_sampling/U_physics` 特征已存在） | — |
 | T6 清理执行 | `TODO`（只有 dry-run 清单） | — |
 
 逐条清单：[`docs/PHASE1_PR2_ACCEPTANCE.md`](docs/PHASE1_PR2_ACCEPTANCE.md)；
 方法口径：[`docs/PHASE1_PR2_METHOD_SPEC.md`](docs/PHASE1_PR2_METHOD_SPEC.md)；
 可执行命令：[`docs/PHASE1_PR2_RUNBOOK.md`](docs/PHASE1_PR2_RUNBOOK.md)。
+
+## E024 真实结果（fold 0 / `y_k2` / s0 / 758 窗口 / 单动物 M2）
+
+| 臂 | 参数量 | PSNR | PSNR(missing) | SSIM | e_missing | Dice | Dice★ | clDice★ | pred_frac |
+|---|---|---|---|---|---|---|---|---|---|
+| `P2_I0` 纯插值地板 | 0 | 27.8118 | 24.8015 | 0.6891 | 0.0452 | 0.7440 | 0.7433 | 0.7372 | 0.1871 |
+| `P2_W0` 插值+Wiener | 0 | 27.8118 | 24.8015 | 0.6891 | 0.0452 | 0.7440 | 0.7433 | 0.7372 | 0.1871 |
+| `P2_Direct` | 1.710 M | 29.2342 | 26.2581 | 0.7572 | 0.0382 | 0.7347 | 0.7618 | 0.7602 | 0.1129 |
+| `P2_ResidualI` | 1.711 M | 29.4132 | 26.4031 | 0.7629 | 0.0376 | 0.7366 | 0.7683 | 0.7684 | 0.1041 |
+| `P2_DualI` | 2.974 M | 29.4257 | 26.4154 | 0.7635 | 0.0375 | 0.7340 | 0.7685 | 0.7684 | 0.1014 |
+| `P2_DualW` | 2.976 M | 29.4121 | 26.4019 | 0.7631 | 0.0375 | 0.7343 | 0.7685 | 0.7685 | 0.1017 |
+| `P2_DualW` ctrl=zeros | 2.976 M | 29.3209 | 26.3117 | 0.7598 | 0.0379 | 0.7356 | 0.7648 | 0.7650 | 0.1087 |
+| `P2_DualW` ctrl=shuffle | 2.976 M | 29.4031 | 26.3931 | 0.7626 | 0.0377 | 0.7370 | 0.7679 | 0.7680 | 0.1047 |
+
+四条结论，按可声称的强度排序：
+
+1. **地板 → 学习残差是唯一跨过声称阈值的一级**：`ΔPSNR(missing) +1.60 dB`、`ΔSSIM +0.074`。
+   再往上加第二个分支**完全饱和**（`DualI` 比 `ResidualI` 只多 0.012 dB）。
+2. **Gate 2 的结论是否定的**：`DualW − DualI = −0.013 dB`、`DualW − ctrlzeros = +0.090 dB`，
+   都远低于 1 dB / 0.03 Dice 的声称阈值。**在 identity PSF 下，物理分支装的是什么内容
+   无关紧要**——关闭分支、喂零、打乱，三者差异只有 0.09 dB 量级。因此本 PR 不声称
+   Wiener 反卷积的独立增益；这一条要等有真实标定的 PSF 才能改。
+3. **PSNR 与结构指标分道扬镳**：PSNR 涨 1.6 dB 的同时，原始 Dice 反而略降
+   （0.7440 → 0.7343）。按面积归一后的 Dice★ 才涨。诊断（758 窗口 + 第二个独立 256×256
+   窗口）都指向**欠分割**：`pred_frac` 从 0.1871 掉到 0.1017，参考是 0.1676。
+4. **深度分层下，深部是结构性失败**：0–600 µm 的 `ΔDice` 为 `+0.011…+0.017`，
+   600–1000 µm 为 `−0.034…−0.072`（自助区间均不含 0）；而同一批深部窗口 PSNR 涨了
+   1.65 dB。**只看 PSNR 会把最差的层读成改善最大的层。**
+
+定性图（六列同 ViewSpec，`A0` 与 `P2_I0` 在 11 项指标上逐位相等，是 identity PSF 的
+可视证据）：`runs/E024_dual_prior/figures/qual_y_k2/`，读法见
+[`docs/PHASE1_PR2_E024_RESULTS.md`](docs/PHASE1_PR2_E024_RESULTS.md) §8.1。
+
+**本节的数字不能这样用**：单折单种子单动物（`ci_estimable=false`，跨动物结论一句都没有）；
+不能当作延迟/吞吐/峰值显存的性能证据（四张卡都有其他用户的作业在共卡，本轮刻意不跑
+`scripts.benchmark`）；`A*/S*` 旧代的数字不可与新代同列排名。
+
+## 一次被自己抓到并修掉的错数字
+
+`collect_results` 原本以 `arm` 为键，于是 `P2_DualW`、`P2_DualW[ctrl=zeros]`、
+`P2_DualW[ctrl=shuffle]` 三个 run 被并成一列：表头拿的是先被 `next()` 碰到的那个
+（`ctrl=shuffle`，29.4031），跨动物均值把一只动物数成 `n=3`。修法是让列头唯一确定
+产生它的 run（`_label`）、歧义**报错而不是猜**，并把 `model_control` 从 checkpoint 旁的
+`config.yaml` **推导**出来回填（`spur_mpm/scripts/backfill_model_control.py`，默认 dry-run、
+冲突则拒绝）。6 项单测钉住这条规则（`test_collect_results_variant.py`）。
+**教训：参数匹配对照恰恰是最容易被表格张冠李戴的对象。**
 
 ## 背景 / Research positioning
 
@@ -69,5 +116,13 @@ SPUR-MPM 的研究目标是**多光子显微成像的通用稀疏重建**，而�
 | `31c8434` | T1：`I0` 与 `W0` 分离，FFT 前填满所有缺失轴 |
 | `957a7df` | T2：双分支重建器、`P2_*` 臂族、输出契约 |
 | `06f0662` | 归因链补齐 + 方法书/执行手册/验收清单 + 地板冒烟证据 + `run_e024.sh` |
+| `65d9d90`…`2e875b9` | T4：GPU 2 变成现量的阈值、每卡一个作业、每次训练记录实测显存、断点续跑 |
+| `040722c`…`ac864bc` | E024 第一批真实数字、欠分割诊断、深部结构性失败 |
+| `a79d6cf` | 修 `collect_results` 的列头歧义（对照臂被并进头条）+ `model_control` 回填 |
+| `82b734a` | 结果文档补产物清单与定性图读法；验收清单把骨架报告改回 `RUNNING` |
+| `7590d8a` | 把八臂的 `summary.json`/`samples.csv`、主表与定性图纳入版本库（`runs/` 被 ignore，需 `-f`） |
 
-本次提交包含 T0–T2 的代码、单测、归档报告与三份文档。GPU 实验尚未执行，所有真实数据结果为 `NOT_RUN`，理由与证据见 `docs/PHASE1_PR2_ACCEPTANCE.md`。
+本次 PR 包含 T0–T2 的代码与单测、E024 的 8 臂真实结果与全部证据文件、归档报告与六份文档。
+仍未执行的项（T3 损失、T5 不确定性与拓扑适配器、T6 实际清理、折 1–2、`z_k4`/`yz_k2x2`、
+性能基准）逐条列在 [`docs/PHASE1_PR2_ACCEPTANCE.md`](docs/PHASE1_PR2_ACCEPTANCE.md) §7，
+**未实际运行的项一律没有标成完成**。
