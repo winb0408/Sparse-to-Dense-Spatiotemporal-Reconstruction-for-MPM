@@ -18,13 +18,17 @@
 #
 # Usage:
 #   DRY=1 bash spur_mpm/experiments/run_e024.sh                    # what would run
-#   GPUS=0,1,2 bash spur_mpm/experiments/run_e024.sh               # actually run
-#   STAGE=dual GPUS=0,1,2 SEEDS="0 1 2" bash spur_mpm/experiments/run_e024.sh
+#   GPUS=0,1 bash spur_mpm/experiments/run_e024.sh                 # actually run
+#   STAGE=dual GPUS=0,3 SEEDS="0 1 2" bash spur_mpm/experiments/run_e024.sh
+#   SKIP_DONE=1 STAGE=all GPUS=0 DRY=0 bash spur_mpm/experiments/run_e024.sh
+#                                                       # fill in what is missing
 #
-# Two rules this script refuses to break:
+# Three rules this script refuses to break:
 #   * no GPU list => no run. A card carrying someone else's job is not a
 #     benchmarking device, and quietly falling back to GPU 0 is how a timing
 #     number becomes meaningless.
+#   * GPU 2 is not ours to fill. It has hung and restarted this server when
+#     occupied, so it is refused outright (ALLOW_GPU2=1 to override on purpose).
 #   * DRY is the default. Writing this file must not launch anything.
 set -u
 cd "$(dirname "$0")/../.."
@@ -60,9 +64,32 @@ EXTRA=("$@")
 
 read -r -a GPU_LIST <<< "${GPUS//,/ }"
 if [[ "$DRY" != "1" && ${#GPU_LIST[@]} -eq 0 ]]; then
-  echo "refusing to run: set GPUS=0,1,2 (physical indices you own)" >&2
+  echo "refusing to run: set GPUS=0,1 (physical indices you own)" >&2
   exit 2
 fi
+
+# GPU 2 is excluded by policy, not by taste. Filling it has hung this server
+# and triggered an unattended restart, which takes down every other user's job
+# as well as ours -- a shared machine does not owe us a card that survives our
+# footprint. This is a hard stop rather than a warning because "I'll remember
+# not to" is exactly the guarantee that failed last time; ALLOW_GPU2=1 exists
+# only so that breaking the rule is a visible act, not a forgotten one.
+if [[ " ${GPU_LIST[*]} " == *" 2 "* && "${ALLOW_GPU2:-0}" != "1" ]]; then
+  echo "refusing to use GPU 2: fully occupying it has hung and restarted this" >&2
+  echo "server before. Use the other cards, or set ALLOW_GPU2=1 deliberately." >&2
+  exit 2
+fi
+
+# A filled-in ladder is the common case for a second launch: some stages have
+# results, others were interrupted. SKIP_DONE=1 makes `STAGE=all` mean "finish
+# what is missing" instead of "redo six hours of finished work". A run counts
+# as done only when both the checkpoint and its test summary exist -- a
+# checkpoint without a summary is a half-run, and re-doing it is cheaper than
+# reporting a number nobody can trace.
+SKIP_DONE="${SKIP_DONE:-0}"
+is_done () {   # is_done <run_name>
+  [[ -s "$OUT/$1/best.pt" && -s "$OUT/$1_test/summary.json" ]]
+}
 
 common=(--config "$CFG"
         --set data.index="$INDEX" --set data.split="$SPLIT"
@@ -73,6 +100,10 @@ common=(--config "$CFG"
 run_one () {   # run_one <run_name> <arm> <fold> <seed> <gpu> [extra args...]
   local name=$1 arm=$2 fold=$3 seed=$4 gpu=$5
   shift 5
+  if [[ "$SKIP_DONE" == "1" && "$DRY" != "1" ]] && is_done "$name"; then
+    echo "skip $name (checkpoint and test summary both present)"
+    return 0
+  fi
   local cmd=(python -m spur_mpm.train --arm "$arm" --fold "$fold" --seed "$seed"
              --name "$name" --out-root "$OUT" "${common[@]}" "${EXTRA[@]}"
              "$@")
@@ -105,6 +136,10 @@ eval_only () {  # eval_only <run_name> <arm> <fold> <seed> <gpu> [extra...]
   # Parameter-free arms: no checkpoint, no training, just the operator.
   local name=$1 arm=$2 fold=$3 seed=$4 gpu=$5
   shift 5
+  if [[ "$SKIP_DONE" == "1" && "$DRY" != "1" && -s "$OUT/${name}_test/summary.json" ]]; then
+    echo "skip $name (floor summary present)"
+    return 0
+  fi
   local cmd=(python -m spur_mpm.evaluate --config "$CFG" --arm "$arm"
              --fold "$fold" --seed "$seed" --split test
              --out "$OUT/${name}_test" --set data.index="$INDEX"

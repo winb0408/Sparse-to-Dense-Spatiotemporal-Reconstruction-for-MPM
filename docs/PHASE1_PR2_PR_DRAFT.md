@@ -2,7 +2,7 @@
 
 **Base:** `PUR-MPM`  
 **Head:** `feature/phase1-dual-prior-20261110`  
-**状态：** Draft。T0/T1/T2 的代码与单测已完成（362 项全绿）；**真实数据实验全部 `NOT_RUN`**
+**状态：** Draft。T0/T1/T2 的代码与单测已完成（384 项全绿）；**真实数据实验进行中（首次）**
 （四张 GPU 被其他用户占用）。未完成真实训练验收前不得合并。
 
 > 本文件即 PR 描述正文；下文链接均为**仓库根目录相对路径**（GitHub 上可直接点开）。
@@ -13,7 +13,7 @@
 | T1 物理语义分离 | `UNIT_TESTED` | `test_physics_prior_contract.py`（30）、`physics/prior.py` |
 | T2 双分支残差模型 | `UNIT_TESTED` | `test_dual_branch_contract.py`（38）、`models/dual_prior_reconstructor.py` |
 | T3 结构/拓扑损失 | `TODO` | — |
-| T4 真实实验（E024） | `NOT_RUN` | 脚本 `spur_mpm/experiments/run_e024.sh`，说明 `docs/PHASE1_PR2_RUNBOOK.md` |
+| T4 真实实验（E024） | `RUNNING`（首次真实训练；结果落地后回填） | 脚本 `spur_mpm/experiments/run_e024.sh`，说明 `docs/PHASE1_PR2_RUNBOOK.md` |
 | T5 不确定性与任务适配器 | `TODO`（`U_sampling/U_physics` 特征已存在） | — |
 | T6 清理执行 | `TODO`（只有 dry-run 清单） | — |
 
@@ -39,7 +39,7 @@ SPUR-MPM 的研究目标是**多光子显微成像的通用稀疏重建**，而�
 
 ## 测试与验收证据 / Proof required
 
-- [x] `pytest spur_mpm/tests -q` 通过（362 项，`EXIT=0`），日志 `docs/evidence/pytest_20261110_T0_T2.log`；新增 physics/dualbranch/archive safety 三组单测。
+- [x] `python -m pytest spur_mpm/tests -o addopts="" -q` 通过（384 项，`EXIT=0`），日志 `docs/evidence/pytest_20261111_T0_T2_guard.log`；新增 physics / dual-branch / archive safety / PSF estimate / run-guard 五组单测。
 - [x] Mask 洞值探针：修改未测 GT 不改变任何模型输入；Z 边界不读取未采样密集邻层。
 - [x] `H=I => W0 == I0`（逐位，不是近似；真实数据上一并验证）；非恒等 H 先填洞后反卷积、无 NaN/Inf。λ/边界稳定性做成 phantom 扫描的部分仍 `TODO`。
 - [x] 残差模型初始化 `R ≡ 0`；两个分支第 1 步都有梯度；hard consistency 仅在含 `y/mask` 的臂上可用。

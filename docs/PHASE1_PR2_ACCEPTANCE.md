@@ -7,7 +7,7 @@
 
 ## 一句话状态
 
-代码与单测已完成并通过（362 项全绿，`docs/evidence/pytest_20261110_T0_T2.log`）；
+代码与单测已完成并通过（384 项全绿，`docs/evidence/pytest_20261111_T0_T2_guard.log`）；
 **全部 GPU 训练与真实数据头条结果 `NOT_RUN`**——四张 A6000 都被其他用户的作业占用，
 带别人作业的卡不是基准设备。零参数地板已在真实数据上做过 CPU 冒烟（见 §3）。
 
@@ -77,6 +77,8 @@
 | T3 图像域 `L_rec`（Charbonnier + 缺失区加权） | `TODO` | 当前用既有 `ReconstructionLoss`（L1 + MS-SSIM），与旧臂一致以保公平 |
 | T3 结构/拓扑损失 | `TODO` | 计划中排在 Gate 2 通过之后 |
 | T4 E024 真实实验与报告 | `NOT_RUN` | 脚本已备：`spur_mpm/experiments/run_e024.sh` |
+| T4 GPU 2 硬拒绝（占满会卡死服务器） | `UNIT_TESTED` | `run_e024.sh` 在第一个作业前 `exit 2`；`test_run_e024_guard.py` 4 项；日志见 `Project log/Project_log.md` 2026-11-11 |
+| T4 断点续跑 `SKIP_DONE=1`（checkpoint + 测试汇总同时存在才算完成） | `UNIT_TESTED` | `run_e024.sh::is_done`；`test_run_e024_guard.py` 2 项 |
 | T4 `run_ladder.py` 的 `pr2` stage | `TODO` | 本轮用独立脚本驱动；并入 ladder 之前需先有 E024 结果 |
 | T5 `U_sampling` / `U_physics` 特征 | `CODE_DONE` + `UNIT_TESTED` | 已作为输入特征存在；**不是校准概率** |
 | T5 `u_model`（集成/MC dropout） | `TODO` | — |
@@ -89,11 +91,12 @@
 
 | 项 | 值 |
 |---|---|
-| 全量回归 | 362 项，`EXIT=0`，`docs/evidence/pytest_20261110_T0_T2.log`（日志自带 `362 passed` 汇总行，不需要数点） |
+| 全量回归 | 384 项，`EXIT=0`，`docs/evidence/pytest_20261111_T0_T2_guard.log`（日志自带 `384 passed` 汇总行，不需要数点） |
 | 新增 `test_physics_prior_contract.py` | 30 |
 | 新增 `test_dual_branch_contract.py` | 38 |
 | 新增 `test_archive_safety.py`（T0 提交） | 21 |
 | 新增 `test_psf_estimate.py` | 16（含 4 条 λ 稳定性） |
+| 新增 `test_run_e024_guard.py` | 6（GPU 2 拒绝 ×3、无 `GPUS=` 拒绝、`SKIP_DONE` 语义 ×2） |
 | 真实数据地板冒烟 | `docs/evidence/smoke_floors_20261110/`（3 份 summary + README） |
 | 真实数据 PSF 估计 | `docs/evidence/psf_estimate_20261110/`（`psf_estimate.{json,md}`） |
 | Fig. 2 重绘 | `spur_mpm/figures/framework/fig2_{pipeline,ablation_matrix}.png` + `fig2_provenance.json` |

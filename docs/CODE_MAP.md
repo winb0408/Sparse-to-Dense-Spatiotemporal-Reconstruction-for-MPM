@@ -179,10 +179,10 @@ python -m spur_mpm.scripts.qualitative_figures --compare runs/compare_y_z_yz.jso
 
 # 7) PR2 双先验阶梯（默认 dry-run，必须显式给 GPUS；顺序不可跳）
 DRY=1 STAGE=all bash spur_mpm/experiments/run_e024.sh
-GPUS=0,1,2 DRY=0 STAGE=floors bash spur_mpm/experiments/run_e024.sh
-GPUS=0,1,2 DRY=0 STAGE=residual bash spur_mpm/experiments/run_e024.sh
-GPUS=0,1,2 DRY=0 STAGE=dual bash spur_mpm/experiments/run_e024.sh
-GPUS=0,1,2 DRY=0 STAGE=controls bash spur_mpm/experiments/run_e024.sh
+GPUS=0,1,3 DRY=0 STAGE=floors bash spur_mpm/experiments/run_e024.sh
+GPUS=0,1,3 DRY=0 STAGE=residual bash spur_mpm/experiments/run_e024.sh
+GPUS=0,1,3 DRY=0 STAGE=dual bash spur_mpm/experiments/run_e024.sh
+GPUS=0,1,3 DRY=0 STAGE=controls bash spur_mpm/experiments/run_e024.sh
 #    protocol 由 MODE/KY/KZ/CONTEXT 决定，run 目录标签随之生成（不会出现
 #    目录叫 y_k2 而实际跑的是 yz_k2x2）；完整说明见 docs/PHASE1_PR2_RUNBOOK.md
 ```

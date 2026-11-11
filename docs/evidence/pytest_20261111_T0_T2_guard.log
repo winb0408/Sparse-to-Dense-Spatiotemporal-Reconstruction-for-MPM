@@ -1,0 +1,14 @@
+# pytest, full suite, 2026-11-11, after the GPU-2 guard + SKIP_DONE.
+# Command: python -m pytest spur_mpm/tests -o addopts="" -q
+#   -o addopts="" is required: pytest.ini already passes -q, and a second
+#   -q makes it -qq, which drops the 'N passed' line and invites counting dots.
+# Covers: T0 archive safety, T1 physics prior, T2 dual branch, PSF estimate
+#   (incl. Gate-1 lambda stability), and the run_e024.sh guards.
+
+........................................................................ [ 18%]
+........................................................................ [ 37%]
+........................................................................ [ 56%]
+........................................................................ [ 75%]
+........................................................................ [ 93%]
+........................                                                 [100%]
+384 passed in 41.40s

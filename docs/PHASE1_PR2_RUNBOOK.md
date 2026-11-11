@@ -19,6 +19,9 @@ python -m pytest spur_mpm/tests -o addopts="" -q; echo "EXIT=$?"
 #     与别人的作业共卡时，训练精度结论仍然有效，但延迟/吞吐/峰值显存一律不可报。
 nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu \
           --format=csv
+#     **GPU 2 不要用。** 它被占满会让整台服务器卡死并触发无人值守重启，
+#     把别人的作业一起带走。`run_e024.sh` 已把这条写成硬拒绝（见下），
+#     不是靠记性。
 
 # (3) 物理先验的来源必须写在命令里。identity 之外的 H 缺 psf_source 会被第一个 batch 拒掉；
 #     本队列没有标定，自估值用 estimated_from_data，理由见 PSF_ESTIMATE 文档。
@@ -33,6 +36,36 @@ DRY=1 STAGE=all bash spur_mpm/experiments/run_e024.sh
 第 (4) 步的 dry-run 是默认行为：`run_e024.sh` 不给 `GPUS=` 就只打印、不执行，
 也不存在"静默回退到 GPU 0"的分支。这条是 T0 归档纪律在训练侧的对应物。
 
+### 0.1 GPU 2 是硬拒绝，不是建议
+
+```bash
+GPUS=0,2 DRY=0 STAGE=dual bash spur_mpm/experiments/run_e024.sh
+# refusing to use GPU 2: fully occupying it has hung and restarted this
+# server before. Use the other cards, or set ALLOW_GPU2=1 deliberately.
+# rc=2
+```
+
+写进脚本而不是写进文档的理由很简单：这条约束原本只在人的记忆里，而上一轮
+正是在这里失了手——把 `P2_ResidualI` 起在了 GPU 2 上。硬拒绝在**第一个作业
+之前**退出（`DRY=1` 的打印也一样），所以它不会先跑起来再提醒。
+`ALLOW_GPU2=1` 保留了一个显式出口，是为了让"破例"成为一个看得见的动作，
+而不是一次忘记。
+
+`spur_mpm/tests/test_run_e024_guard.py`（6 项）把四条规则钉住：任意位置的
+`2` 都拒、dry-run 也拒、覆写必须显式、无 `GPUS=` 不跑。
+
+### 0.2 断点续跑：`SKIP_DONE=1`
+
+阶梯被打断后重开，最贵的错误是把已经跑完的 6 小时再跑一遍：
+
+```bash
+SKIP_DONE=1 STAGE=all GPUS=0 DRY=0 bash spur_mpm/experiments/run_e024.sh
+```
+
+一个 run 只有在 **`best.pt` 与 `<name>_test/summary.json` 同时存在**时才算完成。
+只有 checkpoint 没有测试汇总的是半跑，宁可重跑——半个 run 报出来的数字没人能溯源。
+跳过的 run 会在输出里逐个打印 `skip <name>`，所以"这一轮跑了什么"仍然可读。
+
 `run_e024.sh` 的两级顺序：**跨阶段严格串行**（residual → dual → controls，前一阶段
 全部成功才进下一阶段），**同阶段多臂并行**（同一阶段内各臂互相独立，按 `GPUS=`
 轮转铺开）。前一阶段任一 run 失败，脚本以非零码退出而不是继续——"在缺失的地板上
@@ -43,7 +76,7 @@ DRY=1 STAGE=all bash spur_mpm/experiments/run_e024.sh
 ## 1. 零参数地板（不需要训练，最先跑）
 
 ```bash
-GPUS=0,1,2 DRY=0 STAGE=floors bash spur_mpm/experiments/run_e024.sh
+GPUS=0,1,3 DRY=0 STAGE=floors bash spur_mpm/experiments/run_e024.sh
 ```
 
 跑 `P2_I0`（纯插值）与 `P2_W0`（`wiener_fill_all`）在 test 划分上的指标，
@@ -92,9 +125,9 @@ OUT=runs/E025_psf_stress GPUS=0 STAGE=floors DRY=0 \
 ## 2. 训练阶梯（按顺序，不可跳）
 
 ```bash
-GPUS=0,1,2 DRY=0 STAGE=residual bash spur_mpm/experiments/run_e024.sh   # P2_Direct, P2_ResidualI
-GPUS=0,1,2 DRY=0 STAGE=dual     bash spur_mpm/experiments/run_e024.sh   # P2_DualI,  P2_DualW
-GPUS=0,1,2 DRY=0 STAGE=controls bash spur_mpm/experiments/run_e024.sh   # P2_DualW x {zeros, shuffle}
+GPUS=0,1,3 DRY=0 STAGE=residual bash spur_mpm/experiments/run_e024.sh   # P2_Direct, P2_ResidualI
+GPUS=0,1,3 DRY=0 STAGE=dual     bash spur_mpm/experiments/run_e024.sh   # P2_DualI,  P2_DualW
+GPUS=0,1,3 DRY=0 STAGE=controls bash spur_mpm/experiments/run_e024.sh   # P2_DualW x {zeros, shuffle}
 ```
 
 顺序的理由（每个"先"都对应一个必须先存在的对照）：
@@ -134,13 +167,13 @@ GPUS=0,1,2 DRY=0 STAGE=controls bash spur_mpm/experiments/run_e024.sh   # P2_Dua
 **只对进入下一轮的臂**补种子：
 
 ```bash
-STAGE=dual GPUS=0,1,2 DRY=0 SEEDS="0 1 2" bash spur_mpm/experiments/run_e024.sh
+STAGE=dual GPUS=0,1,3 DRY=0 SEEDS="0 1 2" bash spur_mpm/experiments/run_e024.sh
 ```
 
 三种 25% 预算的等成本对比（`y_k4` / `z_k4` / `yz_k2x2`，7 层上下文）用同一份脚本换协议参数：
 
 ```bash
-OUT=runs/E024_matched SEEDS=0 GPUS=0,1,2 DRY=0 STAGE=dual \
+OUT=runs/E024_matched SEEDS=0 GPUS=0,1,3 DRY=0 STAGE=dual \
   bash spur_mpm/experiments/run_e024.sh \
   --set sampling.mode=yz --set sampling.ky=2 --set sampling.kz=2 \
   --set data.context_slices=7
