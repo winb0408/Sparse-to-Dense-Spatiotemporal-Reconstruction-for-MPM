@@ -89,8 +89,8 @@
 ## 环境
 
 conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -o addopts="" -q`
-（**390 项，全绿**；日志 `docs/evidence/pytest_20261111_T0_T2_guard.log`。`-o addopts=""` 是必需的：
-`pytest.ini` 已经带 `-q`，命令行再加一个 `-q` 会变成 `-qq`、把 `390 passed` 那行一起吞掉，
+（**396 项，全绿**；日志 `docs/evidence/pytest_20261111_T0_T2_guard.log`。`-o addopts=""` 是必需的：
+`pytest.ini` 已经带 `-q`，命令行再加一个 `-q` 会变成 `-qq`、把 `396 passed` 那行一起吞掉，
 只留下点阵。上一轮为 245 项，
 本轮新增 `test_physics_prior_contract.py` 30 项、`test_dual_branch_contract.py` 38 项、
 `test_archive_safety.py` 21 项、`test_psf_estimate.py` 16 项、

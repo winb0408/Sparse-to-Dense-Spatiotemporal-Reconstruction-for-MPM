@@ -1,20 +1,12 @@
-# pytest, full suite, 2026-11-11, current state of this branch.
-# Command: python -m pytest spur_mpm/tests -o addopts="" -q
-#   -o addopts="" is required: pytest.ini already passes -q, and a second
-#   -q makes it -qq, which drops the 'N passed' line and invites counting dots.
-# Covers: T0 archive safety, T1 physics prior, T2 dual branch, PSF estimate
-#   (incl. Gate-1 lambda stability), and the run_e024.sh launch guards
-#   (GPU-2 occupancy threshold, no silent default card, SKIP_DONE, one job
-#   per card).
-#
-# Supersedes the earlier logs from today: 362 -> 378 (PSF) -> 384 -> 388 ->
-# 390 as the guard tests grew with the rules. Each earlier version is still
-# in git history next to the commit it belonged to.
-
+# Full regression, regenerated 2026-11-12 after the E024 control-label fix.
+# `-o addopts=""` is required: pytest.ini already passes -q, and a second -q
+# becomes -qq, which drops the "N passed" line and leaves dots as the evidence.
+# This file supersedes earlier versions; each is still in git history next to
+# the commit that changed the count.
 ........................................................................ [ 18%]
 ........................................................................ [ 36%]
-........................................................................ [ 55%]
-........................................................................ [ 73%]
-........................................................................ [ 92%]
-..............................                                           [100%]
-390 passed in 41.44s
+........................................................................ [ 54%]
+........................................................................ [ 72%]
+........................................................................ [ 90%]
+....................................                                     [100%]
+396 passed in 31.63s

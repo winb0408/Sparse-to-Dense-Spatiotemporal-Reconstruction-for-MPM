@@ -305,6 +305,16 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         "supervision": arm.supervision,
         "input_support": input_support,
         "consistency_projection": projection,
+        # The arm name alone does not identify a run: a parameter-matched
+        # physics control is the *same* arm with the same weights' shape and a
+        # different input. Without this field a table that groups by ``arm``
+        # silently reports a control as if it were the headline run (E024: the
+        # `P2_DualW` column came out as the shuffle control, 29.4031 instead of
+        # 29.4121), and a cross-animal mean counts one animal three times.
+        "model_control": {
+            "phys_control": str(cfg["model"].get("phys_control", "none")),
+            "consistency": str(cfg["model"].get("consistency") or "off"),
+        },
         "n_windows": len(rows),
         "n_windows_fully_measured": int(sum(bool(r.get("fully_measured"))
                                             for r in rows)),

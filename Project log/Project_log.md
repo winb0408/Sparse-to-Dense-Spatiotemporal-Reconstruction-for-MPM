@@ -2265,7 +2265,84 @@ dual 臂的 hard consistency 在模型内部做，所以 `P2_DualI`/`P2_DualW` �
 `psnr_measured` 必须等于 **120.0**（mse=0 封顶）。不是 120 就说明约束没生效，
 该 run 不能进表。写在跑完之前，不是事后解释。
 
+### 新发现：一次 `evaluate` 写盘完成后没有退出，白占 GPU0 8.2 GB 一小时
+
+`E024_P2_DualW_y_k2_fold0_s0_ctrlzeros` 的评估在 **22:10:25** 就写出了
+`samples.csv` 与 `summary.json`（日志最后一行 `wrote ...`），但进程
+（pid 2775036）一直活到 23:10 才被我发现并收掉：
+
+| 观测 | 值 |
+|---|---|
+| 状态 | `S (sleeping)`，161 线程，`/proc/<pid>/stack` 不可读 |
+| 线程分布 | 141 个 `futex_wait_queue_me`、17 个 `R`、2 个 `poll_schedule_timeout` |
+| 5 秒内 CPU tick | 1516（约 3 核在**空转**，不是阻塞在 I/O） |
+| 持有的卡 | GPU0，收掉后 `nvidia-smi` 从 33 878 → 25 651 MiB（**8.2 GB**） |
+
+**判断：这是解释器退出阶段的挂起，不是数字的问题。** `evaluate.main()` 在
+`print(f"wrote {out}")` 之后立刻 `return 0`，之后只剩 `SystemExit` 与解释器
+teardown——hang 发生在那之后，而产物在之前已经落盘、且逐字段校验完整
+（`n_windows=758`，12 个指标全在）。**因此该 run 的结果有效，保留进表。**
+
+**为什么它危险，以及为什么没有改代码。** 这类挂起不影响正确性，只吞显存：
+在这台四张卡都有人用的机器上，8 GB 的静默泄漏会把下一次排期推向 OOM，而
+`run_e024.sh` 的 `wait` 会一直挂着等一个已经干完活的进程。所以：
+`is_done` 以"`best.pt` + `_test/summary.json` 同时存在"判断完成，恰好对这种
+情形免疫；但脚本本身仍会等进程退出。
+**本轮的做法是记录 + 收掉，不猜原因改代码**——没有 `faulthandler` 栈
+（`py-spy` 需要 sudo，此环境无权限），改 `os._exit()` 之类是在猜。
+下次复现时先 `PYTHONFAULTHANDLER=1` 跑，拿到栈再修。这条已写进
+`docs/PHASE1_PR2_E024_RESULTS.md` §5。
+
+### 收集器把对照臂当成了头条臂，还数成了三只动物
+
+`collect_results` 用 `arm` 作分组键。`P2_DualW` 与它的两个
+`phys_control` 对照是**同一臂名、同一参数量**的三个 run，于是：
+
+| 症状 | 实测 |
+|---|---|
+| 主表 `P2_DualW` 列拿到的是谁 | 谁先被 `next()` 碰到谁——**ctrlshuffle**，29.4031 而不是 29.4121 |
+| 跨动物表 | `P2_DualW\| 3 animals \| 29.3787`——**一只动物数了三遍**，范围 [29.3209, 29.4121] 是三个变体而非三只鼠 |
+| 深度分层 | `P2_DualW` 的每一层 n=480，是三个 run 的窗口平均 |
+
+**根因不在分组函数，在记录里**：`evaluate.py` 的 summary **根本没有
+`phys_control` 字段**，所以下游没有任何办法区分这三个 run。修三层：
+
+1. `evaluate.py` 的 summary 增加 `model_control: {phys_control, consistency}`。
+2. `collect_results` 的键从 `arm` 改为 `_label(run)`，对照组显示为
+   `P2_DualW[ctrl=zeros]`；同一 `(label, fold)` 出现两个 run 时**报错而不是猜**——
+   "谁先被 `next()` 碰上"正是这次错数字的产生方式。
+3. 已有的 8 份 summary 是改字段之前写的，用
+   `spur_mpm/scripts/backfill_model_control.py` 补：值**不手打**，从 summary 自己
+   记录的 `checkpoint` 路径回溯到训练目录的 `config.yaml` 取 `model.phys_control`；
+   默认 dry-run，与已有值冲突则**拒绝**。补写后 `diff` 只多出这一个块。
+
+重生成后主表 `P2_DualW fold0 = 29.4121`（真臂），两个对照各占一列，跨动物表全部
+`n = 1`，深度分层每层 n=160。新增 6 项测试钉住这条规则
+（`test_collect_results_variant.py`），全量 396 项全绿。
+
+**教训写成一句可复用的话：一个列头必须能唯一确定产生它的那个 run。**
+参数匹配对照的存在意义就是"除了这一点别的都一样"，所以它恰恰是最容易被
+表格悄悄张冠李戴的对象。
+
+### 深度分层给出的本轮最强结构结论
+
+对 758 个窗口**逐一配对**、按 200 µm 分 6 层、2000 次自助重采样：
+
+- 浅部 0–600 µm：`DualW − I0` 的 Dice **+0.011～+0.017**，区间不含 0；
+- 深部 600–1000 µm：**−0.034 / −0.072**，区间不含 0——**学习把结构变成了强度**；
+- 同一批窗口深部 PSNR **涨了 1.65 dB**。
+
+只看 PSNR 会得出"深部改善最大"，而结构上那里是全轮最差。机制已查清：
+地板 pred/ref 各层恒为 1.11，训练臂从 0.74 掉到 0.55——对比度随深度收缩，
+固定的参考阈值在深部把面积切掉近一半。这就是 T3 面积/拓扑项的实测理由。
+
+### 过程教训：GPU0 上并发评估把 eval 拖慢了 6 倍
+
+`ctrlshuffle` 的评估 23:06 起、01:09 才写出（2 小时），而同样 758 窗口的
+`ctrlzeros` 在空卡上只要 20 分钟。差别是 `structure_report` 同时占了 GPU0。
+不是错误，但**下次排期要把整卷骨架报告与逐窗评估错开**，否则一个 20 分钟的任务
+会看起来像挂了。
+
 ### 仍在跑
 
-`P2_DualI` → `P2_DualW` → `ctrlzeros` → `ctrlshuffle`，串行在 GPU0 上，
-预计 22:30 前后全部落地；之后统一出定性图与整卷骨架报告。
+`structure_report` 的 `P2_I0`（第 4 卷）+ 定性图（逐臂绘制中）。

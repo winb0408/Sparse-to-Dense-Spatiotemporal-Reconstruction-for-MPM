@@ -7,7 +7,7 @@
 
 ## 一句话状态
 
-代码与单测已完成并通过（390 项全绿，`docs/evidence/pytest_20261111_T0_T2_guard.log`）；
+代码与单测已完成并通过（396 项全绿，`docs/evidence/pytest_20261111_T0_T2_guard.log`）；
 **全部 GPU 训练与真实数据头条结果 `NOT_RUN`**——四张 A6000 都被其他用户的作业占用，
 带别人作业的卡不是基准设备。零参数地板已在真实数据上做过 CPU 冒烟（见 §3）。
 
@@ -67,8 +67,8 @@
 | 每个 epoch 重新抽 patch（含 holdout） | `UNIT_TESTED` | `test_each_epoch_draws_different_patches`（参数化两种） |
 | 真实窗口端到端前向 + 反向 | `UNIT_TESTED` | `test_a_pr2_arm_runs_on_real_windows_and_backpropagates` |
 | 2.5D Z/YZ 输入输出尺寸、`valid_z` 不参与堆叠 | `UNIT_TESTED` | 参数化 `t∈{1,7}`；`test_valid_z_is_not_a_stackable_channel` |
-| **在各稀疏协议下真实训练** | `RUNNING`（y_k2 / fold 0；其余协议 `NOT_RUN`） | `runs/E024_dual_prior/`、`docs/PHASE1_PR2_E024_RESULTS.md` |
-| **Gate 2 的"`P2_DualW` 在 identity H 下结果归因不虚报"** | `UNIT_TESTED`（结构层） | identity 退化已由测试与冒烟确认；**归因结论要等训练结果**，`NOT_RUN` |
+| **在各稀疏协议下真实训练** | `GPU_VALIDATED`（**y_k2 / fold 0 / s0**；其余协议仍 `NOT_RUN`） | 8 个臂全部落地：`runs/E024_dual_prior/*_test/summary.json`、`docs/PHASE1_PR2_E024_RESULTS.md` |
+| **Gate 2 的"`P2_DualW` 在 identity H 下结果归因不虚报"** | `GPU_VALIDATED`（结论是**否定的**） | `DualW − DualI = −0.013 dB`、`DualW − ctrlzeros = +0.090 dB`，均远低于 1 dB 阈值 → 不声称物理分支的独立贡献。`docs/PHASE1_PR2_E024_RESULTS.md` §3.3 |
 
 ## 4. T3–T6（本轮明确未做）
 
@@ -76,9 +76,9 @@
 |---|---|---|
 | T3 图像域 `L_rec`（Charbonnier + 缺失区加权） | `TODO` | 当前用既有 `ReconstructionLoss`（L1 + MS-SSIM），与旧臂一致以保公平 |
 | T3 结构/拓扑损失 | `TODO` | 计划中排在 Gate 2 通过之后 |
-| T4 E024 真实实验与报告（fold 0） | `RUNNING`：residual 已落地，dual/controls 在跑 | `docs/PHASE1_PR2_E024_RESULTS.md`、`runs/E024_dual_prior/` |
+| T4 E024 真实实验与报告（fold 0） | `GPU_VALIDATED`：floors + residual + dual + 2 个对照共 8 臂落地 | `docs/PHASE1_PR2_E024_RESULTS.md`、`runs/E024_dual_prior/` |
 | T4 GPU 2 占用率闸门（<50 % 才可用，每次启动现量） | `UNIT_TESTED` | `run_e024.sh::gpu_mem`；`test_run_e024_guard.py` 7 项（注入假 `nvidia-smi`）；日志见 `Project log/Project_log.md` 2026-11-11 |
-| T4 每次训练记录实测显存（`gpu_peak_{allocated,reserved}_mb`） | `CODE_DONE` | `train.py` 写进 `final_val.json`；GPU 上的 run 落地后核对 |
+| T4 每次训练记录实测显存（`gpu_peak_{allocated,reserved}_mb`） | `GPU_VALIDATED` | 四个 dual 臂实测 `reserved` 19 138–19 154 MiB，与 `nvidia-smi` 差分估算差 1.8 %；`docs/PHASE1_PR2_E024_RESULTS.md` §5 |
 | T4 每卡一个作业的并发上限 | `UNIT_TESTED` | `run_e024.sh::make_room`；`test_run_e024_guard.py` 2 项（假 `python` 量真实重叠） |
 | T4 断点续跑 `SKIP_DONE=1`（checkpoint + 测试汇总同时存在才算完成） | `UNIT_TESTED` | `run_e024.sh::is_done`；`test_run_e024_guard.py` 2 项 |
 | T4 `run_ladder.py` 的 `pr2` stage | `TODO` | 本轮用独立脚本驱动；并入 ladder 之前需先有 E024 结果 |
@@ -93,11 +93,12 @@
 
 | 项 | 值 |
 |---|---|
-| 全量回归 | 390 项，`EXIT=0`，`docs/evidence/pytest_20261111_T0_T2_guard.log`（日志自带 `390 passed` 汇总行，不需要数点） |
+| 全量回归 | 396 项，`EXIT=0`，`docs/evidence/pytest_20261111_T0_T2_guard.log`（日志自带 `396 passed` 汇总行，不需要数点） |
 | 新增 `test_physics_prior_contract.py` | 30 |
 | 新增 `test_dual_branch_contract.py` | 38 |
 | 新增 `test_archive_safety.py`（T0 提交） | 21 |
 | 新增 `test_psf_estimate.py` | 16（含 4 条 λ 稳定性） |
+| 新增 `test_collect_results_variant.py` | 6（控制臂列名/分组、`n animals`、深度分层不合并、歧义报错） |
 | 新增 `test_run_e024_guard.py` | 12（GPU 2 占用率闸门 ×7、无 `GPUS=` 拒绝、`SKIP_DONE` 语义 ×2、每卡一个作业 ×2） |
 | 真实数据地板冒烟 | `docs/evidence/smoke_floors_20261110/`（3 份 summary + README） |
 | 真实数据 PSF 估计 | `docs/evidence/psf_estimate_20261110/`（`psf_estimate.{json,md}`） |
@@ -139,12 +140,15 @@ python -m spur_mpm.scripts.framework_figure \
 
 ## 7. 本轮未运行的项，逐条列出（不得读作完成）
 
-- `P2_Direct`、`P2_ResidualI`：已跑完（fold 0），见 `docs/PHASE1_PR2_E024_RESULTS.md`
-- `P2_DualI`、`P2_DualW`、两个 `phys_control` 对照：`RUNNING`（2026-11-11 夜间落地）
+- `P2_Direct`、`P2_ResidualI`、`P2_DualI`、`P2_DualW`、`ctrlzeros`、`ctrlshuffle`：
+  **已跑完**（fold 0 / s0），见 `docs/PHASE1_PR2_E024_RESULTS.md`
 - 默认 256×256 的地板正式数：`NOT_RUN`（只有 32×32 CPU 冒烟）
-- 三折 × 多种子：`NOT_RUN`
+- 三折 × 多种子：`NOT_RUN`（单动物，`ci_estimable=false`，跨动物结论一句都没有）
 - `z_k4` / `yz_k2x2` 等成本协议：`NOT_RUN`
-- 整卷 3D 骨架报告、定性图、成本表：`NOT_RUN`
+- 延迟 / 吞吐 / 峰值显存作为**性能**数字：`NOT_RUN`（四张卡都有别人的作业在跑，
+  共卡条件下的这些数字不可比也不可复现；`scripts.benchmark` 本轮刻意不跑）
+- 整卷 3D 骨架报告与定性图：`DONE`（`runs/E024_dual_prior/structure_*/`、
+  `runs/E024_dual_prior/figures/qual_y_k2/`）
 - `P2_DualWU` / `P2_DualWUT` / `P2_TopoConf`：`TODO`（前者需标定 H，后两者属 T3/T5）
 
 Fig. 2 的 `planned` 栏、以及本文件的每一处 `NOT_RUN`，在真实测量落到
