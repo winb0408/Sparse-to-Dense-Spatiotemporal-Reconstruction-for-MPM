@@ -176,10 +176,27 @@ eval_only () {  # eval_only <run_name> <arm> <fold> <seed> <gpu> [extra...]
   echo "done $name"
 }
 
-# Round-robin over whatever was handed in; never more than one job per card.
+# Round-robin over whatever was handed in.
 next_gpu () {
   if [[ ${#GPU_LIST[@]} -eq 0 ]]; then echo "?"; return 0; fi   # dry run
   echo "${GPU_LIST[$(( $1 % ${#GPU_LIST[@]} ))]}"
+}
+
+# **One job per card, and the comment above is why this exists.** Round-robin
+# alone does not enforce that: hand in one card and a two-arm stage launches
+# both halves on it, because wrapping around the list is not the same as there
+# being room. On cards already carrying another user's job that is an OOM, and
+# it is an OOM the round-robin *caused* -- so the queue is capped at the number
+# of cards and a slot is freed by reaping the oldest job, not by hoping.
+wait_one () {   # reap the oldest running job; it counts as failed if it failed
+  local p=${pids[0]}
+  pids=("${pids[@]:1}")
+  wait "$p" || fail=$((fail+1))
+}
+
+make_room () {  # block until fewer jobs are running than there are cards
+  [[ "$DRY" == "1" ]] && return 0
+  while [[ ${#pids[@]} -ge ${#GPU_LIST[@]} ]]; do wait_one; done
 }
 
 fail=0
@@ -190,20 +207,17 @@ slot=0
 if [[ "$STAGE" == "floors" || "$STAGE" == "all" ]]; then
   for arm in P2_I0 P2_W0; do
     for f in $FOLDS; do
-      eval_only "E024_${arm}_${TAG}_fold${f}" "$arm" "$f" 0 "$(next_gpu $slot)" \
-        >/dev/null 2>&1 &
-      pids+=($!); slot=$((slot+1))
+      make_room; slot=$((slot+1))
+      if [[ "$DRY" == "1" ]]; then
+        eval_only "E024_${arm}_${TAG}_fold${f}" "$arm" "$f" 0 "$(next_gpu $slot)"
+      else
+        eval_only "E024_${arm}_${TAG}_fold${f}" "$arm" "$f" 0 "$(next_gpu $slot)" \
+          >/dev/null 2>&1 &
+        pids+=($!)
+      fi
     done
   done
-  if [[ "$DRY" == "1" ]]; then
-    for arm in P2_I0 P2_W0; do
-      for f in $FOLDS; do
-        eval_only "E024_${arm}_${TAG}_fold${f}" "$arm" "$f" 0 "$(next_gpu $slot)"
-      done
-    done
-  else
-    for p in "${pids[@]}"; do wait "$p" || fail=$((fail+1)); done
-  fi
+  while [[ ${#pids[@]} -gt 0 ]]; do wait_one; done
   echo "--- floors: P2_W0 == P2_I0 is the EXPECTED result under identity PSF ---"
 fi
 
@@ -217,7 +231,9 @@ fi
 #     budget, different model), so they are launched together and spread over
 #     whatever cards were handed in. Launching them one at a time leaves the
 #     second card idle for hours, which is how "no GPU available" becomes
-#     self-fulfilling.
+#     self-fulfilling. The cap is one job per card (see `make_room`): with a
+#     single card the arms queue instead of sharing it, which is the difference
+#     between a longer stage and an OOM.
 launch () {   # launch <stage-name> <arm> [extra args...]
   local stage=$1 arm=$2
   shift 2
@@ -233,26 +249,25 @@ launch () {   # launch <stage-name> <arm> [extra args...]
   for f in $FOLDS; do
     for s in $SEEDS; do
       local name="E024_${arm}_${TAG}_fold${f}_s${s}${tag}"
+      make_room; slot=$((slot+1))
       if [[ "$DRY" == "1" ]]; then
         run_one "$name" "$arm" "$f" "$s" "$(next_gpu $slot)" "$@"
       else
         run_one "$name" "$arm" "$f" "$s" "$(next_gpu $slot)" "$@" &
         pids+=($!)
       fi
-      slot=$((slot+1))
     done
   done
 }
 
 wait_stage () {   # drain this stage before the next one may start
   [[ "$DRY" == "1" ]] && { pids=(); return 0; }
-  for p in "${pids[@]}"; do wait "$p" || fail=$((fail+1)); done
+  while [[ ${#pids[@]} -gt 0 ]]; do wait_one; done
   if [[ $fail -gt 0 ]]; then
     echo "stage failed ($fail run(s)); stopping -- a later stage read on top of" \
          "a missing floor is exactly the comparison this order exists to prevent" >&2
     exit 1
   fi
-  pids=()
 }
 
 pids=(); slot=0

@@ -146,3 +146,61 @@ def test_skip_done_still_launches_when_the_summary_is_missing(tmp_path: Path):
     assert p.returncode == 2, (p.stdout, p.stderr)
     assert "refusing to run" not in p.stderr, p.stderr
     assert "refusing to use GPU 2" in p.stderr, p.stderr
+
+
+# --- 4. one job per card ---------------------------------------------------
+#
+# Round-robin alone does not cap concurrency: hand in one card and a two-arm
+# stage launches both halves on it, because wrapping around the list is not the
+# same as there being room. On a card already carrying someone else's job that
+# is an OOM that the scheduler caused. The fake `python` below records when each
+# job starts and ends, so the number this pins is real overlap, not intent.
+
+_FAKE_PY = """#!/bin/sh
+echo "S $$ $(date +%s%N)" >> "$FAKE_PY_LOG"
+sleep 0.6
+echo "E $$ $(date +%s%N)" >> "$FAKE_PY_LOG"
+exit 0
+"""
+
+
+def _peak_concurrency(path: Path) -> int:
+    events = []
+    for line in path.read_text().splitlines():
+        kind, pid, ns = line.split()
+        events.append((kind, pid, int(ns)))
+    events.sort(key=lambda e: e[2])
+    cur = peak = 0
+    for kind, _pid, _ns in events:
+        cur += 1 if kind == "S" else -1
+        peak = max(peak, cur)
+    return peak
+
+
+def _run_with_fake_python(tmp_path: Path, gpus: str) -> tuple[int, Path]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "python").write_text(_FAKE_PY)
+    (bin_dir / "python").chmod(0o755)
+    log = tmp_path / "jobs.log"
+    log.write_text("")
+    out = tmp_path / "ladder"
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_PY_LOG": str(log),
+           "GPUS": gpus, "DRY": "0", "STAGE": "dual", "FOLDS": "0",
+           "SEEDS": "0", "OUT": str(out)}
+    p = _run(env)
+    return p.returncode, log
+
+
+def test_one_card_means_the_arms_queue_instead_of_sharing_it(tmp_path: Path):
+    rc, log = _run_with_fake_python(tmp_path, "0")
+    assert rc == 0, rc
+    # two arms x (train + eval) = four python processes, each start + end
+    assert log.read_text().count("\n") == 8, log.read_text()
+    assert _peak_concurrency(log) == 1, log.read_text()
+
+
+def test_two_cards_mean_the_arms_run_together(tmp_path: Path):
+    rc, log = _run_with_fake_python(tmp_path, "0,1")
+    assert rc == 0, rc
+    assert _peak_concurrency(log) == 2, log.read_text()

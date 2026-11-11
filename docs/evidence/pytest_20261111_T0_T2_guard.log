@@ -3,18 +3,18 @@
 #   -o addopts="" is required: pytest.ini already passes -q, and a second
 #   -q makes it -qq, which drops the 'N passed' line and invites counting dots.
 # Covers: T0 archive safety, T1 physics prior, T2 dual branch, PSF estimate
-#   (incl. Gate-1 lambda stability), and the run_e024.sh launch guards.
+#   (incl. Gate-1 lambda stability), and the run_e024.sh launch guards
+#   (GPU-2 occupancy threshold, no silent default card, SKIP_DONE, one job
+#   per card).
 #
-# This file supersedes the 384-test version committed earlier today: the
-# guard tests went from 6 to 10 when the GPU-2 rule changed from 'refuse'
-# to 'refuse while busy' (a measured occupancy threshold). The earlier 384
-# run is still in git history for that commit.
+# Supersedes the earlier logs from today: 362 -> 378 (PSF) -> 384 -> 388 ->
+# 390 as the guard tests grew with the rules. Each earlier version is still
+# in git history next to the commit it belonged to.
 
 ........................................................................ [ 18%]
-........................................................................ [ 37%]
+........................................................................ [ 36%]
 ........................................................................ [ 55%]
-........................................................................ [ 74%]
+........................................................................ [ 73%]
 ........................................................................ [ 92%]
-............................                                             [100%]
-388 passed in 42.68s
-EXIT=0
+..............................                                           [100%]
+390 passed in 41.44s
