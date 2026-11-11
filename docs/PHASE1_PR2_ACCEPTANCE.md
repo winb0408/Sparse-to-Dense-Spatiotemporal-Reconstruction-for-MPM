@@ -67,7 +67,7 @@
 | 每个 epoch 重新抽 patch（含 holdout） | `UNIT_TESTED` | `test_each_epoch_draws_different_patches`（参数化两种） |
 | 真实窗口端到端前向 + 反向 | `UNIT_TESTED` | `test_a_pr2_arm_runs_on_real_windows_and_backpropagates` |
 | 2.5D Z/YZ 输入输出尺寸、`valid_z` 不参与堆叠 | `UNIT_TESTED` | 参数化 `t∈{1,7}`；`test_valid_z_is_not_a_stackable_channel` |
-| **在各稀疏协议下真实训练** | `NOT_RUN` | 无空闲 GPU；命令见 RUNBOOK §2 |
+| **在各稀疏协议下真实训练** | `RUNNING`（y_k2 / fold 0；其余协议 `NOT_RUN`） | `runs/E024_dual_prior/`、`docs/PHASE1_PR2_E024_RESULTS.md` |
 | **Gate 2 的"`P2_DualW` 在 identity H 下结果归因不虚报"** | `UNIT_TESTED`（结构层） | identity 退化已由测试与冒烟确认；**归因结论要等训练结果**，`NOT_RUN` |
 
 ## 4. T3–T6（本轮明确未做）
@@ -76,7 +76,7 @@
 |---|---|---|
 | T3 图像域 `L_rec`（Charbonnier + 缺失区加权） | `TODO` | 当前用既有 `ReconstructionLoss`（L1 + MS-SSIM），与旧臂一致以保公平 |
 | T3 结构/拓扑损失 | `TODO` | 计划中排在 Gate 2 通过之后 |
-| T4 E024 真实实验与报告 | `NOT_RUN` | 脚本已备：`spur_mpm/experiments/run_e024.sh` |
+| T4 E024 真实实验与报告（fold 0） | `RUNNING`：residual 已落地，dual/controls 在跑 | `docs/PHASE1_PR2_E024_RESULTS.md`、`runs/E024_dual_prior/` |
 | T4 GPU 2 占用率闸门（<50 % 才可用，每次启动现量） | `UNIT_TESTED` | `run_e024.sh::gpu_mem`；`test_run_e024_guard.py` 7 项（注入假 `nvidia-smi`）；日志见 `Project log/Project_log.md` 2026-11-11 |
 | T4 每次训练记录实测显存（`gpu_peak_{allocated,reserved}_mb`） | `CODE_DONE` | `train.py` 写进 `final_val.json`；GPU 上的 run 落地后核对 |
 | T4 每卡一个作业的并发上限 | `UNIT_TESTED` | `run_e024.sh::make_room`；`test_run_e024_guard.py` 2 项（假 `python` 量真实重叠） |
@@ -139,8 +139,8 @@ python -m spur_mpm.scripts.framework_figure \
 
 ## 7. 本轮未运行的项，逐条列出（不得读作完成）
 
-- `P2_Direct`、`P2_ResidualI`、`P2_DualI`、`P2_DualW`、两个 `phys_control` 对照
-  的任何一次真实训练：`NOT_RUN`
+- `P2_Direct`、`P2_ResidualI`：已跑完（fold 0），见 `docs/PHASE1_PR2_E024_RESULTS.md`
+- `P2_DualI`、`P2_DualW`、两个 `phys_control` 对照：`RUNNING`（2026-11-11 夜间落地）
 - 默认 256×256 的地板正式数：`NOT_RUN`（只有 32×32 CPU 冒烟）
 - 三折 × 多种子：`NOT_RUN`
 - `z_k4` / `yz_k2x2` 等成本协议：`NOT_RUN`

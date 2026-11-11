@@ -96,12 +96,15 @@ conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mp
 `test_archive_safety.py` 21 项、`test_psf_estimate.py` 16 项、
 `test_run_e024_guard.py` 12 项，其余为 `test_framework_figure.py` 等既有文件的扩充）。
 
-## PR2 物理先验 / 双分支：本文件不含新结果
+## PR2 物理先验 / 双分支
 
-本文档描述的是 **E021/E023 那一代（`A*/S*/SS*`）** 的数字。PR2 新方法代（`P2_*`）
-**没有任何真实数据结果**：四张 GPU 全被其他用户占用，训练 `NOT_RUN`。
+本文档的主体是 **E021/E023 那一代（`A*/S*/SS*`）** 的数字。PR2 新方法代（`P2_*`）
+的第一批真实数字（fold 0、单种子、758 窗口）在
+[`docs/PHASE1_PR2_E024_RESULTS.md`](PHASE1_PR2_E024_RESULTS.md)：地板与 residual 阶段
+已落地，dual 与 controls 仍在跑，逐条状态见该文件。**新旧两代的数字不可同列排名**
+（见文末两条口径陷阱）。
 
-已有的是协议层证据，不是方法层结论：
+PR2 的协议层证据（不依赖训练，已全部完成）：
 
 | 项 | 结果 | 证据 |
 |---|---|---|
