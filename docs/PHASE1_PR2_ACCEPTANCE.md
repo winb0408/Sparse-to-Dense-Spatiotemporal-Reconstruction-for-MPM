@@ -44,7 +44,7 @@
 | **自估 PSF：由假定 NA 反推衍射极限** | `UNIT_TESTED` + 真实数据 | `physics/psf_estimate.py::diffraction_limited_sigma`；σ 仅 0.16–0.21 / 0.11–0.22 体素 |
 | **自估 PSF：留出测量预测扫描** | `UNIT_TESTED` + 真实数据 | `docs/evidence/psf_estimate_20261110/`；**两轴最优 σ=0**，非零宽度全部更差 |
 | `estimated_from_data` 第三种标签存在且与 `calibrated_optical` 分开 | `UNIT_TESTED` | `test_an_estimated_psf_has_its_own_label_and_is_not_the_calibrated_one` |
-| **Gate 1 的 phantom 数值稳定性（λ 扫描）** | `TODO` | λ 扫描已随留出预测扫描跑过一部分（同一批数据、6 档 σ），但仍缺独立 phantom；本轮不宣称完成 |
+| **Gate 1 的 phantom 数值稳定性（λ 扫描）** | `UNIT_TESTED` | 已知宽度 phantom 上扫 λ=1e-5…1e-1：有限且峰值有界；有模糊时优于插值；1 % 噪声下 λ=1e-4 的误差是插值基线的 7.7 倍。4 条断言 + 数字表见 `docs/PHASE1_PR2_PSF_ESTIMATE.md` §6 |
 
 ## 3. T2 — 双分支残差网络与训练器
 
@@ -93,7 +93,7 @@
 | 新增 `test_physics_prior_contract.py` | 30 |
 | 新增 `test_dual_branch_contract.py` | 38 |
 | 新增 `test_archive_safety.py`（T0 提交） | 21 |
-| 新增 `test_psf_estimate.py` | 12 |
+| 新增 `test_psf_estimate.py` | 16（含 4 条 λ 稳定性） |
 | 真实数据地板冒烟 | `docs/evidence/smoke_floors_20261110/`（3 份 summary + README） |
 | 真实数据 PSF 估计 | `docs/evidence/psf_estimate_20261110/`（`psf_estimate.{json,md}`） |
 | Fig. 2 重绘 | `spur_mpm/figures/framework/fig2_{pipeline,ablation_matrix}.png` + `fig2_provenance.json` |

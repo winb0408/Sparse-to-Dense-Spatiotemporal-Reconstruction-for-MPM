@@ -23,6 +23,7 @@ from spur_mpm.physics.psf_estimate import (
 )
 from spur_mpm.physics.prior import PSF_SOURCES, psf_source_label
 from spur_mpm.physics.sampling import SamplingSpec
+from spur_mpm.physics.wiener import interp_linear, wiener_fill_all
 
 
 # --- 1. the arithmetic ------------------------------------------------------
@@ -194,3 +195,71 @@ def test_an_estimate_without_its_label_is_still_refused():
         assert "psf_source" in str(exc)
     else:
         raise AssertionError("an unlabelled estimated PSF should be refused")
+
+
+# --- 4. Gate 1: lambda stability on a phantom with a known width -------------
+#
+# The pair of results below is the whole point of scanning lambda at all. When a
+# blur IS present, deconvolving beats interpolating -- so the machinery works.
+# When lambda is too small, noise gets amplified faster than blur gets removed.
+# Both have to be pinned, because "lower lambda is sharper" is the intuition
+# that makes an over-deconvolved figure look better than it is.
+
+def _phantom_pair(shape=(16, 64, 64), psf_um=1.0, noise=0.0, seed=1):
+    g = torch.Generator().manual_seed(seed)
+    sharp = torch.zeros(shape)
+    for _ in range(120):
+        z = int(torch.randint(0, shape[0], (1,), generator=g))
+        y = int(torch.randint(0, shape[1], (1,), generator=g))
+        x = int(torch.randint(0, shape[2], (1,), generator=g))
+        sharp[z, y, x] = 1.0
+    psf = PSFConfig(psf_um, 0.0, 0.98, 5.0)
+    blurred = torch.fft.ifftn(torch.fft.fftn(sharp) * gaussian_otf_3d(shape, psf),
+                              dim=(-3, -2, -1)).real
+    if noise:
+        blurred = blurred + noise * torch.randn(shape, generator=g)
+    mask = torch.from_numpy(measured_mask(shape, SamplingSpec(mode="y", ky=2)))
+    y = torch.where(mask, blurred, torch.zeros_like(blurred))
+    return sharp, y, mask, psf
+
+
+def _held_rmse(pred, sharp, mask):
+    held = ~mask
+    return float(((pred[held] - sharp[held]) ** 2).mean().sqrt())
+
+
+def test_wiener_stays_finite_across_five_orders_of_magnitude_of_lambda():
+    sharp, y, mask, psf = _phantom_pair()
+    for lam in (1e-5, 1e-4, 1e-3, 1e-2, 1e-1):
+        w0 = wiener_fill_all(y, mask, psf, lam)
+        assert torch.isfinite(w0).all(), lam
+        # bounded, not merely finite: a Wiener with a vanishing lambda divides
+        # by an almost-zero OTF and can return 1e6 without ever producing a NaN
+        assert float(w0.abs().max()) < 10.0, (lam, float(w0.abs().max()))
+
+
+def test_when_a_blur_is_present_deconvolution_beats_interpolation():
+    """The `there is blur` case -- it must work, or the negative real-data
+    result would be uninformative (an operator that never helps explains
+    nothing)."""
+    sharp, y, mask, psf = _phantom_pair()
+    baseline = _held_rmse(interp_linear(y, mask), sharp, mask)
+    best = min(_held_rmse(wiener_fill_all(y, mask, psf, lam), sharp, mask)
+               for lam in (1e-3, 1e-2, 1e-1))
+    assert best < baseline, (best, baseline)
+
+
+def test_too_small_a_lambda_is_worse_than_a_regularised_one_even_without_noise():
+    sharp, y, mask, psf = _phantom_pair()
+    err = {lam: _held_rmse(wiener_fill_all(y, mask, psf, lam), sharp, mask)
+           for lam in (1e-5, 1e-2)}
+    assert err[1e-5] > err[1e-2], err
+
+
+def test_under_noise_over_deconvolution_loses_to_not_deconvolving_at_all():
+    sharp, y, mask, psf = _phantom_pair(noise=0.01)
+    baseline = _held_rmse(interp_linear(y, mask), sharp, mask)
+    aggressive = _held_rmse(wiener_fill_all(y, mask, psf, 1e-4), sharp, mask)
+    regularised = _held_rmse(wiener_fill_all(y, mask, psf, 1e-1), sharp, mask)
+    assert aggressive > 2.0 * baseline, (aggressive, baseline)
+    assert regularised < aggressive, (regularised, aggressive)
