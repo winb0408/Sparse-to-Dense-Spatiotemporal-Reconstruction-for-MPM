@@ -201,6 +201,11 @@ class ItemConfig:
     u_kind: str = "geo"
     geo_mode: str = "per_axis"
     check_leakage: bool = True
+    # Provenance of a non-identity PSF (PR2 §2). ``None`` is correct for the
+    # real Dryad stacks, whose optics are already in the data; a degradation
+    # stress test must say so here or the physics prior refuses to run, so a
+    # synthetic blur cannot reach a table without a label.
+    psf_source: str | None = None
 
     def to_dict(self) -> dict:
         return {"sampling": self.sampling.to_dict(), "psf": self.psf.to_dict(),
@@ -208,7 +213,8 @@ class ItemConfig:
                 "lam": self.lam, "features": list(self.features),
                 "supervision": self.supervision, "dual": self.dual,
                 "holdout": self.holdout.to_dict() if self.holdout else None,
-                "u_kind": self.u_kind, "geo_mode": self.geo_mode}
+                "u_kind": self.u_kind, "geo_mode": self.geo_mode,
+                "psf_source": self.psf_source}
 
 
 def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
@@ -249,7 +255,9 @@ def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
     obs = dict(psf=cfg.psf, lam=cfg.lam, warm_start_kind=cfg.warm_start_kind,
                u_kind=cfg.u_kind, geo_mode=cfg.geo_mode,
                ky=spec.ky, kz=spec.kz,
-               voxel_xy_um=geometry.voxel_xy_um, voxel_z_um=geometry.z_step_um)
+               voxel_xy_um=geometry.voxel_xy_um, voxel_z_um=geometry.z_step_um,
+               psf_source=cfg.psf_source,
+               valid_z=None if valid_z is None else torch.as_tensor(valid_z, dtype=torch.bool))
 
     if cfg.dual:
         if cfg.holdout is None:
@@ -350,6 +358,8 @@ class SparseVolumeDataset(Dataset):
             raise ValueError(f"context_depth must be odd, got {self.depth}")
         self.patches_per_epoch = int(patches_per_epoch)
         self.seed = int(seed)
+        #: Bumped by the trainer once per pass over the loader; see set_epoch.
+        self.epoch = 0
         self._check_fits()
 
     def _check_fits(self) -> None:
@@ -365,12 +375,30 @@ class SparseVolumeDataset(Dataset):
             if not geom.shape:
                 geom.shape = tuple(arr.shape)
 
+    def set_epoch(self, epoch: int) -> None:
+        """Change which patches this dataset yields for the same indices.
+
+        Without this, item ``i`` was the same patch at every epoch for the whole
+        run: the loader shuffled the *order* of a fixed set of
+        ``patches_per_epoch`` patches, so a 3000-step run with 1000 patches per
+        epoch saw 1000 distinct patches 3 times. That is not a wrong number in
+        any single row, which is why it survived -- but it does mean the
+        "random patches" in every run log overstated how much of each volume was
+        visited, and the epoch count was not the coverage it looks like.
+
+        The seed stays ``(run seed, epoch, index)``, so the draw is reproducible
+        across workers and across processes: nothing here depends on how the
+        DataLoader split the work.
+        """
+        self.epoch = int(epoch)
+
     def __len__(self) -> int:
         return self.patches_per_epoch
 
     def __getitem__(self, index: int) -> dict:
         rng = np.random.default_rng(
-            np.random.SeedSequence([self.seed, index]).generate_state(1)[0])
+            np.random.SeedSequence([self.seed, self.epoch, index])
+            .generate_state(1)[0])
         si = int(rng.integers(len(self.sample_ids)))
         sid = self.sample_ids[si]
         geom = self.cache.geometry(sid)
@@ -384,7 +412,7 @@ class SparseVolumeDataset(Dataset):
         raw = stack_patch(arr, z0, y0, x0, d, h, w)
         dense = self.cache.calibration.apply(raw).astype(np.float32)
         holdout_seed = int(np.random.SeedSequence(
-            [self.seed, index, 77]).generate_state(1)[0])
+            [self.seed, self.epoch, index, 77]).generate_state(1)[0])
 
         item = _make_item(dense, geom, self.cfg, z0, y0, x0, holdout_seed)
         item["sample_id"] = sid

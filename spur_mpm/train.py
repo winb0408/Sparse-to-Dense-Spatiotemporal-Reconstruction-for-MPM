@@ -34,7 +34,7 @@ from spur_mpm.common.config import apply_overrides, config_hash, load_config
 from spur_mpm.common.provenance import collect_provenance
 from spur_mpm.common.runlog import RunDir
 from spur_mpm.common.seeding import seed_worker, set_seed
-from spur_mpm.common.tensors import select_centre as _select_centre
+from spur_mpm.common.tensors import as_reconstruction, select_centre as _select_centre
 from spur_mpm.data.datasets import (
     ItemConfig,
     SparseVolumeDataset,
@@ -88,6 +88,9 @@ def build_components(cfg: dict, arm_name: str, seed: int):
         dual=arm.dual,
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
+        # Declared once, in the experiment config: a non-identity H without a
+        # source label is refused rather than silently treated as calibrated.
+        psf_source=cfg["physics"].get("psf_source"),
     )
 
     geom0 = cache.geometry(fold["train"][0])
@@ -150,7 +153,8 @@ def validate(model, loader, device, *, supervision: str, rho: str,
             pred = 0.5 * (_select_centre(out_a.float(), batch["center_index"]) +
                           _select_centre(out_b.float(), batch["center_index"]))
         else:
-            pred = _select_centre(out.float(), batch["center_index"])
+            pred = _select_centre(as_reconstruction(out).float(),
+                                  batch["center_index"])
         if use_dense:
             target = batch["target"].to(device)
             ps.append(float(psnr(pred, target)))
@@ -213,14 +217,29 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
     model = build_model(arm, context, base=int(cfg["model"]["base"]),
                         window=int(cfg["model"]["window"]),
                         depths=tuple(cfg["model"]["depths"]),
-                        heads=tuple(cfg["model"]["heads"])).to(device)
+                        heads=tuple(cfg["model"]["heads"]),
+                        # The parameter-matched controls (phys_control) and the
+                        # consistency switch are part of the *model*, so they
+                        # must come from the config and land in the config
+                        # fingerprint -- otherwise two runs that differ only by
+                        # "the physics candidate was zeroed" look identical in
+                        # their provenance.
+                        phys_control=str(cfg["model"].get("phys_control", "none")),
+                        consistency=cfg["model"].get("consistency")).to(device)
 
     run_name = name or f"{cfg['experiment']}__{arm.name}__{sampling.tag}__s{seed}"
     run = RunDir(out_root, run_name, resume=resume)
     cfg = dict(cfg)
     cfg["model"].update({"arm": arm.name, "features": list(arm.features),
                          "context_depth": context,
-                         "n_parameters": count_parameters(model)})
+                         "n_parameters": count_parameters(model),
+                         # Resolved values, so the run directory says what the
+                         # model actually was rather than what the default was.
+                         "phys_control": str(cfg["model"].get("phys_control",
+                                                              "none")),
+                         "consistency": (arm.consistency
+                                         if cfg["model"].get("consistency") is None
+                                         else str(cfg["model"]["consistency"]))})
     run.write_config(cfg)
     run.write_provenance(collect_provenance(
         config=cfg,
@@ -265,10 +284,20 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
         start, best = ck["step"], ck["best"]
         print(f"[{run_name}] resumed at step {start} (best={best:.4f})", flush=True)
 
+    # The patch draw depends on (seed, epoch, index); bumping the epoch before
+    # each pass is what makes successive epochs different patches instead of the
+    # same patches in a different order (see SparseVolumeDataset.set_epoch).
+    # Resuming starts at the epoch the recorded step count falls in, so a
+    # resumed run does not replay the first epoch's patches.
+    epoch = start // max(1, len(train_loader))
+
     def batches():
+        nonlocal epoch
         while True:
+            train_ds.set_epoch(epoch)
             for b in train_loader:
                 yield b
+            epoch += 1
 
     step = start
     model.train()
@@ -300,7 +329,7 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
         else:
             with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
                 out = model(x)
-            out = out.float()
+            out = as_reconstruction(out).float()
             pred = _select_centre(out, batch["center_index"])
 
             if arm.supervision == "self":
@@ -360,6 +389,19 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
     torch.save({"model": model.state_dict(), "config": cfg}, run.path / "last.pt")
     final = validate(model, val_loader, device, supervision=arm.supervision,
                      rho=cfg["loss"]["rho"], amp=amp, dual=arm.dual)
+    # What this run actually held on the card. Recorded because "may these two
+    # arms share a GPU?" is otherwise answered by guessing, and a guess is how a
+    # launch ends in an OOM three hours in. It is a *capacity* number, not a
+    # performance claim: on a card carrying another user's job it measures
+    # co-occupancy, and must not be quoted as a benchmark.
+    if device.type == "cuda":
+        final["gpu_peak_allocated_mb"] = round(
+            torch.cuda.max_memory_allocated(device) / 2 ** 20, 1)
+        final["gpu_peak_reserved_mb"] = round(
+            torch.cuda.max_memory_reserved(device) / 2 ** 20, 1)
+        print(f"[{run_name}] gpu peak: allocated "
+              f"{final['gpu_peak_allocated_mb']:.0f} MiB, reserved "
+              f"{final['gpu_peak_reserved_mb']:.0f} MiB", flush=True)
     (run.path / "final_val.json").write_text(json.dumps(final, indent=2))
     problems = run.validate(expect_weights=True)
     run.close()

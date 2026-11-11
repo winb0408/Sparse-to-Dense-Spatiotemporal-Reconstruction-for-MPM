@@ -67,7 +67,7 @@ from scipy.ndimage import uniform_filter
 from torch.utils.data import DataLoader
 
 from spur_mpm.common.config import load_config
-from spur_mpm.common.tensors import select_centre
+from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.data.split import read_split
 from spur_mpm.evaluate import _feature_slice, withholds_at_eval
@@ -169,7 +169,8 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
     preds, targets, m_acq, m_in, zs, y_given = [], [], [], [], [], []
     for batch in loader:
         if model is not None:
-            pred = select_centre(model(batch["inputs"].to(device)).float(),
+            pred = select_centre(as_reconstruction(
+                model(batch["inputs"].to(device))).float(),
                                  batch["center_index"]).cpu()
         else:
             pred = batch["warmstart_center"]

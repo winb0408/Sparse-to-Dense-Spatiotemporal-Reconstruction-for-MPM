@@ -31,9 +31,15 @@ import torch
 
 from spur_mpm.physics.psf import PSFConfig
 
-__all__ = ["wiener_deconv_3d", "WARM_START_MODES", "warm_start"]
+__all__ = ["wiener_deconv_3d", "interp_linear", "WARM_START_MODES", "warm_start"]
 
-WARM_START_MODES = ("bilinear", "wiener", "wiener_fill_first", "iterdc")
+#: ``wiener_fill_all`` is the *new* fill-first branch (PR2 §T1): every missing
+#: axis is interpolated before any FFT. ``wiener_fill_first`` is the old one,
+#: which only fills lateral holes, and is kept unchanged because checkpoints and
+#: published numbers were produced with it. For a Y-only mask the two agree; for
+#: Z / YZ they do not, and the difference is the whole point of the fix.
+WARM_START_MODES = ("bilinear", "wiener", "wiener_fill_first", "wiener_fill_all",
+                    "iterdc")
 
 
 def wiener_deconv_3d(y: torch.Tensor, psf: PSFConfig, lam: float = 0.01) -> torch.Tensor:
@@ -171,9 +177,12 @@ def warm_start(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,
         steps_i = int(parts[2]) if len(parts) > 2 else 5
         return iterative_dc_inverse(y, mask, psf, lam=lam_i, steps=steps_i)
 
-    if mode not in ("wiener", "wiener_fill_first"):
+    if mode not in ("wiener", "wiener_fill_first", "wiener_fill_all"):
         raise ValueError(f"unknown warm-start mode {mode!r}; expected one of "
                          f"{WARM_START_MODES}")
+
+    if mode == "wiener_fill_all":
+        return wiener_fill_all(y, mask, psf, lam)
 
     if mode == "wiener_fill_first":
         # Deconvolving zero-filled holes rings (Gibbs), so fill the
@@ -184,12 +193,78 @@ def warm_start(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,
     return _wiener_pipeline(y, mask, psf, lam)
 
 
-def _bilinear(y: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-    mask_z = mask.amax(dim=(-2, -1))
+def interp_linear(y: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """``I0 = Interp(Y, M)``: pure linear interpolation, no FFT, no network.
+
+    This is the public name for the operator the ``bilinear`` arm has always
+    used. It fills **every** missing axis (Z first, then laterally), so the
+    result has no zero-valued hole left for a later FFT to ring on -- which is
+    what makes it usable as the prior ``W0`` is computed from.
+
+    Measured voxels are never overwritten, so ``I0[M] == Y[M]`` exactly.
+    """
+    if y.shape != mask.shape:
+        raise ValueError(f"y {tuple(y.shape)} and mask {tuple(mask.shape)} disagree")
+    mask_b = mask.bool()
+    mask_z = mask_b.amax(dim=(-2, -1))
     out = _depth_interp(y, mask_z) if not bool(mask_z.all()) else y
-    if bool((~mask).any()):
-        out = _lateral_interp(out, mask)
+    if bool((~mask_b).any()):
+        out = _lateral_interp(out, mask_b)
     return out
+
+
+def _bilinear(y: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    return interp_linear(y, mask)
+
+
+def wiener_fill_all(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,
+                    lam: float = 0.01) -> torch.Tensor:
+    """``W0 = Wiener(I0; H, lam)``: fill every hole first, then deconvolve.
+
+    The order matters for more than numerics. Convolving a zero-filled hole
+    with a blur kernel pulls zeros *into* measured neighbourhoods (Gibbs
+    ringing plus a systematic darkening at the edge of the support), and the
+    damage is largest exactly where the arm is supposed to be inventing
+    structure. Filling first means the FFT only ever sees a complete image, so
+    the only thing the deconvolution can do is redistribute intensity that is
+    already there.
+
+    With an identity PSF this returns ``I0`` bit-for-bit (no FFT is run at
+    all): there is no optical model to invert, so claiming a "Wiener gain"
+    under ``H = I`` would be claiming that gap filling beats gap filling.
+    """
+    _check_prior_args(y, mask, psf, lam)
+    i0 = interp_linear(y, mask)
+    if psf.is_identity:
+        return i0.clone()
+    out = wiener_deconv_3d(i0, psf, lam)
+    if not bool(torch.isfinite(out).all()):
+        raise ValueError("Wiener fill-all produced non-finite values; check the "
+                         "PSF sigmas, lambda and the input range")
+    return out
+
+
+def _check_prior_args(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,
+                      lam: float) -> None:
+    """Reject the inputs that make the inverse problem meaningless.
+
+    ``lam <= 0`` divides by ``|H|^2 + lam``, which is zero wherever the OTF has
+    a null (every real PSF has them) -- that is an Inf, not a small number. A
+    negative or non-finite sigma is not a PSF at all. Both are configuration
+    errors and belong at the top of the stack trace, not in a NaN loss.
+    """
+    if not isinstance(lam, (int, float)) or not float(lam) > 0:
+        raise ValueError(f"lambda must be a positive finite number, got {lam!r}")
+    if not float(lam) < float("inf"):
+        raise ValueError(f"lambda must be finite, got {lam!r}")
+    for name in ("sigma_xy_um", "sigma_z_um"):
+        v = getattr(psf, name)
+        if not (float(v) >= 0.0) or not float(v) < float("inf"):
+            raise ValueError(f"psf.{name} must be finite and >= 0, got {v!r}")
+    if y.shape != mask.shape:
+        raise ValueError(f"y {tuple(y.shape)} and mask {tuple(mask.shape)} disagree")
+    if not bool(torch.isfinite(y).all()):
+        raise ValueError("the measurement contains non-finite values")
 
 
 def _wiener_pipeline(y: torch.Tensor, mask: torch.Tensor, psf: PSFConfig,

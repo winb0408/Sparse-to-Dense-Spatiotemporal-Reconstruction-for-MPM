@@ -32,10 +32,11 @@ import torch
 from torch.utils.data import DataLoader
 
 from spur_mpm.common.config import apply_overrides, deep_merge, load_config
-from spur_mpm.common.tensors import select_centre
+from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.models.registry import build_model, eval_features, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
+from spur_mpm.physics.prior import psf_source_label
 from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.ssl.holdout import HoldoutSpec
 from spur_mpm.physics.sampling import SamplingSpec
@@ -78,6 +79,9 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
         dual=arm.dual,
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
+        # A non-identity H has to be labelled where it was declared, not
+        # re-invented at the point of use (PR2 §2).
+        psf_source=cfg["physics"].get("psf_source"),
     )
     ds = VolumeWindowDataset(cache, [sample_id], item_cfg, patch_hw=None,
                              context_depth=context, z_stride=1)
@@ -88,7 +92,10 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
         model = build_model(arm, context, base=int(cfg["model"]["base"]),
                             window=int(cfg["model"]["window"]),
                             depths=tuple(cfg["model"]["depths"]),
-                            heads=tuple(cfg["model"]["heads"])).to(device)
+                            heads=tuple(cfg["model"]["heads"]),
+                            phys_control=str(cfg["model"].get("phys_control",
+                                                              "none")),
+                            consistency=cfg["model"].get("consistency")).to(device)
         payload = torch.load(ckpt, map_location=device, weights_only=False)
         model.load_state_dict(payload["model"])
         model.eval()
@@ -98,8 +105,9 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
     with torch.no_grad():
         for batch in loader:
             if model is not None:
-                pred = select_centre(model(batch["inputs"].to(device)).float(),
-                                     batch["center_index"])
+                pred = select_centre(
+                    as_reconstruction(model(batch["inputs"].to(device))).float(),
+                    batch["center_index"])
                 pred = pred[0].cpu().numpy()
             else:
                 # Baseline arm: the physics warm start for the centre plane.
@@ -130,7 +138,12 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
         "geometry": geom.to_dict(),
         "sampling": sampling.to_dict(),
         "context_depth": context,
-        "physics": {"psf": psf.to_dict(), "lam": cfg["physics"]["lam"]},
+        "physics": {"psf": psf.to_dict(), "lam": cfg["physics"]["lam"],
+                    # A whole-volume figure must say which optical model it was
+                    # drawn under; `identity` means W0 == I0 and the figure is
+                    # a gap-filling result (PR2 §2).
+                    "psf_source": psf_source_label(
+                        psf, cfg["physics"].get("psf_source"))},
         "timing": {
             "wall_seconds": round(wall, 3),
             "n_planes": int(volume.shape[0]),

@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 
+from spur_mpm.common.tensors import as_reconstruction
 from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
                                            split_psnr, ssim)
 from spur_mpm.metrics.statistics import bootstrap_ci, group_mean, paired_delta
@@ -28,7 +29,9 @@ def test_model_forward_shape(arm_name):
     # twice as wide while its output stays a single plane per branch.
     n = 2 if arm.dual else 1
     x = torch.rand(2, n * len(arm.features), 32, 32)
-    out = model(x)
+    # PR2 arms return the output contract dict; the legacy arms still return a
+    # tensor. ``as_reconstruction`` is the one place that knows the difference.
+    out = as_reconstruction(model(x))
     assert out.shape == (2, 1, 32, 32)
 
 

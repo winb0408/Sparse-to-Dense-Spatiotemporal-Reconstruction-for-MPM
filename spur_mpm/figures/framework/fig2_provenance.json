@@ -89,6 +89,7 @@
  "groups": {
   "floors": "no-learning floors  (needs_training = False) - the reference a network has to beat",
   "supervised": "supervised - measured in Phase 1",
+  "planned": "PR2 dual-prior - implemented in code, real-data run NOT_RUN (no free GPU; see docs/PHASE1_PR2_ACCEPTANCE.md)",
   "frozen": "self-supervised - frozen 2026-10-30, NOT measured in Phase 1 (archive/selfsup_v1)"
  },
  "arms": {
@@ -706,6 +707,587 @@
     }
    }
   },
+  "P2_I0": {
+   "group": "planned",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_I0'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_I0'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_I0'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_I0'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_I0'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_I0'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "bilinear",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_I0'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "none",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_I0'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "macs": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "latency": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    }
+   }
+  },
+  "P2_W0": {
+   "group": "planned",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_W0'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_W0'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_W0'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_W0'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_W0'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_W0'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener_fill_all",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_W0'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "none",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_W0'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "macs": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "latency": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    }
+   }
+  },
+  "P2_Direct": {
+   "group": "planned",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_Direct'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_Direct'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_Direct'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_Direct'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_Direct'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_Direct'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "bilinear",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_Direct'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_Direct'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "macs": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "latency": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    }
+   }
+  },
+  "P2_ResidualI": {
+   "group": "planned",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_ResidualI'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_ResidualI'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_ResidualI'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_ResidualI'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_ResidualI'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_ResidualI'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "bilinear",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_ResidualI'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_ResidualI'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "macs": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "latency": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    }
+   }
+  },
+  "P2_DualI": {
+   "group": "planned",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualI'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualI'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualI'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualI'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualI'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualI'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "bilinear",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualI'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualI'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "macs": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "latency": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    }
+   }
+  },
+  "P2_DualW": {
+   "group": "planned",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualW'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualW'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualW'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualW'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualW'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualW'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener_fill_all",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualW'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualW'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "macs": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "latency": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    }
+   }
+  },
+  "P2_DualWU": {
+   "group": "planned",
+   "frozen": false,
+   "cells": {
+    "y": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualWU'].features",
+     "rule": "'y' in arm.features"
+    },
+    "mask": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualWU'].features",
+     "rule": "'mask' in arm.features"
+    },
+    "x0": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualWU'].features",
+     "rule": "'x0' in arm.features"
+    },
+    "uncertainty": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualWU'].features",
+     "rule": "'uncertainty' in arm.features"
+    },
+    "fusion": {
+     "tick": false,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualWU'].fusion",
+     "rule": "arm.fusion"
+    },
+    "trunk": {
+     "tick": true,
+     "text": "",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualWU'].needs_training",
+     "rule": "arm.needs_training"
+    },
+    "warm_start": {
+     "tick": null,
+     "text": "wiener_fill_all",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualWU'].warm_start",
+     "rule": "arm.warm_start"
+    },
+    "supervision": {
+     "tick": null,
+     "text": "dense",
+     "source": "spur_mpm/models/registry.py",
+     "field": "ARMS['P2_DualWU'].supervision",
+     "rule": "arm.supervision"
+    },
+    "params": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "macs": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    },
+    "latency": {
+     "tick": null,
+     "text": "NOT_RUN",
+     "source": "spur_mpm/models/registry.py",
+     "field": "-",
+     "rule": "PR2 arm implemented; real-data experiment NOT_RUN"
+    }
+   }
+  },
   "SS0": {
    "group": "frozen",
    "frozen": true,
@@ -1128,6 +1710,7 @@
    "bilinear",
    "wiener",
    "wiener_fill_first",
+   "wiener_fill_all",
    "iterdc"
   ],
   "warm_start_source": "spur_mpm/physics/wiener.py::WARM_START_MODES",
@@ -1143,7 +1726,11 @@
    "bilinear": [
     "A0",
     "S0",
-    "SS0"
+    "SS0",
+    "P2_I0",
+    "P2_Direct",
+    "P2_ResidualI",
+    "P2_DualI"
    ],
    "wiener": [
     "S1",
@@ -1157,6 +1744,11 @@
    ],
    "wiener_fill_first": [
     "A1"
+   ],
+   "wiener_fill_all": [
+    "P2_W0",
+    "P2_DualW",
+    "P2_DualWU"
    ],
    "iterdc": []
   },
@@ -1191,11 +1783,18 @@
    "SS2g",
    "S1g",
    "S2g",
-   "SS1c"
+   "SS1c",
+   "P2_Direct",
+   "P2_ResidualI",
+   "P2_DualI",
+   "P2_DualW",
+   "P2_DualWU"
   ],
   "no_network_arms": [
    "A0",
-   "A1"
+   "A1",
+   "P2_I0",
+   "P2_W0"
   ],
   "frozen_arms": [
    "SS0",
@@ -1214,7 +1813,12 @@
    "SS2g": 4,
    "S1g": 3,
    "S2g": 4,
-   "SS1c": 3
+   "SS1c": 3,
+   "P2_Direct": 2,
+   "P2_ResidualI": 3,
+   "P2_DualI": 3,
+   "P2_DualW": 5,
+   "P2_DualWU": 7
   },
   "channels_source": "spur_mpm/models/registry.py::Arm.features (len), SwinUNet2D(in_ch = len(features) * context_depth)"
  }

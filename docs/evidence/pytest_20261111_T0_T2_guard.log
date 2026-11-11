@@ -1,0 +1,12 @@
+# Full regression, regenerated 2026-11-12 after the E024 control-label fix.
+# `-o addopts=""` is required: pytest.ini already passes -q, and a second -q
+# becomes -qq, which drops the "N passed" line and leaves dots as the evidence.
+# This file supersedes earlier versions; each is still in git history next to
+# the commit that changed the count.
+........................................................................ [ 18%]
+........................................................................ [ 36%]
+........................................................................ [ 54%]
+........................................................................ [ 72%]
+........................................................................ [ 90%]
+....................................                                     [100%]
+396 passed in 31.63s

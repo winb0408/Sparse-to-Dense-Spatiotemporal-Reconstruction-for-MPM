@@ -48,8 +48,44 @@ def _fold_of(run: dict) -> int:
     return int(run.get("fold", 0))
 
 
+def _label(run: dict) -> str:
+    """What a table column is about: the arm *and* the model variant.
+
+    ``P2_DualW`` with ``phys_control=zeros`` is the same arm, the same parameter
+    count and the same recipe with a deliberately emptied physics input. Grouping
+    on ``arm`` alone put three E024 runs in one column: the headline cell came out
+    as the *shuffle* control (29.4031 instead of 29.4121, by directory order) and
+    the cross-animal table reported one animal as ``n = 3``.
+
+    Old summaries have no ``model_control``; they keep their old label, so
+    historical tables are unchanged.
+    """
+    control = (run.get("model_control") or {}).get("phys_control") or "none"
+    arm = run.get("arm", "?")
+    return arm if control in ("none", "") else f"{arm}[ctrl={control}]"
+
+
+def _pick(runs: list[dict], label: str, fold: int | None = None) -> dict | None:
+    """The single run carrying ``label`` (and ``fold``), or a loud failure.
+
+    Two runs sharing a label differ only by directory, and "whichever ``next()``
+    returns first" is how a control became the headline number. That ambiguity is
+    refused, not resolved silently.
+    """
+    hits = [r for r in runs
+            if _label(r) == label and (fold is None or _fold_of(r) == fold)]
+    if len(hits) > 1:
+        raise SystemExit(
+            f"{len(hits)} runs share the label {label!r} (fold {fold}): "
+            + ", ".join(r["_path"] for r in hits)
+            + ". Their summary.json does not record model_control, so no table "
+              "can say which run a column belongs to. Re-evaluate them with a "
+              "summary that records it.")
+    return hits[0] if hits else None
+
+
 def main_table(runs: list[dict]) -> str:
-    arms = sorted({r["arm"] for r in runs})
+    arms = sorted({_label(r) for r in runs})
     folds = sorted({_fold_of(r) for r in runs})
 
     lines = ["| metric | " + " | ".join(f"{a} fold{f}" for a in arms for f in folds)
@@ -61,8 +97,7 @@ def main_table(runs: list[dict]) -> str:
         for arm in arms:
             per_fold = []
             for fold in folds:
-                run = next((r for r in runs
-                            if r["arm"] == arm and _fold_of(r) == fold), None)
+                run = _pick(runs, arm, fold)
                 value = (run or {}).get("metrics", {}).get(metric, {}).get(
                     "mean_of_group_means")
                 cells.append("—" if value is None else f"{value:.4f}")
@@ -93,10 +128,8 @@ def compare_arms(runs: list[dict], arm_a: str, arm_b: str) -> str:
     for metric in METRICS:
         cells, deltas, signs = [], [], 0
         for fold in folds:
-            a = next((r for r in runs if r["arm"] == arm_a
-                      and _fold_of(r) == fold), None)
-            b = next((r for r in runs if r["arm"] == arm_b
-                      and _fold_of(r) == fold), None)
+            a = _pick(runs, arm_a, fold)
+            b = _pick(runs, arm_b, fold)
             va = (a or {}).get("metrics", {}).get(metric, {}).get(
                 "mean_of_group_means")
             vb = (b or {}).get("metrics", {}).get(metric, {}).get(
@@ -125,12 +158,12 @@ def cross_animal_table(runs: list[dict]) -> str:
     would dress up a three-point sample as precision; a range is what the data
     supports.
     """
-    arms = sorted({r["arm"] for r in runs})
+    arms = sorted({_label(r) for r in runs})
     lines = ["| metric | arm | n animals | mean | min | max |", "|---|---|---|---|---|---|"]
     for metric in METRICS:
         for arm in arms:
             vals = [r["metrics"][metric]["mean_of_group_means"] for r in runs
-                    if r["arm"] == arm and metric in r.get("metrics", {})
+                    if _label(r) == arm and metric in r.get("metrics", {})
                     and r["metrics"][metric].get("mean_of_group_means") is not None]
             if not vals:
                 lines.append(f"| {metric} | {arm} | 0 | — | — | — |")
@@ -158,14 +191,14 @@ DEPTH_METRICS = ("psnr", "dice", "cl_dice")
 def depth_table(runs: list[dict], index_path: Path, band_um: float = 200.0) -> str:
     """Per-arm depth profile. Arms must stay apart: pooling them would report
     the average of the methods as if it were a property of the data."""
-    arms = sorted({run.get("arm", "?") for run in runs})
+    arms = sorted({_label(run) for run in runs})
     steps: dict[str, float] = {}
     chunks: list[str] = []
 
     for arm in arms:
         buckets: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
         for run in runs:
-            if run.get("arm", "?") != arm:
+            if _label(run) != arm:
                 continue
             path = Path(run["_samples"])
             if not path.exists():
@@ -207,7 +240,7 @@ def depth_compare(runs: list[dict], index_path: Path, arm_a: str, arm_b: str,
     per_arm: dict[str, dict[str, dict[str, list[float]]]] = {}
 
     for run in runs:
-        arm = run.get("arm", "?")
+        arm = _label(run)
         if arm not in (arm_a, arm_b):
             continue
         path = Path(run["_samples"])
@@ -272,7 +305,7 @@ def main(argv: list[str] | None = None) -> int:
                   "", depth_compare(runs, args.index, *args.compare, args.band_um)]
     parts += ["", "## 运行清单", "", "| arm | fold | run | checkpoint |", "|---|---|---|---|"]
     for run in runs:
-        parts.append(f"| {run['arm']} | {_fold_of(run)} | `{run['_path']}` | "
+        parts.append(f"| {_label(run)} | {_fold_of(run)} | `{run['_path']}` | "
                      f"{run.get('checkpoint') or '—'} |")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(parts) + "\n")

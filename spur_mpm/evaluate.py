@@ -28,7 +28,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from spur_mpm.common.config import apply_overrides, load_config
-from spur_mpm.common.tensors import select_centre
+from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.data.split import read_split
 from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
@@ -37,6 +37,7 @@ from spur_mpm.metrics.statistics import summarise_by_group
 from spur_mpm.metrics.vessel import mask_vessel_metrics, segment_pair
 from spur_mpm.models.registry import build_model, eval_features, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
+from spur_mpm.physics.prior import psf_source_label
 from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.physics.sampling import SamplingSpec
 from spur_mpm.ssl.holdout import HoldoutSpec
@@ -163,6 +164,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         supervision="self" if withhold else "dense",
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
+        psf_source=cfg["physics"].get("psf_source"),
     )
     ds = VolumeWindowDataset(cache, sample_ids, item_cfg,
                              patch_hw=tuple(cfg["data"]["patch_hw"]),
@@ -178,7 +180,13 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         model = build_model(arm, context, base=int(cfg["model"]["base"]),
                             window=int(cfg["model"]["window"]),
                             depths=tuple(cfg["model"]["depths"]),
-                            heads=tuple(cfg["model"]["heads"])).to(device)
+                            heads=tuple(cfg["model"]["heads"]),
+                            # Must match the training run exactly: a control arm
+                            # scored with the physics candidate restored would be
+                            # a different model than the one that was trained.
+                            phys_control=str(cfg["model"].get("phys_control",
+                                                              "none")),
+                            consistency=cfg["model"].get("consistency")).to(device)
         payload = torch.load(ckpt, map_location=device, weights_only=False)
         model.load_state_dict(payload["model"])
         model.eval()
@@ -193,7 +201,8 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         for batch in loader:
             if model is not None:
                 x = batch["inputs"].to(device)
-                pred = select_centre(model(x).float(), batch["center_index"])
+                pred = select_centre(as_reconstruction(model(x)).float(),
+                                     batch["center_index"])
                 pred = pred.cpu()
             else:
                 # Use the same query-centred prior as inference. This also
@@ -287,10 +296,25 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         "sampling": sampling.to_dict(),
         "context_depth": context,
         "physics": {"psf": psf.to_dict(), "lam": cfg["physics"]["lam"],
-                    "u_kind": cfg["physics"].get("u_kind", "geo")},
+                    "u_kind": cfg["physics"].get("u_kind", "geo"),
+                    # Which optical model this number may be attributed to. Under
+                    # `identity` the Wiener candidate equals interpolation, so a
+                    # summary without this field invites the wrong sentence.
+                    "psf_source": psf_source_label(
+                        psf, cfg["physics"].get("psf_source"))},
         "supervision": arm.supervision,
         "input_support": input_support,
         "consistency_projection": projection,
+        # The arm name alone does not identify a run: a parameter-matched
+        # physics control is the *same* arm with the same weights' shape and a
+        # different input. Without this field a table that groups by ``arm``
+        # silently reports a control as if it were the headline run (E024: the
+        # `P2_DualW` column came out as the shuffle control, 29.4031 instead of
+        # 29.4121), and a cross-animal mean counts one animal three times.
+        "model_control": {
+            "phys_control": str(cfg["model"].get("phys_control", "none")),
+            "consistency": str(cfg["model"].get("consistency") or "off"),
+        },
         "n_windows": len(rows),
         "n_windows_fully_measured": int(sum(bool(r.get("fully_measured"))
                                             for r in rows)),

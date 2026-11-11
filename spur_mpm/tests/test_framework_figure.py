@@ -18,6 +18,7 @@ from spur_mpm.scripts.framework_figure import (
     COLUMN_BY_KEY,
     FROZEN,
     NA,
+    NOT_RUN,
     Number,
     cell_for,
     format_number,
@@ -178,7 +179,10 @@ def test_blocks_cover_every_row():
     rows = matrix_rows()
     blocks = matrix_blocks(rows)
     assert sum(len(b.rows) for b in blocks) == len(rows)
-    assert [b.key for b in blocks] == ["floors", "supervised", "frozen"]
+    # ``planned`` sits between the measured bands and the frozen ones: a row
+    # that exists in code but has no real-data number yet is neither.
+    assert [b.key for b in blocks] == ["floors", "supervised", "planned", "frozen"]
+    assert all(r.planned for b in blocks if b.key == "planned" for r in b.rows)
 
 
 def test_frozen_rows_say_frozen_rather_than_blank():
@@ -190,6 +194,32 @@ def test_frozen_rows_say_frozen_rather_than_blank():
             assert rows[name].cell("macs").text == FROZEN
             # the design is still shown, in grey
             assert rows[name].cell("y").tick is True
+
+
+def test_an_unrun_pr2_arm_says_not_run_instead_of_inventing_a_number():
+    """The honest cell for "implemented, no GPU minute spent yet".
+
+    ``n/a`` would read as "not applicable to this arm"; ``NOT_RUN`` says the
+    experiment is owed. The design columns still come from the registry, so the
+    figure keeps showing what *would* be run.
+    """
+    numbers = {name: {} for name, arm in ARMS.items()
+               if group_of(arm) != "frozen" and arm.family != "pr2"}
+    rows = {r.arm.name: r for r in matrix_rows(numbers=numbers)}
+    pr2 = [a for a in ARMS.values() if a.family == "pr2"]
+    assert pr2, "no PR2 arms registered"
+    for arm in pr2:
+        row = rows[arm.name]
+        assert row.planned is True and row.group == "planned"
+        for column in ("params", "macs", "latency"):
+            assert row.cell(column).text == NOT_RUN
+        assert row.cell("warm_start").text == arm.warm_start   # design still shown
+
+    # As soon as a real number exists the arm joins the measured band, with no
+    # hand-maintained list to update.
+    numbers[pr2[0].name] = {"params_m": Number(1.0, "x.json", "params_m")}
+    moved = {r.arm.name: r for r in matrix_rows(numbers=numbers)}[pr2[0].name]
+    assert moved.planned is False and moved.group != "planned"
 
 
 def test_supervised_arm_without_a_measurement_is_an_error():

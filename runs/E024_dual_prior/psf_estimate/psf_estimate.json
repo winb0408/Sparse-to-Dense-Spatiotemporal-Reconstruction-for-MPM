@@ -1,0 +1,430 @@
+{
+  "protocol": {
+    "fold": 0,
+    "split": "spur_mpm/experiments/E020_cohort/split.json",
+    "index": "data_local/dryad_cache/index_cohort.json",
+    "sampling": {
+      "mode": "y",
+      "ky": 2,
+      "kz": 1
+    },
+    "patch": [
+      32,
+      256,
+      256
+    ],
+    "n_patches": 6,
+    "lam": 0.01,
+    "seed": 0,
+    "volumes": [
+      "M1_FOVII_S1_vessels",
+      "M1_FOVII_S2_vessels",
+      "M3_FOVI_S1_vessels",
+      "M3_FOVI_S2_vessels"
+    ],
+    "test_ids": [
+      "M2_FOVII_S1_vessels",
+      "M2_FOVII_S2_vessels",
+      "M2_FOVI_S1_vessels",
+      "M2_FOVI_S2_vessels"
+    ]
+  },
+  "arithmetic": [
+    {
+      "excitation_nm": 1340.0,
+      "na": 0.8,
+      "n_medium": 1.33,
+      "n_photon": 3,
+      "fwhm_xy_um_single_photon": 0.85425,
+      "fwhm_z_um_single_photon": 4.408175830874853,
+      "sigma_xy_um": 0.20944516199050356,
+      "sigma_z_um": 1.080797308727195,
+      "sigma_xy_px": 0.21371955305153426,
+      "sigma_z_px": 0.21615946174543899,
+      "psf": {
+        "sigma_xy_um": 0.20944516199050356,
+        "sigma_z_um": 1.080797308727195,
+        "voxel_xy_um": 0.98,
+        "voxel_z_um": 5.0,
+        "sigma_xy_px": 0.21371955305153426,
+        "sigma_z_px": 0.21615946174543899,
+        "is_identity": false
+      },
+      "assumptions": [
+        "diffraction-limited: no scattering, no aberration, no defocus, no motion; real tissue is always broader than this, never narrower",
+        "first-order multi-photon narrowing (FWHM / sqrt(N)); exact for the lateral axes, approximate axially",
+        "NA and n are NOT in the deposit -- they are inputs to this call, and the answer inherits whatever error they carry"
+      ]
+    },
+    {
+      "excitation_nm": 1340.0,
+      "na": 1.0,
+      "n_medium": 1.33,
+      "n_photon": 3,
+      "fwhm_xy_um_single_photon": 0.6834,
+      "fwhm_z_um_single_photon": 2.602340433692622,
+      "sigma_xy_um": 0.16755612959240287,
+      "sigma_z_um": 0.6380422753165802,
+      "sigma_xy_px": 0.17097564244122743,
+      "sigma_z_px": 0.12760845506331603,
+      "psf": {
+        "sigma_xy_um": 0.16755612959240287,
+        "sigma_z_um": 0.6380422753165802,
+        "voxel_xy_um": 0.98,
+        "voxel_z_um": 5.0,
+        "sigma_xy_px": 0.17097564244122743,
+        "sigma_z_px": 0.12760845506331603,
+        "is_identity": false
+      },
+      "assumptions": [
+        "diffraction-limited: no scattering, no aberration, no defocus, no motion; real tissue is always broader than this, never narrower",
+        "first-order multi-photon narrowing (FWHM / sqrt(N)); exact for the lateral axes, approximate axially",
+        "NA and n are NOT in the deposit -- they are inputs to this call, and the answer inherits whatever error they carry"
+      ]
+    },
+    {
+      "excitation_nm": 1340.0,
+      "na": 1.05,
+      "n_medium": 1.33,
+      "n_photon": 3,
+      "fwhm_xy_um_single_photon": 0.6508571428571428,
+      "fwhm_z_um_single_photon": 2.29565186976528,
+      "sigma_xy_um": 0.15957726627847893,
+      "sigma_z_um": 0.5628483204410788,
+      "sigma_xy_px": 0.16283394518212135,
+      "sigma_z_px": 0.11256966408821575,
+      "psf": {
+        "sigma_xy_um": 0.15957726627847893,
+        "sigma_z_um": 0.5628483204410788,
+        "voxel_xy_um": 0.98,
+        "voxel_z_um": 5.0,
+        "sigma_xy_px": 0.16283394518212135,
+        "sigma_z_px": 0.11256966408821575,
+        "is_identity": false
+      },
+      "assumptions": [
+        "diffraction-limited: no scattering, no aberration, no defocus, no motion; real tissue is always broader than this, never narrower",
+        "first-order multi-photon narrowing (FWHM / sqrt(N)); exact for the lateral axes, approximate axially",
+        "NA and n are NOT in the deposit -- they are inputs to this call, and the answer inherits whatever error they carry"
+      ]
+    }
+  ],
+  "heldout_xy": [
+    {
+      "axis": "xy",
+      "sigma_um": 0.0,
+      "sigma_px": 0.0,
+      "is_identity": true,
+      "psnr_mean": 26.001547239750863,
+      "psnr_median": 26.14499121626239,
+      "delta_psnr_mean": 0.0,
+      "delta_psnr_median": 0.0,
+      "changed_fraction_mean": 0.0,
+      "n_patches": 24
+    },
+    {
+      "axis": "xy",
+      "sigma_um": 0.2,
+      "sigma_px": 0.20408163265306123,
+      "is_identity": false,
+      "psnr_mean": 25.835320502558428,
+      "psnr_median": 25.97505992830463,
+      "delta_psnr_mean": -0.1662267371924376,
+      "delta_psnr_median": -0.170131100839086,
+      "changed_fraction_mean": 0.9997480114301046,
+      "n_patches": 24
+    },
+    {
+      "axis": "xy",
+      "sigma_um": 0.4,
+      "sigma_px": 0.40816326530612246,
+      "is_identity": false,
+      "psnr_mean": 25.01762767835807,
+      "psnr_median": 25.128404700899406,
+      "delta_psnr_mean": -0.9839195613927935,
+      "delta_psnr_median": -1.0108254889347386,
+      "changed_fraction_mean": 0.999948521455129,
+      "n_patches": 24
+    },
+    {
+      "axis": "xy",
+      "sigma_um": 0.6,
+      "sigma_px": 0.6122448979591837,
+      "is_identity": false,
+      "psnr_mean": 22.51904277731303,
+      "psnr_median": 22.552591250320685,
+      "delta_psnr_mean": -3.482504462437833,
+      "delta_psnr_median": -3.5577332443030087,
+      "changed_fraction_mean": 0.9999839663505554,
+      "n_patches": 24
+    },
+    {
+      "axis": "xy",
+      "sigma_um": 0.8,
+      "sigma_px": 0.8163265306122449,
+      "is_identity": false,
+      "psnr_mean": 20.277090784453367,
+      "psnr_median": 20.298619415640438,
+      "delta_psnr_mean": -5.724456455297499,
+      "delta_psnr_median": -5.848007207744022,
+      "changed_fraction_mean": 0.9999887545903524,
+      "n_patches": 24
+    },
+    {
+      "axis": "xy",
+      "sigma_um": 1.0,
+      "sigma_px": 1.0204081632653061,
+      "is_identity": false,
+      "psnr_mean": 20.32704875769615,
+      "psnr_median": 20.364458090082284,
+      "delta_psnr_mean": -5.674498482054712,
+      "delta_psnr_median": -5.760020839167536,
+      "changed_fraction_mean": 0.9999881386756897,
+      "n_patches": 24
+    },
+    {
+      "axis": "xy",
+      "sigma_um": 1.5,
+      "sigma_px": 1.530612244897959,
+      "is_identity": false,
+      "psnr_mean": 20.393936856566775,
+      "psnr_median": 20.699730671857587,
+      "delta_psnr_mean": -5.607610383184091,
+      "delta_psnr_median": -5.339224208714839,
+      "changed_fraction_mean": 0.999987781047821,
+      "n_patches": 24
+    },
+    {
+      "axis": "xy",
+      "sigma_um": 2.0,
+      "sigma_px": 2.0408163265306123,
+      "is_identity": false,
+      "psnr_mean": 21.19207494896677,
+      "psnr_median": 21.739955362834223,
+      "delta_psnr_mean": -4.809472290784096,
+      "delta_psnr_median": -4.393755051246345,
+      "changed_fraction_mean": 0.9999855955441793,
+      "n_patches": 24
+    },
+    {
+      "axis": "xy",
+      "sigma_um": 3.0,
+      "sigma_px": 3.061224489795918,
+      "is_identity": false,
+      "psnr_mean": 22.193618768868927,
+      "psnr_median": 23.453206099100754,
+      "delta_psnr_mean": -3.8079284708819423,
+      "delta_psnr_median": -2.7351031007378186,
+      "changed_fraction_mean": 0.999983549118042,
+      "n_patches": 24
+    }
+  ],
+  "heldout_z": [
+    {
+      "axis": "z",
+      "sigma_um": 0.0,
+      "sigma_px": 0.0,
+      "is_identity": true,
+      "psnr_mean": 26.001547239750863,
+      "psnr_median": 26.14499121626239,
+      "delta_psnr_mean": 0.0,
+      "delta_psnr_median": 0.0,
+      "changed_fraction_mean": 0.0,
+      "n_patches": 24
+    },
+    {
+      "axis": "z",
+      "sigma_um": 1.0,
+      "sigma_px": 0.2,
+      "is_identity": false,
+      "psnr_mean": 25.82890788231362,
+      "psnr_median": 25.969342248590813,
+      "delta_psnr_mean": -0.17263935743724504,
+      "delta_psnr_median": -0.1756277418817369,
+      "changed_fraction_mean": 0.9997239311536154,
+      "n_patches": 24
+    },
+    {
+      "axis": "z",
+      "sigma_um": 2.0,
+      "sigma_px": 0.4,
+      "is_identity": false,
+      "psnr_mean": 24.938305290842635,
+      "psnr_median": 25.076140593588416,
+      "delta_psnr_mean": -1.0632419489082336,
+      "delta_psnr_median": -1.066457333734622,
+      "changed_fraction_mean": 0.9999410112698873,
+      "n_patches": 24
+    },
+    {
+      "axis": "z",
+      "sigma_um": 3.0,
+      "sigma_px": 0.6,
+      "is_identity": false,
+      "psnr_mean": 22.420521235478247,
+      "psnr_median": 22.618590631047873,
+      "delta_psnr_mean": -3.581026004272617,
+      "delta_psnr_median": -3.5285608779874327,
+      "changed_fraction_mean": 0.9999816219011942,
+      "n_patches": 24
+    },
+    {
+      "axis": "z",
+      "sigma_um": 5.0,
+      "sigma_px": 1.0,
+      "is_identity": false,
+      "psnr_mean": 20.488449895246433,
+      "psnr_median": 20.856421978227342,
+      "delta_psnr_mean": -5.513097344504431,
+      "delta_psnr_median": -5.312388782450856,
+      "changed_fraction_mean": 0.9999876618385315,
+      "n_patches": 24
+    },
+    {
+      "axis": "z",
+      "sigma_um": 8.0,
+      "sigma_px": 1.6,
+      "is_identity": false,
+      "psnr_mean": 21.444786649400445,
+      "psnr_median": 22.006717855180053,
+      "delta_psnr_mean": -4.556760590350418,
+      "delta_psnr_median": -3.961010762286758,
+      "changed_fraction_mean": 0.9999855756759644,
+      "n_patches": 24
+    }
+  ],
+  "best_xy": {
+    "axis": "xy",
+    "sigma_um": 0.0,
+    "sigma_px": 0.0,
+    "is_identity": true,
+    "psnr_mean": 26.001547239750863,
+    "psnr_median": 26.14499121626239,
+    "delta_psnr_mean": 0.0,
+    "delta_psnr_median": 0.0,
+    "changed_fraction_mean": 0.0,
+    "n_patches": 24
+  },
+  "best_z": {
+    "axis": "z",
+    "sigma_um": 0.0,
+    "sigma_px": 0.0,
+    "is_identity": true,
+    "psnr_mean": 26.001547239750863,
+    "psnr_median": 26.14499121626239,
+    "delta_psnr_mean": 0.0,
+    "delta_psnr_median": 0.0,
+    "changed_fraction_mean": 0.0,
+    "n_patches": 24
+  },
+  "per_volume": {
+    "M1_FOVII_S1_vessels": {
+      "n_patches": 6,
+      "best_xy": {
+        "axis": "xy",
+        "sigma_um": 0.0,
+        "sigma_px": 0.0,
+        "is_identity": true,
+        "psnr_mean": 25.122819353718555,
+        "psnr_median": 25.40637854703987,
+        "delta_psnr_mean": 0.0,
+        "delta_psnr_median": 0.0,
+        "changed_fraction_mean": 0.0,
+        "n_patches": 6
+      },
+      "best_z": {
+        "axis": "z",
+        "sigma_um": 0.0,
+        "sigma_px": 0.0,
+        "is_identity": true,
+        "psnr_mean": 25.122819353718555,
+        "psnr_median": 25.40637854703987,
+        "delta_psnr_mean": 0.0,
+        "delta_psnr_median": 0.0,
+        "changed_fraction_mean": 0.0,
+        "n_patches": 6
+      }
+    },
+    "M1_FOVII_S2_vessels": {
+      "n_patches": 6,
+      "best_xy": {
+        "axis": "xy",
+        "sigma_um": 0.0,
+        "sigma_px": 0.0,
+        "is_identity": true,
+        "psnr_mean": 24.753028919032506,
+        "psnr_median": 24.895696264588196,
+        "delta_psnr_mean": 0.0,
+        "delta_psnr_median": 0.0,
+        "changed_fraction_mean": 0.0,
+        "n_patches": 6
+      },
+      "best_z": {
+        "axis": "z",
+        "sigma_um": 0.0,
+        "sigma_px": 0.0,
+        "is_identity": true,
+        "psnr_mean": 24.753028919032506,
+        "psnr_median": 24.895696264588196,
+        "delta_psnr_mean": 0.0,
+        "delta_psnr_median": 0.0,
+        "changed_fraction_mean": 0.0,
+        "n_patches": 6
+      }
+    },
+    "M3_FOVI_S1_vessels": {
+      "n_patches": 6,
+      "best_xy": {
+        "axis": "xy",
+        "sigma_um": 0.0,
+        "sigma_px": 0.0,
+        "is_identity": true,
+        "psnr_mean": 26.947849383952313,
+        "psnr_median": 26.94655796975392,
+        "delta_psnr_mean": 0.0,
+        "delta_psnr_median": 0.0,
+        "changed_fraction_mean": 0.0,
+        "n_patches": 6
+      },
+      "best_z": {
+        "axis": "z",
+        "sigma_um": 0.0,
+        "sigma_px": 0.0,
+        "is_identity": true,
+        "psnr_mean": 26.947849383952313,
+        "psnr_median": 26.94655796975392,
+        "delta_psnr_mean": 0.0,
+        "delta_psnr_median": 0.0,
+        "changed_fraction_mean": 0.0,
+        "n_patches": 6
+      }
+    },
+    "M3_FOVI_S2_vessels": {
+      "n_patches": 6,
+      "best_xy": {
+        "axis": "xy",
+        "sigma_um": 0.0,
+        "sigma_px": 0.0,
+        "is_identity": true,
+        "psnr_mean": 27.182491302300082,
+        "psnr_median": 27.13948519627468,
+        "delta_psnr_mean": 0.0,
+        "delta_psnr_median": 0.0,
+        "changed_fraction_mean": 0.0,
+        "n_patches": 6
+      },
+      "best_z": {
+        "axis": "z",
+        "sigma_um": 0.0,
+        "sigma_px": 0.0,
+        "is_identity": true,
+        "psnr_mean": 27.182491302300082,
+        "psnr_median": 27.13948519627468,
+        "delta_psnr_mean": 0.0,
+        "delta_psnr_median": 0.0,
+        "changed_fraction_mean": 0.0,
+        "n_patches": 6
+      }
+    }
+  }
+}

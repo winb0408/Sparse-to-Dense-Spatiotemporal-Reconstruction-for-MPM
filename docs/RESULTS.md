@@ -88,11 +88,44 @@
 
 ## 环境
 
-conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -q`
-（**245 项，全绿**；本轮新增的有 `test_qualitative_figures.py`、`test_sparse_figures.py`、
-`test_ladder_curves.py`、`test_benchmark.py`、`test_ladder_report.py`、`test_skeleton.py` 的扩充，
-以及 `test_run_ladder_state.py`、`test_framework_figure.py`、`test_structure_figure.py`、
-`test_structure_report.py`）。
+conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mpm/tests -o addopts="" -q`
+（**400 项，全绿**；日志 `docs/evidence/pytest_20261112_compare_structure.log`。`-o addopts=""` 是必需的：
+`pytest.ini` 已经带 `-q`，命令行再加一个 `-q` 会变成 `-qq`、把 `400 passed` 那行一起吞掉，
+只留下点阵。上一轮为 245 项，
+本轮新增 `test_physics_prior_contract.py` 30 项、`test_dual_branch_contract.py` 38 项、
+`test_archive_safety.py` 21 项、`test_psf_estimate.py` 16 项、
+`test_run_e024_guard.py` 12 项，其余为 `test_framework_figure.py` 等既有文件的扩充）。
+
+## PR2 物理先验 / 双分支
+
+本文档的主体是 **E021/E023 那一代（`A*/S*/SS*`）** 的数字。PR2 新方法代（`P2_*`）
+的第一批真实数字（fold 0、单种子、758 窗口）在
+[`docs/PHASE1_PR2_E024_RESULTS.md`](PHASE1_PR2_E024_RESULTS.md)：**8 个臂全部落地**
+（地板 2 + residual 2 + dual 2 + 参数匹配对照 2），定性图在
+`runs/E024_dual_prior/figures/qual_y_k2/`，主结论是**否定**的（identity PSF 下
+物理分支没有可测量的独立贡献）。整卷 3D 骨架报告两臂八卷已落盘：均值 Dice 0.8392→0.8744，
+但四卷中三卷的 Δ 低于声称阈值、且与窗口级 Dice **符号相反**（两把尺子），故不下结论。
+**新旧两代的数字不可同列排名**（见文末两条口径陷阱）。
+
+PR2 的协议层证据（不依赖训练，已全部完成）：
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| identity PSF 下 `P2_W0` 与 `P2_I0` | 真实测试卷上**逐位相同**（只有 `"arm"` 字段不同） | `docs/evidence/smoke_floors_20261110/` |
+| 非恒等 H（人为额外加 blur）再反卷积 | PSNR 28.03 → 27.55，SSIM 0.750 → 0.629，**变差** | 同上 |
+| 源数据是否含 PSF 标定 | **不含**：README 把成像参数指向正文 Methods，TIFF 头只有 `spacing=5.0`，spec 无 NA | `docs/PHASE1_PR2_PSF_ESTIMATE.md` §1 |
+| 衍射极限算术（1340 nm 三光子） | σ_xy 0.16–0.21 体素、σ_z 0.11–0.22 体素——**比体素还细** | 同上 §2 |
+| 留出真实测量行的最优反卷积宽度 | **两轴都是 σ=0**，9 档横向 / 6 档轴向全部更差（0.2 µm 即 −0.17 dB） | `docs/evidence/psf_estimate_20261110/` |
+
+第二、第四条**不能**读作"Wiener 有害"：真实 stack 已带自身光学，再按一个不存在的
+模糊去卷积，等于去掉不存在的模糊。它们能读作的是——本队列**没有可去除的光学模糊**，
+所以 identity 是测出来的结论而非默认假设；而"Wiener 在本队列有独立增益"这句话，
+现在有可复现的否定证据。方法口径见 [`docs/PHASE1_PR2_METHOD_SPEC.md`](PHASE1_PR2_METHOD_SPEC.md) §2，
+估计过程见 [`docs/PHASE1_PR2_PSF_ESTIMATE.md`](PHASE1_PR2_PSF_ESTIMATE.md)，
+逐条状态见 [`docs/PHASE1_PR2_ACCEPTANCE.md`](PHASE1_PR2_ACCEPTANCE.md)。
+
+**新旧数字不可同列排名**：`A1` 是 `wiener_fill_first`（Z 未填洞），`P2_W0` 是
+`wiener_fill_all`；`S1` 的 `X0` 只是拼接通道，`P2_ResidualI` 是残差锚点。
 
 ## 两个必须知道的口径陷阱
 
