@@ -153,8 +153,9 @@ python -m spur_mpm.scripts.framework_figure \
   + 4 项单测）。数字见 `docs/PHASE1_PR2_E024_RESULTS.md` §8.2：均值 Dice 0.8392 → 0.8744
   （+0.0352），但**四卷中有三卷的 Δ 低于 0.03 声称阈值、且单动物**，故该节不下结论；
   该节同时记录了与窗口级 Dice 的**符号相反**及其原因（两把尺子）
-- 整卷骨架在**同一操作点**上的受控重算：`NOT_RUN`（判定符号相反是操作点还是结构差异所需；
-  未跑，故不得写"训练臂结构更好"）
+- 对输出幅度敏感的整卷 Dice 已不足以定论，**对幅度不敏感的结构比较**：`NOT_RUN`
+  （需要按臂对比度匹配的二值化，或骨架中心线/分支长度这类不经体素面积的指标（T3）；
+  `keep_recon=False` 已删除重建数组，要做需先重跑重建。故不得写"训练臂结构更好"）
 - 定性图：`DONE`（`runs/E024_dual_prior/figures/qual_y_k2/`，6 列同 ViewSpec，
   读法与三条注意事项见 `docs/PHASE1_PR2_E024_RESULTS.md` §8.1）
 - `P2_DualWU` / `P2_DualWUT` / `P2_TopoConf`：`TODO`（前者需标定 H，后两者属 T3/T5）
