@@ -389,6 +389,19 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
     torch.save({"model": model.state_dict(), "config": cfg}, run.path / "last.pt")
     final = validate(model, val_loader, device, supervision=arm.supervision,
                      rho=cfg["loss"]["rho"], amp=amp, dual=arm.dual)
+    # What this run actually held on the card. Recorded because "may these two
+    # arms share a GPU?" is otherwise answered by guessing, and a guess is how a
+    # launch ends in an OOM three hours in. It is a *capacity* number, not a
+    # performance claim: on a card carrying another user's job it measures
+    # co-occupancy, and must not be quoted as a benchmark.
+    if device.type == "cuda":
+        final["gpu_peak_allocated_mb"] = round(
+            torch.cuda.max_memory_allocated(device) / 2 ** 20, 1)
+        final["gpu_peak_reserved_mb"] = round(
+            torch.cuda.max_memory_reserved(device) / 2 ** 20, 1)
+        print(f"[{run_name}] gpu peak: allocated "
+              f"{final['gpu_peak_allocated_mb']:.0f} MiB, reserved "
+              f"{final['gpu_peak_reserved_mb']:.0f} MiB", flush=True)
     (run.path / "final_val.json").write_text(json.dumps(final, indent=2))
     problems = run.validate(expect_weights=True)
     run.close()

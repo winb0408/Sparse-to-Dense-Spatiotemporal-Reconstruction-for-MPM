@@ -27,8 +27,8 @@
 #   * no GPU list => no run. A card carrying someone else's job is not a
 #     benchmarking device, and quietly falling back to GPU 0 is how a timing
 #     number becomes meaningless.
-#   * GPU 2 is not ours to fill. It has hung and restarted this server when
-#     occupied, so it is refused outright (ALLOW_GPU2=1 to override on purpose).
+#   * GPU 2 is on probation. Filling it has hung and restarted this server, so
+#     it is used only while under half full -- checked at launch, not assumed.
 #   * DRY is the default. Writing this file must not launch anything.
 set -u
 cd "$(dirname "$0")/../.."
@@ -68,16 +68,36 @@ if [[ "$DRY" != "1" && ${#GPU_LIST[@]} -eq 0 ]]; then
   exit 2
 fi
 
-# GPU 2 is excluded by policy, not by taste. Filling it has hung this server
-# and triggered an unattended restart, which takes down every other user's job
-# as well as ours -- a shared machine does not owe us a card that survives our
-# footprint. This is a hard stop rather than a warning because "I'll remember
-# not to" is exactly the guarantee that failed last time; ALLOW_GPU2=1 exists
-# only so that breaking the rule is a visible act, not a forgotten one.
+# GPU 2 is on probation, not off limits. Filling it has hung this server and
+# triggered an unattended restart, taking other users' jobs down with ours. So
+# it may be used only while it is **less than half full**, and that is measured
+# at launch time rather than assumed: "it was half free an hour ago" is exactly
+# the shape of the last incident. The threshold is deliberately conservative --
+# a card this one's occupancy can push to 100 % is not worth a second arm today.
+#
+#   GPU2_MAX_FRACTION=0.5   (default) ceiling on used/total before the launch
+#   ALLOW_GPU2=1            skip the check; a visible act, not a forgotten one
+GPU2_MAX_FRACTION="${GPU2_MAX_FRACTION:-0.5}"
+gpu_mem () {   # gpu_mem <index> -> "<used_mib>,<total_mib>", empty if unreadable
+  "${NVIDIA_SMI:-nvidia-smi}" --query-gpu=memory.used,memory.total \
+    --format=csv,noheader,nounits -i "$1" 2>/dev/null | tr -d ' '
+}
 if [[ " ${GPU_LIST[*]} " == *" 2 "* && "${ALLOW_GPU2:-0}" != "1" ]]; then
-  echo "refusing to use GPU 2: fully occupying it has hung and restarted this" >&2
-  echo "server before. Use the other cards, or set ALLOW_GPU2=1 deliberately." >&2
-  exit 2
+  mem="$(gpu_mem 2)"; used="${mem%%,*}"; total="${mem##*,}"
+  if ! [[ "$used" =~ ^[0-9]+$ && "$total" =~ ^[0-9]+$ ]] || (( total == 0 )); then
+    echo "refusing to use GPU 2: could not read its occupancy (got '$mem')." >&2
+    echo "An unreadable card is not evidence that it is free." >&2
+    exit 2
+  fi
+  if awk -v u="$used" -v t="$total" -v f="$GPU2_MAX_FRACTION" \
+       'BEGIN{exit !(u/t >= f)}'; then
+    echo "refusing to use GPU 2: ${used}/${total} MiB is $(awk -v u="$used" \
+         -v t="$total" 'BEGIN{printf "%.1f", 100*u/t}')%, at or above the" \
+         "$(awk -v f="$GPU2_MAX_FRACTION" 'BEGIN{printf "%.0f", 100*f}')% ceiling." >&2
+    echo "GPU 2 may be used only while under half full; ALLOW_GPU2=1 overrides." >&2
+    exit 2
+  fi
+  echo "GPU 2 at ${used}/${total} MiB -- under the ceiling, allowed this launch" >&2
 fi
 
 # A filled-in ladder is the common case for a second launch: some stages have

@@ -19,9 +19,9 @@ python -m pytest spur_mpm/tests -o addopts="" -q; echo "EXIT=$?"
 #     与别人的作业共卡时，训练精度结论仍然有效，但延迟/吞吐/峰值显存一律不可报。
 nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu \
           --format=csv
-#     **GPU 2 不要用。** 它被占满会让整台服务器卡死并触发无人值守重启，
-#     把别人的作业一起带走。`run_e024.sh` 已把这条写成硬拒绝（见下），
-#     不是靠记性。
+#     **GPU 2 只在低于半满时可用。** 它被占满会让整台服务器卡死并触发无人值守
+#     重启，把别人的作业一起带走。`run_e024.sh` 每次启动现量，≥50 % 就拒绝
+#     （见 §0.1），不是靠记性。
 
 # (3) 物理先验的来源必须写在命令里。identity 之外的 H 缺 psf_source 会被第一个 batch 拒掉；
 #     本队列没有标定，自估值用 estimated_from_data，理由见 PSF_ESTIMATE 文档。
@@ -36,25 +36,44 @@ DRY=1 STAGE=all bash spur_mpm/experiments/run_e024.sh
 第 (4) 步的 dry-run 是默认行为：`run_e024.sh` 不给 `GPUS=` 就只打印、不执行，
 也不存在"静默回退到 GPU 0"的分支。这条是 T0 归档纪律在训练侧的对应物。
 
-### 0.1 GPU 2 是硬拒绝，不是建议
+### 0.1 GPU 2 是"观察期"：低于半满才可用，且每次启动重新量
 
 ```bash
 GPUS=0,2 DRY=0 STAGE=dual bash spur_mpm/experiments/run_e024.sh
-# refusing to use GPU 2: fully occupying it has hung and restarted this
-# server before. Use the other cards, or set ALLOW_GPU2=1 deliberately.
+# refusing to use GPU 2: 26274/49140 MiB is 53.5%, at or above the 50% ceiling.
+# GPU 2 may be used only while under half full; ALLOW_GPU2=1 overrides.
 # rc=2
 ```
 
+规则是**显存占用率 < 50 %** 才允许，而且在**每次启动时**用 `nvidia-smi` 现量，
+不是沿用上一次的判断——"一小时前还空着一半"正是上次事故的形态。阈值含等于：
+正好 50 % 算满，拒绝。读不到占用率也是拒绝：**"读不出来"不等于"它是空的"**。
+`GPU2_MAX_FRACTION`（默认 `0.5`）可调，`ALLOW_GPU2=1` 是唯一的破例出口。
+
 写进脚本而不是写进文档的理由很简单：这条约束原本只在人的记忆里，而上一轮
-正是在这里失了手——把 `P2_ResidualI` 起在了 GPU 2 上。硬拒绝在**第一个作业
-之前**退出（`DRY=1` 的打印也一样），所以它不会先跑起来再提醒。
-`ALLOW_GPU2=1` 保留了一个显式出口，是为了让"破例"成为一个看得见的动作，
-而不是一次忘记。
+正是在这里失了手——把 `P2_ResidualI` 起在了 GPU 2 上。检查发生在**第一个作业
+之前**（`DRY=1` 的打印分支同样检查），所以它不会先跑起来再提醒。
+不在 `GPUS=` 里的卡根本不会去读占用率，所以一台坏掉的 `nvidia-smi` 不会
+连带挡住本来就合规的卡。
 
-`spur_mpm/tests/test_run_e024_guard.py`（6 项）把四条规则钉住：任意位置的
-`2` 都拒、dry-run 也拒、覆写必须显式、无 `GPUS=` 不跑。
+`spur_mpm/tests/test_run_e024_guard.py`（10 项）把规则钉住而不是把机器状态钉住：
+测试通过 `NVIDIA_SMI` 注入一个假命令，覆盖 53.5 % 拒绝、正好 50 % 拒绝、36.6 %
+放行、读不出拒绝、显式破例放行、阈值可调、非 2 号卡不做探测，以及无 `GPUS=` 不跑。
 
-### 0.2 断点续跑：`SKIP_DONE=1`
+### 0.2 显存是量出来的，不是估出来的
+
+`train.py` 在每次训练结束时把本 run 真正占住的显存写进 `final_val.json`：
+
+```json
+"gpu_peak_allocated_mb": 10842.3,
+"gpu_peak_reserved_mb": 13384.0
+```
+
+`reserved` 才是与 `nvidia-smi` 对得上的那个数（缓存分配器替进程留住的部分），
+所以判断"这两臂能不能共卡"看它，留 15 % 余量。**这是容量数字，不是性能结论**：
+在别人作业同在的卡上量到的共占值，不得写进任何延迟/吞吐/峰值显存表格。
+
+### 0.3 断点续跑：`SKIP_DONE=1`
 
 阶梯被打断后重开，最贵的错误是把已经跑完的 6 小时再跑一遍：
 
@@ -259,7 +278,7 @@ python -m spur_mpm.scripts.framework_figure \
 
 每个 run 目录必须有：`config.yaml`（含解析后的 `phys_control` / `consistency` /
 `n_parameters`）、`provenance.json`（数据与 split 的 hash）、`log.jsonl`、
-`best.pt`、`final_val.json`。评估目录必须有 `summary.json`，其中的 `physics`
+`best.pt`、`final_val.json`（GPU 上跑的还要有 `gpu_peak_reserved_mb`）。评估目录必须有 `summary.json`，其中的 `physics`
 块带 `psf_source`，`checkpoint` 字段非空（除零参数地板）。
 
 新 run 不得覆盖 E021/E023；E024 的编号如被占用则顺延并在
