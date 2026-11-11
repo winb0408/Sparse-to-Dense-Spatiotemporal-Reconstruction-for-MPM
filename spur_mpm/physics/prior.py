@@ -50,8 +50,15 @@ __all__ = [
 ]
 
 #: Where a non-identity ``H`` may legitimately come from (PR2 §2).
+#:
+#: ``estimated_from_data`` is the third case the deposit forces: no optical
+#: calibration ships with it (README points at a Methods section that is not
+#: included, the TIFFs carry only the axial step), so an ``H`` may be estimated
+#: from the data itself -- see :mod:`spur_mpm.physics.psf_estimate`. It is
+#: deliberately *not* spelled like the calibrated one: a summary produced with
+#: it must never be quotable as "calibrated optics".
 PSF_SOURCES = ("identity", "calibrated_optical", "synthetic_extra_degradation",
-               "unlabelled_identity_assumed")
+               "estimated_from_data", "unlabelled_identity_assumed")
 
 
 def _source_for(psf: PSFConfig, psf_source: str | None) -> str:
@@ -64,9 +71,10 @@ def _source_for(psf: PSFConfig, psf_source: str | None) -> str:
     if psf_source in (None, "identity"):
         raise ValueError(
             "a non-identity PSF needs an explicit psf_source "
-            "('calibrated_optical' or 'synthetic_extra_degradation'): the two "
-            "license different conclusions, and an unlabelled H is how a "
-            "degradation stress test ends up in the main table")
+            "('calibrated_optical', 'synthetic_extra_degradation' or "
+            "'estimated_from_data'): they license different conclusions, and an "
+            "unlabelled H is how a degradation stress test ends up in the main "
+            "table")
     return psf_source
 
 

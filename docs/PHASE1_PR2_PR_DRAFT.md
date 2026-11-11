@@ -46,6 +46,7 @@ SPUR-MPM 的研究目标是**多光子显微成像的通用稀疏重建**，而�
 - [x] 旧 E021/E023 原样索引；新 run 编号/命名规则在 RUNBOOK §6 定义（尚无实际 run）。
 - [x] 所有未跑项标记 `NOT_RUN`（含 Fig. 2 新增栏）；2D-Y/3D-Y/Z/YZ 指标待 T4 执行。
 - [x] 已提交 `ARCHIVE_MANIFEST_20261110.md`、`CLEANUP_REPORT_20261110.md`，逐项列出决策与恢复方式。
+- [x] **PSF 来源已查证并自行估计**：源数据**不含**标定（README 指向正文 Methods、TIFF 头只有 `spacing`、spec 无 NA）。两个独立估计器都指向 identity——算术上 1340 nm 三光子的 σ 只有 0.16–0.21 体素（横向）/ 0.11–0.22（轴向）；经验上用被抽掉的真实行做留出预测，两轴最优宽度均为 σ=0。新增 `estimated_from_data` 标签，与 `calibrated_optical` 刻意不同名。见 [`docs/PHASE1_PR2_PSF_ESTIMATE.md`](docs/PHASE1_PR2_PSF_ESTIMATE.md)、`docs/evidence/psf_estimate_20261110/`。
 - [x] **归因链补齐**：`psf_source` 已贯穿 config→dataset→prior 并写进 `summary.json` 的 `physics` 块；`phys_control`/`consistency` 已进入 `build_model` 与 `config_hash`。此前三条都不通——带标签的非恒等 PSF 会在第一个 batch 被拒，`--set model.phys_control=zeros` 会用头条 run 的名字训对照组，且两次 run 哈希相同。三处均有单测。
 
 ## 本 PR 暂不做 / Out of scope

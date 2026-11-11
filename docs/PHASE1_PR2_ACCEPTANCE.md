@@ -40,7 +40,11 @@
 | 新 `mask_aware_inverse` 以 I0 为正则中心 | `UNIT_TESTED` | `test_mask_aware_inverse_holds_unmeasured_voxels_at_i0` |
 | 旧 `iterative_dc_inverse` 不被暗改（仍向 0 收缩） | `UNIT_TESTED` | `test_the_old_iterative_inverse_is_unchanged_and_still_shrinks_toward_zero` |
 | 真实数据上非恒等 H 数值有限 | 冒烟通过 | `P2_W0_blur_synthetic_summary_32px_cpu.json` |
-| **Gate 1 的 phantom 数值稳定性（λ 扫描）** | `TODO` | 需要独立 phantom 脚本；本轮只做了真实数据单一 λ |
+| **源数据是否含 PSF 标定** | `ACCEPTED`（查证结论：**不含**） | `docs/PHASE1_PR2_PSF_ESTIMATE.md` §1：README 指向正文 Methods、TIFF 头只有 `spacing`、spec 无 NA |
+| **自估 PSF：由假定 NA 反推衍射极限** | `UNIT_TESTED` + 真实数据 | `physics/psf_estimate.py::diffraction_limited_sigma`；σ 仅 0.16–0.21 / 0.11–0.22 体素 |
+| **自估 PSF：留出测量预测扫描** | `UNIT_TESTED` + 真实数据 | `docs/evidence/psf_estimate_20261110/`；**两轴最优 σ=0**，非零宽度全部更差 |
+| `estimated_from_data` 第三种标签存在且与 `calibrated_optical` 分开 | `UNIT_TESTED` | `test_an_estimated_psf_has_its_own_label_and_is_not_the_calibrated_one` |
+| **Gate 1 的 phantom 数值稳定性（λ 扫描）** | `TODO` | λ 扫描已随留出预测扫描跑过一部分（同一批数据、6 档 σ），但仍缺独立 phantom；本轮不宣称完成 |
 
 ## 3. T2 — 双分支残差网络与训练器
 
@@ -89,7 +93,9 @@
 | 新增 `test_physics_prior_contract.py` | 30 |
 | 新增 `test_dual_branch_contract.py` | 38 |
 | 新增 `test_archive_safety.py`（T0 提交） | 21 |
+| 新增 `test_psf_estimate.py` | 12 |
 | 真实数据地板冒烟 | `docs/evidence/smoke_floors_20261110/`（3 份 summary + README） |
+| 真实数据 PSF 估计 | `docs/evidence/psf_estimate_20261110/`（`psf_estimate.{json,md}`） |
 | Fig. 2 重绘 | `spur_mpm/figures/framework/fig2_{pipeline,ablation_matrix}.png` + `fig2_provenance.json` |
 
 复现命令：
@@ -109,13 +115,18 @@ python -m spur_mpm.scripts.framework_figure \
 ## 6. 需要验收人裁决的三件事
 
 1. **identity PSF 下能声称什么。** 本轮把它写死成"只能声称缺口填充"，
-   并让 `P2_W0` 与 `P2_I0` 在真实数据上逐位相等。如果验收人认为应当先做
-   PSF 标定再进入消融，那 T3/T4 的臂顺序需要调整（`P2_DualW` 在有标定 H 之前
-   无法与 `P2_DualI` 区分）。当前实现两条路都准备了：`P2_W0` 可以带标定 H 跑，
-   但必须落在独立分组、独立目录（RUNBOOK §1.2）。
+   并让 `P2_W0` 与 `P2_I0` 在真实数据上逐位相等。**这一条现在有了独立证据**：
+   源数据不含标定（查证见 `docs/PHASE1_PR2_PSF_ESTIMATE.md` §1），两个自估器都
+   指向 identity（算术上 PSF 比体素还细；经验上留出预测的最优宽度为 σ=0）。
+   所以"先做 PSF 标定再进消融"这条待决项，实际上被降级为：**需要一个真实的
+   标定体（beads 或仪器日志）才能改变结论**，而不是"再调一调参数"。
+   若验收人有该数据，`P2_W0` 可以带标定 H 跑，但必须落在独立分组、独立目录
+   （RUNBOOK §1.2）。
 2. **是否允许"未经标定的 PSF 调参"进入主表。** 本轮的态度是不允许，
-   并给出了反例：额外加 blur 再反卷积把 PSNR 从 28.03 压到 27.55。
-   如果验收人希望把"最优 σ"作为探索分支，需要先定义它与主表的隔离方式。
+   并给出了两份反例：额外加 blur 再反卷积把 PSNR 从 28.03 压到 27.55；
+   在真实数据上按 9 档 σ 做留出预测，每一档都比不做更差。现在新增了
+   `estimated_from_data` 标签——**如果**验收人仍希望把自估宽度作为探索分支，
+   该标签强制它在 summary 里区别于 `calibrated_optical`，可与主表并存而不混淆。
 3. **E024 编号。** 目前 `runs/` 下没有 `E024_*`，脚本用 `runs/E024_dual_prior/`。
    若验收人要求顺延编号，脚本里 `OUT=` 一处改即可，但映射要记进本文档。
 

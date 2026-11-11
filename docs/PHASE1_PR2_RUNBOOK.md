@@ -1,29 +1,42 @@
 # Phase 1 PR2 运行手册：E024 双先验阶梯
 
 > 方法依据：`docs/PHASE1_PR2_METHOD_SPEC.md`。任务依据：`docs/PHASE1_PR2_IMPLEMENTATION_PLAN.md` §6、§7。
-> **当前状态：全部 GPU 训练 NOT_RUN。** 本手册描述的是下一步要执行的命令，不是已执行记录。
-> 唯一已实际执行的是 §1 的两个零参数地板（CPU 冒烟，见 §1.3）。
+> **当前状态：** 地板与首批真实训练已执行（见 `docs/PHASE1_PR2_ACCEPTANCE.md` 的实际记录）；
+> PSF 侧已有独立证据（`docs/PHASE1_PR2_PSF_ESTIMATE.md`）。本手册描述命令，执行结果不回填在这里。
 
 执行前提：`conda activate threePM`（python 3.10.19 / torch 2.6.0+cu124），工作目录 `/ssd1/wjb/SPUR-MPM`。
 
 ---
 
-## 0. 开跑前的三项检查（每次都要做）
+## 0. 开跑前的四项检查（每次都要做）
 
 ```bash
-# (1) 回归测试必须全绿；EXIT=0 是唯一信号（pytest 配置了 -q，不打印 "passed" 汇总行）
-python -m pytest spur_mpm/tests -q; echo "EXIT=$?"
+# (1) 回归测试必须全绿。EXIT=0 是唯一信号：pytest.ini 里已经带 -q，命令行再加一个
+#     -q 会变成 -qq 并把 "N passed" 汇总行吞掉，所以必须用 -o addopts="" 覆盖掉它。
+python -m pytest spur_mpm/tests -o addopts="" -q; echo "EXIT=$?"
 
-# (2) GPU 必须真的空闲。带别人作业的卡不是基准设备，不许拿来做计时/显存结论
+# (2) GPU 必须真的空闲。看**显存**判断能不能跑，看**利用率**判断能不能报性能：
+#     与别人的作业共卡时，训练精度结论仍然有效，但延迟/吞吐/峰值显存一律不可报。
 nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu \
           --format=csv
 
-# (3) 明确要跑什么，先看 dry-run
+# (3) 物理先验的来源必须写在命令里。identity 之外的 H 缺 psf_source 会被第一个 batch 拒掉；
+#     本队列没有标定，自估值用 estimated_from_data，理由见 PSF_ESTIMATE 文档。
+#     (3a) 复核估计器（CPU，约 8 分钟，只碰训练动物）
+python -m spur_mpm.scripts.estimate_psf --fold 0 --n-patches 6 \
+  --out runs/E024_dual_prior/psf_estimate
+
+# (4) 明确要跑什么，先看 dry-run
 DRY=1 STAGE=all bash spur_mpm/experiments/run_e024.sh
 ```
 
-第 (3) 步的 dry-run 是默认行为：`run_e024.sh` 不给 `GPUS=` 就只打印、不执行，
+第 (4) 步的 dry-run 是默认行为：`run_e024.sh` 不给 `GPUS=` 就只打印、不执行，
 也不存在"静默回退到 GPU 0"的分支。这条是 T0 归档纪律在训练侧的对应物。
+
+`run_e024.sh` 的两级顺序：**跨阶段严格串行**（residual → dual → controls，前一阶段
+全部成功才进下一阶段），**同阶段多臂并行**（同一阶段内各臂互相独立，按 `GPUS=`
+轮转铺开）。前一阶段任一 run 失败，脚本以非零码退出而不是继续——"在缺失的地板上
+继续往上堆"正是这个顺序要防的事。
 
 ---
 

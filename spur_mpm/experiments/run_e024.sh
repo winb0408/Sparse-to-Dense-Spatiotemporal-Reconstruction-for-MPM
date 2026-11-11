@@ -153,7 +153,17 @@ if [[ "$STAGE" == "floors" || "$STAGE" == "all" ]]; then
 fi
 
 # --- the trained ladder --------------------------------------------------
-ladder () {   # ladder <stage-name> <arm> [extra args...]
+# Two levels of ordering, and they are not the same:
+#   * across stages, strictly sequential. A residual arm must not be read before
+#     the floor under it, and a dual arm must not be read before the
+#     capacity-matched single-branch arm -- so `dual` does not start until every
+#     `residual` run has finished, pass or fail.
+#   * within a stage, the arms are independent of each other (same data, same
+#     budget, different model), so they are launched together and spread over
+#     whatever cards were handed in. Launching them one at a time leaves the
+#     second card idle for hours, which is how "no GPU available" becomes
+#     self-fulfilling.
+launch () {   # launch <stage-name> <arm> [extra args...]
   local stage=$1 arm=$2
   shift 2
   [[ "$STAGE" == "$stage" || "$STAGE" == "all" ]] || return 0
@@ -165,7 +175,6 @@ ladder () {   # ladder <stage-name> <arm> [extra args...]
     *phys_control=zeros*)   tag="_ctrlzeros" ;;
     *phys_control=shuffle*) tag="_ctrlshuffle" ;;
   esac
-  pids=(); slot=0
   for f in $FOLDS; do
     for s in $SEEDS; do
       local name="E024_${arm}_${TAG}_fold${f}_s${s}${tag}"
@@ -178,20 +187,34 @@ ladder () {   # ladder <stage-name> <arm> [extra args...]
       slot=$((slot+1))
     done
   done
-  if [[ "$DRY" != "1" ]]; then
-    for p in "${pids[@]}"; do wait "$p" || fail=$((fail+1)); done
-  fi
 }
 
-ladder residual P2_Direct
-ladder residual P2_ResidualI
-ladder dual     P2_DualI
-ladder dual     P2_DualW
+wait_stage () {   # drain this stage before the next one may start
+  [[ "$DRY" == "1" ]] && { pids=(); return 0; }
+  for p in "${pids[@]}"; do wait "$p" || fail=$((fail+1)); done
+  if [[ $fail -gt 0 ]]; then
+    echo "stage failed ($fail run(s)); stopping -- a later stage read on top of" \
+         "a missing floor is exactly the comparison this order exists to prevent" >&2
+    exit 1
+  fi
+  pids=()
+}
+
+pids=(); slot=0
+launch residual P2_Direct
+launch residual P2_ResidualI
+wait_stage
+
+launch dual     P2_DualI
+launch dual     P2_DualW
+wait_stage
+
 # The controls are P2_DualW with the candidate's information destroyed, same
 # parameters, same budget. Not separate arms: an arm record would be a second
 # thing to keep in sync with the headline one.
-ladder controls P2_DualW --set model.phys_control=zeros
-ladder controls P2_DualW --set model.phys_control=shuffle
+launch controls P2_DualW --set model.phys_control=zeros
+launch controls P2_DualW --set model.phys_control=shuffle
+wait_stage
 
 # P2_DualWU is NOT launched here: under an identity PSF u_physics is identically
 # zero, so the gate is a constant and the arm degenerates to P2_DualW. It gets

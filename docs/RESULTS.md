@@ -106,10 +106,15 @@ conda env `threePM`，python 3.10，PyTorch。测试：`python -m pytest spur_mp
 |---|---|---|
 | identity PSF 下 `P2_W0` 与 `P2_I0` | 真实测试卷上**逐位相同**（只有 `"arm"` 字段不同） | `docs/evidence/smoke_floors_20261110/` |
 | 非恒等 H（人为额外加 blur）再反卷积 | PSNR 28.03 → 27.55，SSIM 0.750 → 0.629，**变差** | 同上 |
+| 源数据是否含 PSF 标定 | **不含**：README 把成像参数指向正文 Methods，TIFF 头只有 `spacing=5.0`，spec 无 NA | `docs/PHASE1_PR2_PSF_ESTIMATE.md` §1 |
+| 衍射极限算术（1340 nm 三光子） | σ_xy 0.16–0.21 体素、σ_z 0.11–0.22 体素——**比体素还细** | 同上 §2 |
+| 留出真实测量行的最优反卷积宽度 | **两轴都是 σ=0**，9 档横向 / 6 档轴向全部更差（0.2 µm 即 −0.17 dB） | `docs/evidence/psf_estimate_20261110/` |
 
-第二条**不能**读作"Wiener 有害"：真实 stack 已带自身光学，再按未标定的合成 PSF
-去卷积等于去掉不存在的模糊。它能读作的是——把 `synthetic_extra_degradation` 当调参
-旋钮不成立。方法口径见 [`docs/PHASE1_PR2_METHOD_SPEC.md`](PHASE1_PR2_METHOD_SPEC.md) §2，
+第二、第四条**不能**读作"Wiener 有害"：真实 stack 已带自身光学，再按一个不存在的
+模糊去卷积，等于去掉不存在的模糊。它们能读作的是——本队列**没有可去除的光学模糊**，
+所以 identity 是测出来的结论而非默认假设；而"Wiener 在本队列有独立增益"这句话，
+现在有可复现的否定证据。方法口径见 [`docs/PHASE1_PR2_METHOD_SPEC.md`](PHASE1_PR2_METHOD_SPEC.md) §2，
+估计过程见 [`docs/PHASE1_PR2_PSF_ESTIMATE.md`](PHASE1_PR2_PSF_ESTIMATE.md)，
 逐条状态见 [`docs/PHASE1_PR2_ACCEPTANCE.md`](PHASE1_PR2_ACCEPTANCE.md)。
 
 **新旧数字不可同列排名**：`A1` 是 `wiener_fill_first`（Z 未填洞），`P2_W0` 是

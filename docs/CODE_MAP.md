@@ -47,6 +47,8 @@
 | `spur_mpm/models/registry.py` | **臂注册表**：`A0/A1/S0/S1/S2/S1g/S2g` 与 PR2 的 `P2_*` 每个臂是一行声明式记录（S2g = X0+U+门控） |
 | `spur_mpm/models/dual_prior_reconstructor.py` | **PR2 双分支模型**：观察编码器 + 物理编码器 → 逐尺度零初始化融合 → 残差解码器（`D_raw = I0 + R`）；hard consistency 在模型内部；`phys_control` 提供参数匹配对照。不改 `SwinUNet2D`，旧 checkpoint 照旧加载 |
 | `spur_mpm/physics/prior.py` | **物理先验包**：`I0/W0/phys_delta/u_physics` + PSF 来源标注；`mask_aware_inverse`（以 `I0` 为正则中心，与旧 `iterative_dc_inverse` 并存而非取代） |
+| `spur_mpm/physics/psf_estimate.py` | **无标定时的 PSF 估计**：`diffraction_limited_sigma`（由假定 NA/λ/n 反推衍射极限，并把结果同时给成体素单位）与 `holdout_width_scan`（用被欠采样的**真实测量行**做留出预测，扫宽度）。两者都不得自称标定；最优值落在 `σ=0` 就是"别反卷积"的估计 |
+| `spur_mpm/scripts/estimate_psf.py` | 在真实训练队列上跑上面两个估计器，输出 `psf_estimate.{json,md}`；拒绝使用 test 组、不修改任何配置 |
 | `spur_mpm/common/tensors.py` | `as_reconstruction()`：唯一知道"模型返回张量还是字典"的地方，训练/评估/推理/出图共用，防止三处对同一 checkpoint 做不同后处理 |
 | `spur_mpm/models/__init__.py` | 导出 |
 
@@ -214,6 +216,7 @@ GPUS=0,1,2 DRY=0 STAGE=controls bash spur_mpm/experiments/run_e024.sh
 | `test_structure_figure.py` | Fig. 5 里会撒谎的那部分：断点/伪连接图仅在容差外非空、空配对是 NaN 不是 1.0、分叉裁剪框在同一体积两次渲染之间不移动 |
 | `test_structure_report.py` | 整卷表的表头必须说清它引用的是**骨架**分量数（不是掩膜连通块数，两者在同一份 JSON 里差几个量级）；`--from-summary` 重排版不许再索要 `--arm/--out` |
 
+| `test_psf_estimate.py` | PSF 估计的契约：算术上 NA≥n 必须被拒、宽度必须以体素报告；留出扫描能找回它看得见的宽度、无模糊时估计为 identity、"拿测量当真值"与"拿锐利物体当真值"是两个不同问题；`estimated_from_data` 与 `calibrated_optical` 不得混名 |
 | `test_physics_prior_contract.py` | PR2 的物理口径：`I0` 只来自测量、`H=I ⇒ W0==I0` 逐位、非恒等 H 必须先填满所有轴再 FFT、未标 `psf_source` 的 blur 必须被拒、新 `mask_aware_inverse` 把未测点按在 `I0` 而旧 `iterative_dc_inverse` 仍向 0 收缩（旧语义被锁住） |
 | `test_dual_branch_contract.py` | PR2 的模型契约：初始化 `R≡0`、两个分支第 1 步都有梯度（第 0 步为零是刻意的，被断言而非隐藏）、hard consistency 在测量点精确且 train/eval 一致、对照参数量相等且确实改变输出、`P2_DualI` 是 `P2_DualW` 的容量对照、identity 下两算子相等、每个 epoch 重新抽 patch |
 | `test_archive_safety.py` | 归档工具的**拒绝面**：默认 dry-run、受保护路径、路径越界、未授权通配、缺 allowlist 一律拒绝 |
