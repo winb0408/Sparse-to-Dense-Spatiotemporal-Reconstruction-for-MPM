@@ -147,8 +147,10 @@ python -m spur_mpm.scripts.framework_figure \
 - `z_k4` / `yz_k2x2` 等成本协议：`NOT_RUN`
 - 延迟 / 吞吐 / 峰值显存作为**性能**数字：`NOT_RUN`（四张卡都有别人的作业在跑，
   共卡条件下的这些数字不可比也不可复现；`scripts.benchmark` 本轮刻意不跑）
-- 整卷 3D 骨架报告与定性图：`DONE`（`runs/E024_dual_prior/structure_*/`、
-  `runs/E024_dual_prior/figures/qual_y_k2/`）
+- 整卷 3D 骨架报告：`RUNNING`（`runs/E024_dual_prior/structure_P2_I0/` 3/4 卷，
+  `structure_P2_DualW/` 未开始）——**结果文档里一句骨架数字都没有**
+- 定性图：`DONE`（`runs/E024_dual_prior/figures/qual_y_k2/`，6 列同 ViewSpec，
+  读法与三条注意事项见 `docs/PHASE1_PR2_E024_RESULTS.md` §8.1）
 - `P2_DualWU` / `P2_DualWUT` / `P2_TopoConf`：`TODO`（前者需标定 H，后两者属 T3/T5）
 
 Fig. 2 的 `planned` 栏、以及本文件的每一处 `NOT_RUN`，在真实测量落到
