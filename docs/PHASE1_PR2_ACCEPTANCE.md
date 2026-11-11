@@ -7,7 +7,7 @@
 
 ## 一句话状态
 
-代码与单测已完成并通过（396 项全绿，`docs/evidence/pytest_20261111_T0_T2_guard.log`）；
+代码与单测已完成并通过（400 项全绿，`docs/evidence/pytest_20261112_compare_structure.log`）；
 **全部 GPU 训练与真实数据头条结果 `NOT_RUN`**——四张 A6000 都被其他用户的作业占用，
 带别人作业的卡不是基准设备。零参数地板已在真实数据上做过 CPU 冒烟（见 §3）。
 
@@ -93,13 +93,14 @@
 
 | 项 | 值 |
 |---|---|
-| 全量回归 | 396 项，`EXIT=0`，`docs/evidence/pytest_20261111_T0_T2_guard.log`（日志自带 `396 passed` 汇总行，不需要数点） |
+| 全量回归 | 400 项，`EXIT=0`，`docs/evidence/pytest_20261112_compare_structure.log`（日志自带 `400 passed` 汇总行，不需要数点） |
 | 新增 `test_physics_prior_contract.py` | 30 |
 | 新增 `test_dual_branch_contract.py` | 38 |
 | 新增 `test_archive_safety.py`（T0 提交） | 21 |
 | 新增 `test_psf_estimate.py` | 16（含 4 条 λ 稳定性） |
 | 新增 `test_collect_results_variant.py` | 6（控制臂列名/分组、`n animals`、深度分层不合并、歧义报错） |
 | 新增 `test_run_e024_guard.py` | 12（GPU 2 占用率闸门 ×7、无 `GPUS=` 拒绝、`SKIP_DONE` 语义 ×2、每卡一个作业 ×2） |
+| 新增 `test_compare_structure.py` | 4（并列表的 Δ 与均值区分、缺卷要点名、阈值不一致要告警、列名取自 summary 而非目录名） |
 | 真实数据地板冒烟 | `docs/evidence/smoke_floors_20261110/`（3 份 summary + README） |
 | 真实数据 PSF 估计 | `docs/evidence/psf_estimate_20261110/`（`psf_estimate.{json,md}`） |
 | Fig. 2 重绘 | `spur_mpm/figures/framework/fig2_{pipeline,ablation_matrix}.png` + `fig2_provenance.json` |
@@ -147,8 +148,10 @@ python -m spur_mpm.scripts.framework_figure \
 - `z_k4` / `yz_k2x2` 等成本协议：`NOT_RUN`
 - 延迟 / 吞吐 / 峰值显存作为**性能**数字：`NOT_RUN`（四张卡都有别人的作业在跑，
   共卡条件下的这些数字不可比也不可复现；`scripts.benchmark` 本轮刻意不跑）
-- 整卷 3D 骨架报告：`RUNNING`（`runs/E024_dual_prior/structure_P2_I0/` 3/4 卷，
-  `structure_P2_DualW/` 未开始）——**结果文档里一句骨架数字都没有**
+- 整卷 3D 骨架报告：`RUNNING`（`P2_I0` 四卷已落盘，`structure_summary.{md,json}` 在
+  `runs/E024_dual_prior/structure_P2_I0/`；`P2_DualW` 四卷在跑）——结果文档 §8.2 只引用了
+  地板臂数字，**没有任何两臂比较结论**；并列表工具 `scripts/compare_structure.py` 已就绪
+  （4 项单测）
 - 定性图：`DONE`（`runs/E024_dual_prior/figures/qual_y_k2/`，6 列同 ViewSpec，
   读法与三条注意事项见 `docs/PHASE1_PR2_E024_RESULTS.md` §8.1）
 - `P2_DualWU` / `P2_DualWUT` / `P2_TopoConf`：`TODO`（前者需标定 H，后两者属 T3/T5）

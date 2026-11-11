@@ -2,7 +2,7 @@
 
 **Base:** `PUR-MPM`  
 **Head:** `feature/phase1-dual-prior-20261110`  
-**状态：** Draft。T0/T1/T2 的代码与单测已完成（396 项全绿）；**E024 的 8 个臂已在真实数据上跑完**
+**状态：** Draft。T0/T1/T2 的代码与单测已完成（400 项全绿）；**E024 的 8 个臂已在真实数据上跑完**
 （fold 0 / `y_k2` / 758 窗口），主结论是**否定**的：identity PSF 下物理分支没有可测量的独立贡献。
 整卷 3D 骨架报告仍在跑，本文不引用任何骨架数字。验收人复核前不得合并。
 
@@ -86,7 +86,7 @@ SPUR-MPM 的研究目标是**多光子显微成像的通用稀疏重建**，而�
 
 ## 测试与验收证据 / Proof required
 
-- [x] `python -m pytest spur_mpm/tests -o addopts="" -q` 通过（396 项，`EXIT=0`），日志 `docs/evidence/pytest_20261111_T0_T2_guard.log`；新增 physics / dual-branch / archive safety / PSF estimate / run-guard 五组单测。
+- [x] `python -m pytest spur_mpm/tests -o addopts="" -q` 通过（400 项，`EXIT=0`），日志 `docs/evidence/pytest_20261112_compare_structure.log`；新增 physics / dual-branch / archive safety / PSF estimate / run-guard 五组单测。
 - [x] Mask 洞值探针：修改未测 GT 不改变任何模型输入；Z 边界不读取未采样密集邻层。
 - [x] `H=I => W0 == I0`（逐位，不是近似；真实数据上一并验证）；非恒等 H 先填洞后反卷积、无 NaN/Inf。λ/边界稳定性做成 phantom 扫描的部分仍 `TODO`。
 - [x] 残差模型初始化 `R ≡ 0`；两个分支第 1 步都有梯度；hard consistency 仅在含 `y/mask` 的臂上可用。
