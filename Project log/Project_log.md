@@ -2460,3 +2460,51 @@ Dice 对称，覆盖差在哪一侧直接决定符号。**所以 §2 与 §8.2 �
 要判定"结构是否真的更好"，得用对幅度不敏感的比较（按臂对比度匹配的二值化，或骨架
 中心线/分支长度这类不经体素面积的指标，属 T3）。**没跑**，且 `keep_recon=False` 已把
 重建数组删掉（450 MB × 8 卷），要做需先重跑重建。这条已写进验收清单的 `NOT_RUN`。
+
+### 旧项目"Wiener 初始化有显著增益"是怎么来的：查完了，和本轮**不矛盾**
+
+问题来自验收：`/data2/wjb/threePM` 的 C2 说物理先验稳定增益，本轮 E024 里 `P2_W0`
+和 `P2_I0` 一模一样。逐条对过源码后，结论是**协议差异，不是实现差异**。
+
+**旧结论的可核验链路**
+
+1. C2 = EXP-024 主矩阵，6 个 `(k_y,k_z)` 点 × 4 arm，`b4f`(FillFirst-Wiener+门控融合)
+   vs `b1`(Direct)，6/6 正，+0.59…+3.36 dB（`REVIEW_v4/02_CLAIMS_EVIDENCE.md:56-66`）。
+   6 个点里 kz 全 ≥ 2，**全是 yz 双轴稀疏**。
+2. 那套协议里**目标先被 PSF 模糊再采样**：`PSRAS/data/observation.py:128`
+   `hx = blur_3d_fft(x, cfg.psf)`；默认 `--psf_xy 1.0 --psf_z 1.5`（像素），
+   `PSRAS/scripts/train.py:210-211`。而 warm start 用的是**同一个** `psf` 对象
+   （`observation.py:111`）。所以旧 Wiener 解的是一个**已知核、非恒等**的逆问题。
+3. 旧项目自己写明了增益的来源：C6「Wiener 增益主体来自 PSF 退卷积（EXP-021 no-PSF
+   消融）：去掉 PSF 后增益基本消失」（`02_CLAIMS_EVIDENCE.md:200-206`）。
+4. 旧项目也自己划了边界：N10「横向（xy/y）协议上的 Wiener 增益 ≈0 或为负」、
+   N11 Y regime 物理先验大增益被证伪、N7 冻结 λ 的 Wiener 在 Y regime −11…−23 dB
+   （`REVIEW_v4/05_NEGATIVE_RESULTS.md`）。
+
+**本轮为什么必然看不到**
+
+- PSF 是恒等，两条独立路径都指向这一点：解析（NA=0.8 → σ_xy=0.214 px、
+  σ_z=0.216 px，两个都小于 1 体素）与数据扫描（σ=0 是最优；每个非零宽度都是负增益，
+  −0.17…−5.72 dB）。产物在 `runs/E024_dual_prior/psf_estimate/`。
+- 恒等下 `spur_mpm/physics/wiener.py:50` 直接 `if psf.is_identity: return y`，
+  `P2_W0` 臂**根本没进反卷积**。可核验的强证据：`P2_I0` 与 `P2_W0` 的 `summary.json`
+  除 `arm` 字段外**逐字段完全相同**（不是差得小，是同一个数）。
+- 我们的 regime 正是旧项目 N10 说"增益 ≈0 或为负"的那一档：y 单轴、kz=1。
+
+**实现有没有差异**
+
+没有实质差异，而且我们用的是旧版**后一代**：`spur_mpm/physics/wiener.py` 文件头就写着
+ported from `PSRAS/physics/wiener.py`；λ=0.01 相同；v4 的 C2 用的已经是三维
+`gaussian_otf_3d` + 真 σ_z，不是最早 `dataset.py:420-480` 那个逐帧 2D、σ_lateral=1.0
+固定、σ_axial 从不进入 inversion 的版本（后者被外部审查标为 P0）。
+DEC-015 的 fill-first 我们也有（`wiener_fill_all`），而这是**改进**过的顺序。
+
+唯一真实差异在**协议**：旧版把 PSF 用在两端（模糊 GT + 解先验），我们把 PSF 先估计出来
+（=恒等）再用；恒等时先验就退化为插值。
+
+**量级也说明不是同一件事**：本轮 `P2_DualW − P2_Direct = +0.178 dB`，
+`P2_DualW − P2_DualI = −0.014 dB`，都在 1 dB 噪声带内；旧 C2 的效应量 +0.59…+3.36 dB
+是"整栈 b4f vs 裸 b1"，不是 Wiener 地板单独贡献。
+
+**一句话**：旧结论成立的前提是 (i) 有轴向稀疏 kz≥2、(ii) 有一个已知的非恒等 H 可解。
+E024 两条都不满足，所以这是同一个物理事实的两面，不是复现失败。
