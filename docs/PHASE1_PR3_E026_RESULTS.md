@@ -1,9 +1,11 @@
 # E026 results — the historical PSRAS condition under this repository's observation model
 
-**Status:** `matched_synthetic` in progress at the time of writing; the `real`
-group is `NOT_RUN`. Every number below is traced to a run directory that
-contains its own `config.yaml`, `provenance.json` and `metrics.jsonl`; nothing
-here is transcribed from a log by hand.
+**Status:** `matched_synthetic` complete (six arms); `real` partial — two floors
+done, the rest interrupted by a GPU fault and queued, see §4. Every number below
+is traced to a run directory that contains its own `config.yaml`,
+`provenance.json` and `metrics.jsonl`; nothing here is transcribed from a log by
+hand, and every arm that has not produced a summary is marked `NOT_RUN` rather
+than left blank.
 
 Protocol: `sampling.mode=yz`, `ky=2`, `kz=2` → exactly 25 % of voxels retained,
 context `T = 2*kz - 1 = 3`, `patch_hw = 256x256`, 3000 training steps, fold 0.
@@ -102,8 +104,23 @@ more precise.
 
 ## 4. `real` group
 
-`NOT_RUN` at the time of writing. Two facts constrain what it can show, both
-established from the frozen selection file
+**Partially run, then interrupted by a hardware fault.** Two of the three floors
+are complete and the rest is queued; the state of each arm is stated rather than
+implied:
+
+| arm | state |
+|---|---|
+| `I0` | **done** — `psnr_missing` 25.2246, `e_missing` 0.0435, Dice 0.6256, clDice 0.6003 |
+| `W0_full3d` | **done** — identical to `I0` in every field except `arm` |
+| `W0_legacy` | `NOT_RUN` — its evaluation was running when GPU 2 fell off the bus (2026-11-13 21:44, `docs/evidence/gpu2_falloff_20261113/INCIDENT.md`) |
+| `P2_ResidualI` | `NOT_RUN` |
+| `P3_interp` | `NOT_RUN` |
+| `P3_wiener` | `NOT_RUN` |
+| analysis (structure/qualitative) for both E026 groups | `NOT_RUN` |
+
+The floors were re-run on the frozen train-only selection, i.e. no test animal
+touched the kernel choice. Two facts constrain what the remaining arms can show,
+established from that selection file
 (`runs/E026_psras_condition/fold0_yz_k2_kz2_selection.json`) and from the
 operator definitions:
 
@@ -124,10 +141,13 @@ kernel is forced to make the search look different.
 
 - Nothing here shows that the Wiener prior beats interpolation on real data. On
   real data the selected kernel *is* interpolation.
-- The `matched_synthetic` gain is a gain on a synthetic inverse problem with a
+- The `matched_synthetic` result is about a synthetic inverse problem with a
   known kernel. It does not transfer to the recorded stacks without an
-  independent PSF estimate.
+  independent PSF estimate — and with the identity kernel this cohort selects,
+  there is nothing for the Wiener term to invert there either.
 - No multi-seed or multi-fold claim: fold 0, seed 0 only.
+- No arm of the `real` group beyond the two floors has a result yet; nothing in
+  §4 is a finding about real data except the identity-kernel collapse itself.
 
 ## 6. Artefacts
 
