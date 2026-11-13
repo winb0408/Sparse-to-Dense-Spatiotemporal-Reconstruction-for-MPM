@@ -20,6 +20,8 @@ mkdir -p "$OUT"
 if [[ "$STAGE" == "select" || "$STAGE" == "all" ]]; then
   if [[ "$DRY" == "1" ]]; then
     echo "DRY selection: fold=$FOLD, y_k$KY, output=$SEL"
+  elif [[ -s "$SEL" ]]; then
+    echo "Reuse frozen train-only selection: $SEL"
   else
     python -m spur_mpm.scripts.select_adaptive_prior \
       --index "$INDEX" --split "$SPLIT" --fold "$FOLD" --mode y --ky "$KY" \
