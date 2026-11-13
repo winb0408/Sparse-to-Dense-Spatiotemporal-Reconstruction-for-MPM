@@ -2642,3 +2642,39 @@ E024 两条都不满足，所以这是同一个物理事实的两面，不是复
 `review`（"没有规则覆盖"）——其中 E024 归 A、E025/E026 归 B（负结果也是证据）。审计本身
 没有任何 `delete` 候选：11 keep、21 keep-evidence、3 review，共 7.0 GB，逐条理由在
 `docs/archive/cleanup_candidates.json`。
+
+## 2026-11-14 00:0x｜排队期间自查：结构报告的文件名会串组
+
+**怎么发现的**：把 real 组和 E025 排进队列时，顺手核对 `STAGE=analysis` 会写出什么，
+发现 `runs/E026_psras_condition/structure_I0` 已经是**满的**——它的 `*.recon.json` 里写着
+`psf_source: synthetic_extra_degradation`、`sigma=(0.98, 7.5)`，即 **B 组（matched_synthetic）**
+的 I0 结构报告，凌晨 00:06 刚跑完（4 卷，21:41 起，约 2.5 小时）。
+
+**问题**：`run_structure` 的目录名是 `structure_$label`，**不含组标签**。B 组和 real 组共用
+`runs/E026_psras_condition/`，两组同名，于是只有两种结局，都很坏：
+(a) 覆盖守卫拒写，而它被 `|| true` 吞掉 → real 组的 I0 结构报告**永远不跑**，日志里只有
+一行"Refuse overwrite"，看上去像"分析不需要"；(b) 没有守卫时，后跑的组直接把前一组的
+骨架指标覆盖掉——而表里不会留下任何痕迹。E025 有同一个隐患（`tag` 随 `ky` 变）。
+
+**修法**：结构报告、日志、`compare_structure` 输出全部带 `TAG`；已完成的那份 B 组 I0 报告
+**改名迁移**而不是重跑（2.5 小时的重建，输入没变）。同时 `run_structure` 补上和评测一样的
+断点续跑语义：目录里有 `structure_summary.json` 即视为完成并跳过，没有则仍是半成品、仍然拒写
+——否则一次中断的分析阶段将永远无法重启。
+
+**队列改为三步**（`/tmp/pr3_queue.sh`，`runs/PR3_queue_20261114_0023.log`）：这是因为
+`STAGE=all` 只跑**当前 source kind** 的分析，B 组的分析不会因为跑过 real 组而顺带完成，
+必须单独排一步：
+
+1. E026 `real` `STAGE=all`（六臂 + 分析）；
+2. E026 `matched_synthetic` `STAGE=analysis`（六臂结构报告 + 三组 compare + 定性图）；
+3. E025 `y_k4` `STAGE=all`。
+
+三张卡（0/1/3）此刻仍分别在 39.8 / 41.9 / 36.5 GB，即 81 % / 85 % / 74 %，全部高于 60 %
+门限，队列在等。**顺带记录一个只有跑完才会知道的事实**：B 组 I0（参数自由地板）的结构报告
+均值为 Dice 0.8136 / clDice 0.6589 / skelF1 0.5782，但**逐卷差异极大**（FOVII_S1 的 clDice
+0.916 对 FOVI_S2 的 0.307），且每卷只有 34 %–72 % 的平面被判分（参考掩膜填满 >15 % 的平面
+被两侧一起清空）。所以结构指标只能**逐卷 + 报出判分平面占比**，不能只报均值，更不能把
+四卷均值当成一个可比的标量——这一点在写 §4 时必须和 PSNR 一起摊开。
+
+**测试**：`bash -n` 三个脚本通过；E026 `STAGE=analysis SOURCE_KIND=matched_synthetic DRY=1`
+列出 6 个带标签的报告目录与 3 组 compare。本轮没动 Python，未重跑 pytest（上次全量 425 passed）。
