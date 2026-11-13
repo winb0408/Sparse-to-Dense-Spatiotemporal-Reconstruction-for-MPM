@@ -51,9 +51,26 @@ from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.physics.sampling import SamplingSpec
 from spur_mpm.physics.acquisition import NoiseConfig
 
-__all__ = ["main", "run_training"]
+__all__ = ["main", "run_training", "branch_aux_weights"]
 
 DEFAULTS = Path(__file__).parent / "configs" / "base.yaml"
+
+
+def branch_aux_weights(cfg: dict, arm) -> tuple[float, float]:
+    """The PR3 per-branch auxiliary weights, refused where they cannot apply.
+
+    Named and separated from ``run_training`` so the refusal is testable without
+    building a dataset: a positive weight on an arm that has no auxiliary heads
+    would otherwise be silently ignored, and the run would look like a PR3
+    experiment in its config while training nothing of the sort.
+    """
+    aux_obs = float(cfg["loss"].get("branch_obs_weight", 0.0))
+    aux_phys = float(cfg["loss"].get("branch_phys_weight", 0.0))
+    if aux_obs < 0 or aux_phys < 0:
+        raise ValueError("branch auxiliary weights must be nonnegative")
+    if (aux_obs or aux_phys) and not arm.branch_auxiliary:
+        raise ValueError("branch auxiliary weights require a PR3 auxiliary arm")
+    return aux_obs, aux_phys
 
 
 def build_components(cfg: dict, arm_name: str, seed: int):
@@ -261,12 +278,7 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
     opt = torch.optim.AdamW(model.parameters(), lr=float(cfg["train"]["lr"]),
                             weight_decay=float(cfg["train"]["weight_decay"]))
     agree = float(cfg["loss"].get("dual_agree", 0.0))
-    aux_obs = float(cfg["loss"].get("branch_obs_weight", 0.0))
-    aux_phys = float(cfg["loss"].get("branch_phys_weight", 0.0))
-    if (aux_obs < 0 or aux_phys < 0):
-        raise ValueError("branch auxiliary weights must be nonnegative")
-    if (aux_obs or aux_phys) and not arm.branch_auxiliary:
-        raise ValueError("branch auxiliary weights require a PR3 auxiliary arm")
+    aux_obs, aux_phys = branch_aux_weights(cfg, arm)
     steps = int(cfg["train"]["steps"])
     warmup = int(cfg["train"].get("warmup_steps", 0))
     accum = max(1, int(cfg["train"].get("accum", 1)))

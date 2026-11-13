@@ -251,15 +251,17 @@ class DualPriorReconstructor(nn.Module):
         v = self._split(x)
         obs = self._stack(v, self.obs_features)
 
-        # Same architecture and feature count for the no-Wiener control.
-        # The control sees the interpolated candidate in both prior channels.
+        # Parameter-matched control: the physics branch must see I0 where it
+        # would have seen W0, and therefore a zero delta. It must NOT lose
+        # anything else -- u_physics is a function of (M, H, lam), not of W0,
+        # so zeroing it would hand the control less information than the
+        # treatment for a reason that has nothing to do with the deconvolved
+        # candidate, and would flatter the treatment.
         if self.phys_control == "interp_only":
             if "wiener" in v and "interp" in v:
                 v["wiener"] = v["interp"]
             if "phys_delta" in v:
                 v["phys_delta"] = torch.zeros_like(v["phys_delta"])
-            if "u_physics" in v:
-                v["u_physics"] = torch.zeros_like(v["u_physics"])
         phys = None
         if self.phys is not None:
             phys = self._stack(v, self.phys_features)

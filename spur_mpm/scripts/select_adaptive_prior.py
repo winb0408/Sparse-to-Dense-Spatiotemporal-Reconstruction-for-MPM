@@ -33,6 +33,31 @@ DEFAULT_INDEX = "data_local/dryad_cache/index_cohort.json"
 DEFAULT_SPLIT = "spur_mpm/experiments/E020_cohort/split.json"
 
 
+def protocol_mask(patch: tuple[int, int, int], starts: tuple[int, int, int],
+                  spec: SamplingSpec) -> torch.Tensor:
+    """The measurement mask of a crop, on the *global* sampling lattice.
+
+    A crop that starts at an odd row must sample the odd rows of the stack, not
+    the odd rows of the crop: otherwise every training patch invents its own
+    phase and the candidate is fitted to a protocol nobody will deploy. The
+    phase therefore comes from ``starts``, not from the crop index.
+    """
+    ky, kz = int(spec.ky), int(spec.kz)
+    z, h, w = patch
+    if spec.mode == "y":
+        sampled_y = ((torch.arange(h) + starts[1]) % ky) == 0
+        return sampled_y[None, :, None].expand(z, h, w).clone()
+    if spec.mode == "z":
+        sampled_z = ((torch.arange(z) + starts[0]) % kz) == 0
+        return sampled_z[:, None, None].expand(z, h, w).clone()
+    if spec.mode == "yz":
+        sampled_y = ((torch.arange(h) + starts[1]) % ky) == 0
+        sampled_z = ((torch.arange(z) + starts[0]) % kz) == 0
+        return (sampled_z[:, None, None] &
+                sampled_y[None, :, None]).expand(z, h, w).clone()
+    return torch.from_numpy(measured_mask(tuple(patch), spec))
+
+
 def choose_prior(*, index: str, split: str, fold: int, mode: str,
                  ky: int, kz: int, patch: tuple[int, int, int],
                  n_patches: int, sigmas_xy: tuple[float, ...],
@@ -78,20 +103,7 @@ def choose_prior(*, index: str, split: str, fold: int, mode: str,
             sl = tuple(slice(st, st + d) for st, d in zip(starts, patch))
             dense = torch.as_tensor(np.ascontiguousarray(arr[sl]),
                                     dtype=torch.float32)
-            mask = torch.from_numpy(measured_mask(tuple(patch), spec))
-            # Global mask phase must remain fixed: adapt the protocol rather
-            # than hiding arbitrary locations inside each training crop.
-            if mode == "y":
-                sampled_y = ((torch.arange(patch[1]) + starts[1]) % ky) == 0
-                mask = sampled_y[None, :, None].expand(*patch).clone()
-            elif mode == "z":
-                sampled_z = ((torch.arange(patch[0]) + starts[0]) % kz) == 0
-                mask = sampled_z[:, None, None].expand(*patch).clone()
-            elif mode == "yz":
-                sampled_y = ((torch.arange(patch[1]) + starts[1]) % ky) == 0
-                sampled_z = ((torch.arange(patch[0]) + starts[0]) % kz) == 0
-                mask = (sampled_z[:, None, None] &
-                        sampled_y[None, :, None]).expand(*patch).clone()
+            mask = protocol_mask(patch, starts, spec)
             if not mask.any() or bool(mask.all()):
                 continue
             y = torch.where(mask, dense, torch.zeros_like(dense))
