@@ -337,8 +337,8 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
             pred = 0.5 * (pred_a + pred_b)
         else:
             with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
-                out = model(x)
-            out = as_reconstruction(out).float()
+                out_payload = model(x)
+            out = as_reconstruction(out_payload).float()
             pred = _select_centre(out, batch["center_index"])
 
             if arm.supervision == "self":
@@ -356,7 +356,7 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
                 # the candidate instead of being forced to copy its artifacts.
                 if arm.branch_auxiliary and (aux_obs or aux_phys):
                     truth = batch["target"].to(device)
-                    aux = out.get("aux", {})
+                    aux = out_payload.get("aux", {})
                     for key, weight, label in (
                             ("observation_prediction", aux_obs, "branch_obs_l1"),
                             ("physics_prediction", aux_phys, "branch_phys_l1")):
