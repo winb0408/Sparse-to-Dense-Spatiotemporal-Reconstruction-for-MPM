@@ -156,6 +156,10 @@ if [[ "$STAGE" == analysis || "$STAGE" == all ]]; then
   set_tail=("${common[@]:6}")
   fig_dir="$OUT/figures/${TAG}"
   # label|arm|checkpoint|phys_control   (empty checkpoint = parameter-free floor)
+  # W0_legacy stays in the table for traceability, but it is NOT a second floor:
+  # at T=3 its centre-plane prediction matches W0_full3d to 1e-7, and the
+  # ordering only separates at T>=5. See docs/PHASE1_PR3_E026_OPERATOR_ORDER.md.
+  # The zero delta reported by the compare below is the check that this holds.
   arms=(
     "I0|P2_I0||none"
     "W0_full3d|P2_W0||none"
