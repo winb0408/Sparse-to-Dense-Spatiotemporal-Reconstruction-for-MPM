@@ -82,7 +82,10 @@ def build_components(cfg: dict, arm_name: str, seed: int):
                           seed=seed) if withhold else None
 
     item_cfg = ItemConfig(
-        sampling=sampling, psf=psf, noise=noise,
+        sampling=sampling, psf=psf,
+        forward_psf=PSFConfig(**cfg["physics"].get("forward_extra_psf", {})),
+        forward_psf_source=cfg["physics"].get("forward_extra_psf_source"),
+        noise=noise,
         warm_start_kind=arm.warm_start, lam=float(cfg["physics"]["lam"]),
         features=arm.features, supervision=arm.supervision, holdout=holdout,
         dual=arm.dual,
