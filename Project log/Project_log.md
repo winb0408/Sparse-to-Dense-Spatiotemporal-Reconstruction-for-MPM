@@ -2628,8 +2628,11 @@ E024 两条都不满足，所以这是同一个物理事实的两面，不是复
 让任务永远等下去。所以新增共享守卫 `spur_mpm/experiments/_gpu_gate.sh`：
 
 - `gpu_guard <idx>`：先用 `nvidia-smi -L` 检查设备**在不在驱动列表里**，不在就拒绝启动并把
-  `nvidia-smi -L` 的原文打出来；GPU 2 额外做"启动时占用必须 < 50 %"的检查，读不到占用就
+  `nvidia-smi -L` 的原文打出来；再按"启动时占用 < `GPU_MAX_FRACTION`"逐卡检查，读不到占用就
   按"不空闲"处理（沉默不是证据）。
+- **后续按项目负责人指示调整**（同日）：阈值从 50 % 提到 **60 %**——实测一个 E026 训练臂峰值
+  5979 MiB 分配 / 6658 MiB 保留，60 % 占用的 49 GB 卡还剩约 19.6 GB，是峰值的约 3 倍；
+  宁可让更大的任务自己调低阈值，也不要继承一个为小任务定的数。排队轮询从 2 分钟改为 **10 分钟**。
 - `run_e025.sh` / `run_e026_historical.sh` 非 DRY 启动时都调用它；
 - 四个 GPU 阶段（eval / train / structure_report / qualitative_figures）都套上
   `timeout "$JOB_TIMEOUT"`（默认 9000 s，远高于单臂 ~45 分钟），让"停住不动"变成失败而不是

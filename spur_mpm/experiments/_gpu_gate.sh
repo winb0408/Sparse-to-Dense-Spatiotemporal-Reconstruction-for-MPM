@@ -10,22 +10,29 @@
 #    it is still working. `CUDA_VISIBLE_DEVICES=2` is not a check.
 #    Evidence: docs/evidence/gpu2_falloff_20261113/INCIDENT.md.
 #
-# 2. **The card must be under half full at launch.** Filling GPU 2 has hung this
-#    server and triggered an unattended restart that took other users' jobs down
-#    with ours. The occupancy is measured at launch time, not remembered: "it
-#    was half free an hour ago" is exactly the shape of the last incident. An
-#    unreadable card counts as *not free*, because silence is not evidence.
+# 2. **The card must not be more than 60 % occupied at launch.** Filling GPU 2
+#    has hung this server and triggered an unattended restart that took other
+#    users' jobs down with ours. The occupancy is measured at launch time, not
+#    remembered: "it was free an hour ago" is exactly the shape of the last
+#    incident. An unreadable card counts as *not free*, because silence is not
+#    evidence.
 #
 #    GPU 2 fell off the bus on 2026-11-13, so the owner authorised the other
-#    three cards for this work (2026-11-13): GPUs 0, 1 and 3 may be used when
-#    they have roughly half their memory free. The same rule therefore applies
-#    to every index, which is also why it is checked per index — one dead device
-#    breaks a whole-card-list query and would look like "everything unreadable".
+#    three cards for this work, at up to 60 % occupancy (raised from 50 % after
+#    measuring what we actually ask for). The same rule applies to every index,
+#    which is also why it is checked per index — one dead device breaks a
+#    whole-card-list query and would look like "everything unreadable".
 #
-#   GPU_MAX_FRACTION=0.5   ceiling on used/total before a launch, every index
+#    Why 60 % is defensible here and would not be for a bigger job: an E026
+#    training arm peaked at 5979 MiB allocated / 6658 MiB reserved and a test
+#    evaluation is smaller; at 60 % of 49140 MiB the card still has ~19.6 GB
+#    free, about three times our peak. A job with a larger footprint must lower
+#    this ceiling rather than inherit it.
+#
+#   GPU_MAX_FRACTION=0.6   ceiling on used/total before a launch, every index
 #   ALLOW_BUSY=1           skip check 2; a visible act, not a forgotten one
 
-GPU_MAX_FRACTION="${GPU_MAX_FRACTION:-0.5}"
+GPU_MAX_FRACTION="${GPU_MAX_FRACTION:-0.6}"
 
 gpu_guard () {   # gpu_guard <physical index>; returns 2 after printing why
   local idx="$1" nvsmi="${NVIDIA_SMI:-nvidia-smi}" listed mem used total
@@ -53,7 +60,7 @@ gpu_guard () {   # gpu_guard <physical index>; returns 2 after printing why
       "$idx" "$used" "$total" \
       "$(awk -v u="$used" -v t="$total" 'BEGIN{printf "%.1f", 100*u/t}')" \
       "$(awk -v f="$GPU_MAX_FRACTION" 'BEGIN{printf "%.0f", 100*f}')" >&2
-    printf 'The card must have about half its memory free; ALLOW_BUSY=1 overrides.\n' >&2
+    printf 'The card must be under the occupancy ceiling; ALLOW_BUSY=1 overrides.\n' >&2
     return 2
   fi
   printf 'GPU %s at %s/%s MiB -- under the ceiling, allowed this launch\n' \

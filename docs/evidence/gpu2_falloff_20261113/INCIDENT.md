@@ -49,4 +49,13 @@ GPU 2 until `nvidia-smi -L` lists it again.
 launch but not whether the device is *visible*. A launch against a dead handle
 would have hung the same way. Both `run_e026_historical.sh` and `run_e025.sh`
 therefore now refuse to start when `nvidia-smi -L` does not list the requested
-device, and the eval/train stage reports a stall instead of hanging forever.
+device, and every GPU stage carries a `timeout` so a stall fails instead of
+spinning forever (`spur_mpm/experiments/_gpu_gate.sh`).
+
+**Occupancy ceiling after the incident:** GPUs 0/1/3 are authorised for this work
+below 60 % occupancy (owner's instruction, 2026-11-13; the 50 % figure quoted
+above was for GPU 2 before it died). 60 % is justified by the measured footprint
+— an E026 training arm peaked at 5979 MiB allocated / 6658 MiB reserved, so a
+60 %-occupied 49 GB card still leaves ~19.6 GB, about three times our peak. A job
+with a larger footprint must lower the ceiling rather than inherit it. The queue
+polls every 10 minutes rather than every 2, so waiting does not cost the box.
