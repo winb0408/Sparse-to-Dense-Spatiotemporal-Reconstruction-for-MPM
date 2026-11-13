@@ -140,12 +140,16 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
         context = geom0.context_depth(context_z_um=float(cfg["data"]["context_z_um"]))
 
     item_cfg = ItemConfig(
-        sampling=sampling, psf=psf, noise=noise,
+        sampling=sampling, psf=psf,
+        forward_psf=PSFConfig(**cfg["physics"].get("forward_extra_psf", {})),
+        forward_psf_source=cfg["physics"].get("forward_extra_psf_source"),
+        noise=noise,
         warm_start_kind=arm.warm_start, lam=float(cfg["physics"]["lam"]),
         features=features, holdout=holdout, dual=arm.dual,
         supervision="self" if withhold else "dense",
         u_kind=cfg["physics"].get("u_kind", "geo"),
         geo_mode=cfg["physics"].get("geo_mode", "per_axis"),
+        psf_source=cfg["physics"].get("psf_source"),
     )
     ds = VolumeWindowDataset(cache, [sample_id], item_cfg,
                              patch_hw=tuple(cfg["data"]["patch_hw"]),
@@ -160,7 +164,9 @@ def predict_volume(cfg: dict, sample_id: str, arm_name: str,
         model = build_model(arm, context, base=int(cfg["model"]["base"]),
                             window=int(cfg["model"]["window"]),
                             depths=tuple(cfg["model"]["depths"]),
-                            heads=tuple(cfg["model"]["heads"])).to(device)
+                            heads=tuple(cfg["model"]["heads"]),
+                            phys_control=str(cfg["model"].get("phys_control", "none")),
+                            consistency=cfg["model"].get("consistency")).to(device)
         model.load_state_dict(torch.load(ckpt, map_location=device,
                                          weights_only=False)["model"])
         model.eval()
