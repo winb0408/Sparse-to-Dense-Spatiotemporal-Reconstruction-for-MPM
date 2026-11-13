@@ -1,0 +1,68 @@
+{
+  "kind": "preflight",
+  "group": "matched_synthetic",
+  "train_volume": "M1_FOVII_S1_vessels",
+  "protocol": {
+    "mode": "yz",
+    "ky": 2,
+    "kz": 2,
+    "fold": 0,
+    "sampled_fraction": 0.25,
+    "planes_sampled": 8,
+    "planes_total": 16,
+    "rows_sampled_per_plane": 256,
+    "rows_total": 512,
+    "context_planes": 16
+  },
+  "checks": {
+    "target_is_dense_recording": true,
+    "y_equals_forward_H_of_D_once": true,
+    "y_equals_D_on_measured": false,
+    "prior_kernel_used": {
+      "sigma_xy_um": 0.98,
+      "sigma_z_um": 7.5,
+      "voxel_xy_um": 0.98,
+      "voxel_z_um": 5.0,
+      "sigma_xy_px": 1.0,
+      "sigma_z_px": 1.5,
+      "is_identity": false
+    },
+    "forward_kernel_used": {
+      "sigma_xy_um": 0.98,
+      "sigma_z_um": 7.5,
+      "voxel_xy_um": 0.98,
+      "voxel_z_um": 5.0,
+      "sigma_xy_px": 1.0,
+      "sigma_z_px": 1.5,
+      "is_identity": false
+    }
+  },
+  "candidates": {
+    "I0 interp": {
+      "mse_missing": 0.003992964047938585,
+      "mae_missing": 0.042629092931747437,
+      "min": 0.06024263799190521,
+      "max": 0.9866845607757568,
+      "changed_vs_interp": 0.0,
+      "finite": true
+    },
+    "W0 full 3D": {
+      "mse_missing": 0.0030187172815203667,
+      "mae_missing": 0.03864222764968872,
+      "min": -0.066682368516922,
+      "max": 1.1395416259765625,
+      "changed_vs_interp": 0.014910697005689144,
+      "finite": true
+    },
+    "W0 legacy": {
+      "mse_missing": 0.0037699651438742876,
+      "mae_missing": 0.04149467125535011,
+      "min": -0.022566646337509155,
+      "max": 1.0873234272003174,
+      "changed_vs_interp": 0.0067991456016898155,
+      "finite": true
+    }
+  },
+  "full3d_vs_legacy_mean_abs_diff": 0.011377070099115372,
+  "note": "Preflight runs on a TRAIN volume and reports no method result. In the matched_synthetic group the numbers describe a known-kernel synthetic inverse problem, not the recorded stacks."
+}

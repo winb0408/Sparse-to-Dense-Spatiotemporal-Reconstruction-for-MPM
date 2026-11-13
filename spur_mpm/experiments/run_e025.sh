@@ -4,7 +4,9 @@
 # DRY=1 by default; GPU runs require explicit GPU=<owned physical index>.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-CFG="${CFG:-spur_mpm/configs/experiments/E002_supervised_y_k2.yaml}"
+# E025 base config: y_k4 + PR3 branch auxiliary weights. E002 is kept
+# only as the y_k2 headline protocol and would mislabel this run.
+CFG="${CFG:-spur_mpm/configs/experiments/E025_adaptive_y_k4.yaml}"
 INDEX="${INDEX:-data_local/dryad_cache/index_cohort.json}"
 SPLIT="${SPLIT:-spur_mpm/experiments/E020_cohort/split.json}"
 OUT="${OUT:-runs/E025_adaptive_dual_prior}"

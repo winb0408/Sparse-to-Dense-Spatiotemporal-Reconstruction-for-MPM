@@ -1,0 +1,30 @@
+# SPUR-E025 — adaptive effective-prior ladder at 25 % retained (y_k4, 75 %
+# missing). Compare with E026's yz_k2_kz2 at the same retained fraction: the two
+# are a *regime* study, not a parameter-matched pair (geometry and depth context
+# differ).
+experiment: SPUR-E025
+model:
+  arm: P3_DualAdaptive
+sampling:
+  mode: y
+  ky: 4
+  kz: 1
+data:
+  # The E020 Dryad cohort, named here so a direct train.py call cannot fall
+  # back to the E000 audit split, which has a different fold mapping (that
+  # mismatch failed with KeyError on a test animal before this line existed).
+  index: data_local/dryad_cache/index_cohort.json
+  split: spur_mpm/experiments/E020_cohort/split.json
+  context_slices: 1
+  patch_hw: [256, 256]
+train:
+  steps: 3000
+  batch: 8
+loss:
+  l1: 1.0
+  ms_ssim: 0.5
+  branch_obs_weight: 0.05
+  branch_phys_weight: 0.05
+physics:
+  psf_source: null
+  forward_extra_psf_source: null

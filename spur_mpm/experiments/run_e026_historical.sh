@@ -6,8 +6,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 : "${FOLD:=0}" "${SEED:=0}" "${KY:=2}" "${KZ:=2}"
 : "${SOURCE_KIND:=matched_synthetic}" "${STAGE:=all}" "${DRY:=1}"
+# BATCH x ACCUM keeps the effective batch at 8 while halving peak activation
+# memory (co-tenancy on a shared card). Applied to EVERY arm in the group, so
+# within-group comparisons are unaffected; the values land in each run config.
 : "${OUT:=runs/E026_psras_condition}" "${GPU:=}" "${STEPS:=3000}"
-: "${CFG:=spur_mpm/configs/experiments/E002_supervised_y_k2.yaml}"
+: "${BATCH:=8}" "${ACCUM:=1}"
+: "${CFG:=spur_mpm/configs/experiments/E026_psras_condition.yaml}"
 : "${INDEX:=data_local/dryad_cache/index_cohort.json}"
 : "${SPLIT:=spur_mpm/experiments/E020_cohort/split.json}"
 # Historical PSRAS sigma = (1.0 XY px, 1.5 Z px).
@@ -78,7 +82,8 @@ common=(--config "$CFG" --fold "$FOLD" --seed "$SEED"
         --set "physics.forward_extra_psf.sigma_xy_um=$FORWARD_XY"
         --set "physics.forward_extra_psf.sigma_z_um=$FORWARD_Z"
         --set "physics.forward_extra_psf_source=$FORWARD_SOURCE"
-        --set "data.patch_hw=[256,256]" --set "train.steps=$STEPS")
+        --set "data.patch_hw=[256,256]" --set "train.steps=$STEPS"
+        --set "train.batch=$BATCH" --set "train.accum=$ACCUM")
 if [[ "$DRY" != 1 && -z "$GPU" ]]; then
   echo "Set GPU=<owned GPU index> for evaluation and training" >&2; exit 2
 fi
