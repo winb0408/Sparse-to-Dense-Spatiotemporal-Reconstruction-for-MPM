@@ -1,0 +1,54 @@
+{
+  "kind": "diagnostic",
+  "volume": "M1_FOVII_S1_vessels",
+  "fold": 0,
+  "lam": 0.01,
+  "protocol": {
+    "mode": "yz",
+    "ky": 2,
+    "kz": 2
+  },
+  "rows": [
+    {
+      "context_depth": 3,
+      "n_windows": 24,
+      "centre_mean_abs_diff_mean": 3.217212866483502e-08,
+      "centre_mean_abs_diff_max": 1.0963259455820662e-07,
+      "centre_measured_frac": 0.5416666666666666,
+      "missing_frac": 0.7638888855775198
+    },
+    {
+      "context_depth": 5,
+      "n_windows": 24,
+      "centre_mean_abs_diff_mean": 0.0036700996358172886,
+      "centre_mean_abs_diff_max": 0.030724219977855682,
+      "centre_measured_frac": 0.5416666666666666,
+      "missing_frac": 0.7541666651765505
+    },
+    {
+      "context_depth": 7,
+      "n_windows": 24,
+      "centre_mean_abs_diff_mean": 0.010022509843111038,
+      "centre_mean_abs_diff_max": 0.07867260277271271,
+      "centre_measured_frac": 0.5416666666666666,
+      "missing_frac": 0.7619047611951828
+    },
+    {
+      "context_depth": 9,
+      "n_windows": 24,
+      "centre_mean_abs_diff_mean": 0.01746622522477992,
+      "centre_mean_abs_diff_max": 0.24739249050617218,
+      "centre_measured_frac": 0.5416666666666666,
+      "missing_frac": 0.7569444427887598
+    },
+    {
+      "context_depth": 15,
+      "n_windows": 24,
+      "centre_mean_abs_diff_mean": 0.013537365036124053,
+      "centre_mean_abs_diff_max": 0.1686522662639618,
+      "centre_measured_frac": 0.5416666666666666,
+      "missing_frac": 0.7611111104488373
+    }
+  ],
+  "note": "Diagnostic on a TRAIN volume, no training, no test animal scored. It shows how far the two Wiener orderings can disagree as a function of the axial context T the evaluation window provides."
+}
