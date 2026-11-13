@@ -26,6 +26,34 @@
 前者只在被测量体素上算，后者只在缺口上算。总 PSNR 会把两者混在一起，而方法之间
 真正的差别只在缺口上——测量值谁都能逐位复现（插值地板就是 120 dB 封顶）。
 
+### 1.1 为什么 `P2_W0` 与 `P2_I0` 逐字段相同，以及这和旧项目 C2 的关系
+
+`P2_I0` 与 `P2_W0` 的 `summary.json` **除 `arm` 字段外完全相同**。这不是"差别小到看不
+出来"，是恒等 PSF 下 `spur_mpm/physics/wiener.py:50` 的 `if psf.is_identity: return y`
+让反卷积根本没有发生。PSF 判为恒等有两条独立依据（解析：NA=0.8 时 σ_xy=0.214 px、
+σ_z=0.216 px，均 < 1 体素；数据扫描：σ=0 最优，所有非零宽度为负增益 −0.17…−5.72 dB），
+见 `runs/E024_dual_prior/psf_estimate/`。
+
+与旧项目 `/data2/wjb/threePM` 的 C2（"物理先验稳定增益，6/6 正，+0.59…+3.36 dB"）**不
+矛盾**，两个前提在本轮都不成立：
+
+1. **旧协议的 H 是非恒等且已知的**。`PSRAS/data/observation.py:128` 先用
+   `blur_3d_fft(x, cfg.psf)` 模糊目标再采样，默认 `--psf_xy 1.0 --psf_z 1.5` 像素，
+   而 warm start 用**同一个** `psf` 对象——解的是匹配核的逆问题。旧项目自己也把增益
+   归因于这一步退卷积（EXP-021 no-PSF 消融后增益基本消失）。
+2. **旧 C2 的 6 个点 kz 全 ≥ 2**（yz 双轴）。旧项目的负结果 N10 明确写"横向（xy/y）
+   协议上的 Wiener 增益 ≈0 或为负"，N11 更直接证伪了 Y regime 的大增益。本轮 `y_k2`
+   正是那一档。
+
+实现上没有实质差异：`spur_mpm/physics/wiener.py` 是从 `PSRAS/physics/wiener.py` 移植的，
+λ=0.01 相同，用的是三维 OTF 与真 σ_z（不是最早 `dataset.py` 那个逐帧 2D、σ_axial 从不
+进入 inversion 的版本），fill-first 顺序也保留了。差异只在**协议**：旧版把 PSF 用在模糊
+目标和解先验两端，本轮先把 PSF 估计出来（=恒等）再用。
+
+量级上也不是同一件事：本轮 `P2_DualW − P2_Direct = +0.178 dB`、
+`P2_DualW − P2_DualI = −0.014 dB`，均在 1 dB 噪声带内；旧 C2 的 +0.59…+3.36 dB 是
+"整栈 b4f vs 裸 b1"，不是 Wiener 地板单独贡献。
+
 ## 2. 结果（fold 0，758 窗口）
 
 | 臂 | 参数量 | PSNR | PSNR(measured) | PSNR(missing) | SSIM | MAE | e_missing | Dice | Dice★ | clDice | clDice★ | pred_frac |

@@ -84,6 +84,14 @@ POLICY: tuple[tuple[str, str, str], ...] = (
      "primary supervised ladder; its negative ablations are published evidence"),
     ("runs/E023_phase1", "A",
      "audit logs, re-scores and full-volume structure exports"),
+    ("runs/E024_dual_prior", "A",
+     "PR2 dual-prior ladder; its no-Wiener-gain result is the published "
+     "evidence for plan SS8.2 (docs/PHASE1_PR2_E024_RESULTS.md)"),
+    ("runs/E025_adaptive_dual_prior", "B",
+     "PR3 y-only negative control; kept whatever sign it comes out with"),
+    ("runs/E026_psras_condition", "B",
+     "PR3 historical-condition re-check; its matched_synthetic null is evidence "
+     "(docs/PHASE1_PR3_E026_RESULTS.md)"),
     ("runs/E001", "B",
      "parameter-free baselines on the old cohort; superseded, still correct"),
     ("runs/E002", "C",

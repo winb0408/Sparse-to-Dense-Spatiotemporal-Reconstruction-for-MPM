@@ -70,7 +70,10 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
         context = geom.context_depth(context_z_um=float(cfg["data"]["context_z_um"]))
 
     item_cfg = ItemConfig(
-        sampling=sampling, psf=psf, noise=noise, warm_start_kind=arm.warm_start,
+        sampling=sampling, psf=psf,
+        forward_psf=PSFConfig(**cfg["physics"].get("forward_extra_psf", {})),
+        forward_psf_source=cfg["physics"].get("forward_extra_psf_source"),
+        noise=noise, warm_start_kind=arm.warm_start,
         lam=float(cfg["physics"]["lam"]), features=eval_features(arm),
         supervision="dense", holdout=(
             HoldoutSpec(ratio=float(cfg["selfsupervision"]["ratio"]),
@@ -150,8 +153,12 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
             "ms_per_plane": round(1e3 * wall / max(1, int(volume.shape[0])), 3),
             "device": str(device),
             "includes": "index/cache load, per-sample window construction, "
-                        "per-plane forward pass, stacking, np.save of volume, "
-                        "mask and warm start",
+                        "prior computation, per-plane network forward pass, "
+                        "CPU transfer and stacking",
+            "excludes": "disk writes of volume, mask, warm start and metadata",
+            "benchmark_valid": False,
+            "benchmark_note": "This is pipeline wall time, NOT isolated model "
+                              "latency; exclude disk I/O in compute comparisons.",
         },
         "notes": "virtual sparse input; not a hardware acquisition. Volume built "
                  "by stacking centre-plane predictions; see *.mask.npy for the "

@@ -155,7 +155,10 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         context = geom0.context_depth(context_z_um=float(cfg["data"]["context_z_um"]))
 
     item_cfg = ItemConfig(
-        sampling=sampling, psf=psf, noise=noise,
+        sampling=sampling, psf=psf,
+        forward_psf=PSFConfig(**cfg["physics"].get("forward_extra_psf", {})),
+        forward_psf_source=cfg["physics"].get("forward_extra_psf_source"),
+        noise=noise,
         warm_start_kind=arm.warm_start, lam=float(cfg["physics"]["lam"]),
         # "self" is what makes _make_item withhold; a self-supervised arm scored
         # with the full acquired set is built as a dense item and scored the same

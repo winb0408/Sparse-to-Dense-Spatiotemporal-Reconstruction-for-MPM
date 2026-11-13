@@ -183,6 +183,10 @@ class ItemConfig:
 
     sampling: SamplingSpec = field(default_factory=SamplingSpec)
     psf: PSFConfig = field(default_factory=PSFConfig)
+    # Candidate inverse kernel ONLY. Never use it to add blur to recorded GT.
+    # Additional forward blur is a separate, explicitly labelled synthetic test.
+    forward_psf: PSFConfig = field(default_factory=PSFConfig)
+    forward_psf_source: str | None = None
     noise: NoiseConfig = field(default_factory=NoiseConfig)
     warm_start_kind: str = "wiener"
     lam: float = 0.01
@@ -209,6 +213,8 @@ class ItemConfig:
 
     def to_dict(self) -> dict:
         return {"sampling": self.sampling.to_dict(), "psf": self.psf.to_dict(),
+                "forward_extra_psf": self.forward_psf.to_dict(),
+                "forward_extra_psf_source": self.forward_psf_source,
                 "noise": self.noise.to_dict(), "warm_start": self.warm_start_kind,
                 "lam": self.lam, "features": list(self.features),
                 "supervision": self.supervision, "dual": self.dual,
@@ -237,9 +243,15 @@ def _make_item(dense: np.ndarray, geometry: VolumeGeometry, cfg: ItemConfig,
     phase = (z0 % max(spec.kz, 1),
              y0 % max(spec.ky, 1),
              x0 % max(spec.ky, 1))
+    if not cfg.forward_psf.is_identity and \
+            cfg.forward_psf_source != "synthetic_extra_degradation":
+        raise ValueError("extra forward blur requires forward_psf_source="
+                         "'synthetic_extra_degradation'; prior psf is not the "
+                         "acquisition degradation")
     acq = observe(
         torch.from_numpy(dense),
-        AcquisitionConfig(sampling=spec, psf=cfg.psf, noise=cfg.noise, phase=phase),
+        AcquisitionConfig(sampling=spec, psf=cfg.forward_psf,
+                          noise=cfg.noise, phase=phase),
     )
     # Centred boundary windows have padding outside the physical Z extent.
     # Padding is never a measurement, regardless of the lattice phase.

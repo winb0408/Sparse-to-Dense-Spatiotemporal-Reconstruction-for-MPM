@@ -44,7 +44,7 @@ __all__ = ["DualPriorReconstructor", "PHYS_CONTROLS", "CONSISTENCY_MODES",
            "as_reconstruction"]
 
 #: What to do to the physics-branch input, for the parameter-matched controls.
-PHYS_CONTROLS = ("none", "zeros", "shuffle")
+PHYS_CONTROLS = ("none", "zeros", "shuffle", "interp_only")
 #: Observation consistency at the measured positions.
 CONSISTENCY_MODES = ("off", "hard")
 
@@ -171,7 +171,8 @@ class DualPriorReconstructor(nn.Module):
                  window: int = 8, depths: tuple[int, ...] = (2, 2, 2),
                  heads: tuple[int, ...] = (4, 8, 16), residual: bool = True,
                  use_gate: bool = False, consistency: str = "off",
-                 phys_control: str = "none", collect_aux: bool = False):
+                 phys_control: str = "none", collect_aux: bool = False,
+                 branch_auxiliary: bool = False):
         super().__init__()
         features = tuple(features)
         obs_features = tuple(obs_features)
@@ -205,6 +206,7 @@ class DualPriorReconstructor(nn.Module):
         self.consistency = consistency
         self.phys_control = phys_control
         self.collect_aux = bool(collect_aux)
+        self.branch_auxiliary = bool(branch_auxiliary)
         self.idx = {f: i for i, f in enumerate(features)}
 
         dims = [base * (2 ** i) for i in range(len(depths))]
@@ -217,6 +219,20 @@ class DualPriorReconstructor(nn.Module):
         cond_dim = len(cond_names) * self.t if cond_names else 0
         self.fusion = _Fusion(dims, cond_dim, use_gate)
         self.decoder = _Decoder(dims, window, depths, heads, out_ch=self.t)
+        # PR3: lightweight per-branch diagnostics/auxiliary objectives. Each
+        # branch can learn independently from the shared dense reference.
+        # These heads NEVER receive GT as input and are disabled by default
+        # for historical PR2 arms; they are read only by PR3 training.
+        self.obs_head = (nn.Conv2d(dims[0], self.t, 1)
+                         if self.branch_auxiliary else None)
+        self.phys_head = (nn.Conv2d(dims[0], self.t, 1)
+                          if self.phys is not None and self.branch_auxiliary else None)
+        if self.obs_head is not None:
+            nn.init.zeros_(self.obs_head.weight)
+            nn.init.zeros_(self.obs_head.bias)
+        if self.phys_head is not None:
+            nn.init.zeros_(self.phys_head.weight)
+            nn.init.zeros_(self.phys_head.bias)
 
     # -- input slicing ------------------------------------------------------
     def _split(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -235,6 +251,17 @@ class DualPriorReconstructor(nn.Module):
         v = self._split(x)
         obs = self._stack(v, self.obs_features)
 
+        # Parameter-matched control: the physics branch must see I0 where it
+        # would have seen W0, and therefore a zero delta. It must NOT lose
+        # anything else -- u_physics is a function of (M, H, lam), not of W0,
+        # so zeroing it would hand the control less information than the
+        # treatment for a reason that has nothing to do with the deconvolved
+        # candidate, and would flatter the treatment.
+        if self.phys_control == "interp_only":
+            if "wiener" in v and "interp" in v:
+                v["wiener"] = v["interp"]
+            if "phys_delta" in v:
+                v["phys_delta"] = torch.zeros_like(v["phys_delta"])
         phys = None
         if self.phys is not None:
             phys = self._stack(v, self.phys_features)
@@ -262,6 +289,16 @@ class DualPriorReconstructor(nn.Module):
             d_hat = d_raw
 
         aux = {"residual": r}
+        # The two independent views are supervised with small, optional losses
+        # on the same dense target. Observation estimates I0 correction;
+        # physics estimates a W0 correction. Neither branch is forced to copy
+        # Wiener artifacts; final fused output remains the deployed output.
+        if self.branch_auxiliary:
+            aux["observation_prediction"] = (
+                (i0 if i0 is not None else v["y"]) + self.obs_head(f_obs[0]))
+            if self.phys_head is not None:
+                w0 = v.get("wiener", i0)
+                aux["physics_prediction"] = w0 + self.phys_head(f_phys[0])
         if i0 is not None:
             aux["interp"] = i0
         if self.collect_aux:

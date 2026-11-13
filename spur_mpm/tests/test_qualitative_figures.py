@@ -386,3 +386,32 @@ def _freeze_spec(spec, ref, mask):
     cfg = {"data": {"index": "index.json", "split": "split.json"},
            "sampling": {"mode": "y", "ky": 2, "kz": 1}}
     return _freeze(spec, ref, mask, cfg)
+
+
+def test_the_error_map_is_scored_only_where_the_arm_had_to_infer():
+    """Measured voxels are copies, not reconstructions, and must not be scored.
+
+    The failure this pins is quiet: painting |pred-ref| over the whole panel
+    puts every arm at zero on three quarters of a y_k4 image, so an arm that
+    reconstructs nothing still looks as good as one that reconstructs the gaps.
+    """
+    from spur_mpm.scripts.qualitative_figures import missing_error
+
+    ref = _ref()
+    mask = _masks()["y_k2"]
+    pred = ref.copy()
+    # Wrong only where the arm was handed the data: a copy that drifted. A
+    # whole-panel average would count this; the missing-only map must not.
+    pred[mask] += 5.0
+    col = {"axis": "xy", "coord": SHAPE[0] // 2, "key": "XY"}
+    spec = {"z_view": SHAPE[0] // 2, "roi": [0, 0, 8]}
+    got = missing_error(pred, ref, mask, col, spec)
+
+    assert np.all(np.isfinite(got[~mask[col["coord"]]]))
+    assert np.all(np.isnan(got[mask[col["coord"]]]))
+    assert float(np.nanmax(got)) == 0.0          # the gap is reconstructed exactly
+
+    # and an XZ cut that lies entirely on measured rows has nothing to score
+    z = np.zeros(SHAPE, bool); z[:, 0, :] = True
+    xz = {"axis": "xz", "coord": 0, "key": "XZ"}
+    assert np.all(np.isnan(missing_error(pred, ref, z, xz, spec)))
