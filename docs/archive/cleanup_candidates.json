@@ -1,8 +1,8 @@
 {
-  "generated_utc": "2026-11-10T15:01:25Z",
+  "generated_utc": "2026-11-13T14:10:20Z",
   "repo_root": "/ssd1/wjb/SPUR-MPM",
-  "head_sha": "3e2885a0788b424c7c6132b2f70daa628de1d577",
-  "branch": "feature/phase1-dual-prior-20261110",
+  "head_sha": "e8b8abd233d8ca18fd69bce92db548bd71cc5ff9",
+  "branch": "feature/phase1-adaptive-prior-pr3-20261112",
   "protected": [
     "data_local",
     "runs/E021_ladder",
@@ -22,6 +22,21 @@
       "prefix": "runs/E023_phase1",
       "category": "A",
       "reason": "audit logs, re-scores and full-volume structure exports"
+    },
+    {
+      "prefix": "runs/E024_dual_prior",
+      "category": "A",
+      "reason": "PR2 dual-prior ladder; its no-Wiener-gain result is the published evidence for plan SS8.2 (docs/PHASE1_PR2_E024_RESULTS.md)"
+    },
+    {
+      "prefix": "runs/E025_adaptive_dual_prior",
+      "category": "B",
+      "reason": "PR3 y-only negative control; kept whatever sign it comes out with"
+    },
+    {
+      "prefix": "runs/E026_psras_condition",
+      "category": "B",
+      "reason": "PR3 historical-condition re-check; its matched_synthetic null is evidence (docs/PHASE1_PR3_E026_RESULTS.md)"
     },
     {
       "prefix": "runs/E001",
@@ -76,19 +91,19 @@
     }
   },
   "totals": {
-    "entries": 31,
-    "bytes": 5063435748,
+    "entries": 35,
+    "bytes": 7046658918,
     "by_action": {
-      "delete": 1,
-      "keep": 8,
+      "keep": 11,
       "keep-evidence": 21,
-      "review": 1
+      "review": 3
     },
     "by_category": {
-      "A": 2,
-      "B": 6,
+      "A": 3,
+      "B": 8,
       "C": 21,
-      "D": 2
+      "D": 2,
+      "review": 1
     }
   },
   "entries": [
@@ -114,6 +129,8 @@
       "action": "keep",
       "reason": "parameter-free baselines on the old cohort; superseded, still correct",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E001_baselines/E001_table.md",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md"
       ],
@@ -141,6 +158,8 @@
       "action": "keep",
       "reason": "parameter-free baselines on the old cohort; superseded, still correct",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E001_baselines/E001_table.md",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md"
       ],
@@ -168,6 +187,8 @@
       "action": "keep",
       "reason": "parameter-free baselines on the old cohort; superseded, still correct",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E001_baselines/E001_table.md",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md"
       ],
@@ -195,6 +216,8 @@
       "action": "keep",
       "reason": "parameter-free baselines on the old cohort; superseded, still correct",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E001_baselines/E001_table.md",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md"
       ],
@@ -222,6 +245,8 @@
       "action": "keep",
       "reason": "parameter-free baselines on the old cohort; superseded, still correct",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E001_baselines/E001_table.md",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md"
       ],
@@ -249,6 +274,8 @@
       "action": "keep",
       "reason": "parameter-free baselines on the old cohort; superseded, still correct",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E001_baselines/E001_table.md",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md"
       ],
@@ -288,9 +315,12 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md",
         "spur_mpm/figures/qualitative/qualitative_M1_FOVII_S1_vessels.json",
+        "spur_mpm/scripts/audit_runs.py",
         "spur_mpm/scripts/qualitative_figures.py"
       ],
       "archive_destination": "runs/E002_S0_fold0"
@@ -317,6 +347,8 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md"
       ],
@@ -356,6 +388,8 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md",
         "spur_mpm/figures/qualitative/qualitative_M2_FOVII_S1_vessels.json"
@@ -384,6 +418,8 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md"
       ],
@@ -423,6 +459,8 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md",
         "spur_mpm/figures/qualitative/qualitative_M3_FOVI_S1_vessels.json"
@@ -451,6 +489,8 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md"
       ],
@@ -493,9 +533,12 @@
         "archive/selfsup_v1/figures/qualitative_M1_FOVII_S1_vessels_e012.json",
         "archive/selfsup_v1/figures/qualitative_M1_FOVII_S1_vessels_with_dc1.json",
         "archive/selfsup_v1/results/runs_e011/E002_S1_fold0_test_full/summary.json",
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md",
-        "spur_mpm/figures/qualitative/qualitative_M1_FOVII_S1_vessels.json"
+        "spur_mpm/figures/qualitative/qualitative_M1_FOVII_S1_vessels.json",
+        "spur_mpm/tests/test_archive_safety.py"
       ],
       "archive_destination": "runs/E002_S1_fold0"
     },
@@ -521,6 +564,8 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md"
       ],
@@ -563,6 +608,8 @@
         "archive/selfsup_v1/figures/qualitative_M2_FOVII_S1_vessels_e012.json",
         "archive/selfsup_v1/figures/qualitative_M2_FOVII_S1_vessels_with_dc1.json",
         "archive/selfsup_v1/results/runs_e011/E002_S1_fold1_test_full/summary.json",
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md",
         "spur_mpm/figures/qualitative/qualitative_M2_FOVII_S1_vessels.json"
@@ -591,6 +638,8 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md"
       ],
@@ -633,6 +682,8 @@
         "archive/selfsup_v1/figures/qualitative_M3_FOVI_S1_vessels_e012.json",
         "archive/selfsup_v1/figures/qualitative_M3_FOVI_S1_vessels_with_dc1.json",
         "archive/selfsup_v1/results/runs_e011/E002_S1_fold2_test_full/summary.json",
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md",
         "spur_mpm/figures/qualitative/qualitative_M3_FOVI_S1_vessels.json"
@@ -661,6 +712,8 @@
       "action": "keep-evidence",
       "reason": "pre-Z-boundary-fix split, withdrawn from RESULTS.md; kept because PR #1 item B4 re-scores these checkpoints on the fixed code",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/experiments/E002_supervised/E001_vs_E002.md",
         "spur_mpm/experiments/E002_supervised/E002_table.md"
       ],
@@ -687,7 +740,10 @@
       "category_meaning": "protocol-invalid run (wrong checkpoint / split / axis)",
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
-      "referenced_by": [],
+      "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json"
+      ],
       "archive_destination": "runs/E009_A0_fold0_test"
     },
     {
@@ -711,7 +767,10 @@
       "category_meaning": "protocol-invalid run (wrong checkpoint / split / axis)",
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
-      "referenced_by": [],
+      "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json"
+      ],
       "archive_destination": "runs/E009_A0_fold1_test"
     },
     {
@@ -735,7 +794,10 @@
       "category_meaning": "protocol-invalid run (wrong checkpoint / split / axis)",
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
-      "referenced_by": [],
+      "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json"
+      ],
       "archive_destination": "runs/E009_A0_fold2_test"
     },
     {
@@ -772,6 +834,8 @@
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/figures/qualitative/qualitative_M1_FOVII_S1_vessels_ky4.json"
       ],
       "archive_destination": "runs/E009_S1_fold0"
@@ -797,7 +861,10 @@
       "category_meaning": "protocol-invalid run (wrong checkpoint / split / axis)",
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
-      "referenced_by": [],
+      "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json"
+      ],
       "archive_destination": "runs/E009_S1_fold0_test"
     },
     {
@@ -834,6 +901,8 @@
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/figures/qualitative/qualitative_M2_FOVII_S1_vessels_ky4.json"
       ],
       "archive_destination": "runs/E009_S1_fold1"
@@ -859,7 +928,10 @@
       "category_meaning": "protocol-invalid run (wrong checkpoint / split / axis)",
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
-      "referenced_by": [],
+      "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json"
+      ],
       "archive_destination": "runs/E009_S1_fold1_test"
     },
     {
@@ -896,6 +968,8 @@
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
       "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/figures/qualitative/qualitative_M3_FOVI_S1_vessels_ky4.json"
       ],
       "archive_destination": "runs/E009_S1_fold2"
@@ -921,7 +995,10 @@
       "category_meaning": "protocol-invalid run (wrong checkpoint / split / axis)",
       "action": "keep-evidence",
       "reason": "same cohort as E002 at k_y=4; kept for the same B4 comparison",
-      "referenced_by": [],
+      "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json"
+      ],
       "archive_destination": "runs/E009_S1_fold2_test"
     },
     {
@@ -1366,17 +1443,23 @@
         "docs/CODE_MAP.md",
         "docs/PHASE1_ACCEPTANCE_REPORT.md",
         "docs/PHASE1_AUDIT_RESPONSE.md",
+        "docs/PHASE1_PR2_ACCEPTANCE.md",
         "docs/PHASE1_PR2_IMPLEMENTATION_PLAN.md",
         "docs/PHASE1_SUPERVISED_AUDIT_AND_RUNBOOK.md",
         "docs/RESULTS.md",
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/CLEANUP_REPORT_20261110.md",
+        "docs/archive/cleanup_candidates.json",
         "spur_mpm/figures/framework/fig2_provenance.json",
+        "spur_mpm/scripts/audit_runs.py",
         "spur_mpm/scripts/framework_figure.py",
         "spur_mpm/scripts/ladder_curves.py",
         "spur_mpm/scripts/ladder_report.py",
         "spur_mpm/scripts/run_ladder.py",
         "spur_mpm/scripts/structure_figure.py",
         "spur_mpm/scripts/structure_report.py",
-        "spur_mpm/scripts/tolerance_sweep.py"
+        "spur_mpm/scripts/tolerance_sweep.py",
+        "spur_mpm/tests/test_archive_safety.py"
       ],
       "archive_destination": "runs/E021_ladder"
     },
@@ -1524,9 +1607,323 @@
         "docs/PHASE1_AUDIT_RESPONSE.md",
         "docs/PHASE1_PR2_IMPLEMENTATION_PLAN.md",
         "docs/RESULTS.md",
-        "spur_mpm/experiments/reval_pre_fix_checkpoints.sh"
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/CLEANUP_REPORT_20261110.md",
+        "docs/archive/cleanup_candidates.json",
+        "spur_mpm/experiments/reval_pre_fix_checkpoints.sh",
+        "spur_mpm/scripts/audit_runs.py"
       ],
       "archive_destination": "runs/E023_phase1"
+    },
+    {
+      "path": "runs/E024_dual_prior",
+      "kind": "dir",
+      "run_id": "E024_dual_prior",
+      "bytes": 1277293589,
+      "file_count": 102,
+      "sha256": "219acf67d87702650249b6a40c52eee2a0d2b2e4f6d0ce99146ba6bca3530b27",
+      "sha256_kind": "manifest of (relpath,size); per-file hashes for the first 101 files under 64 MiB",
+      "file_sha256": {
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0/best.pt": "6c86cf96eccf15e0be240d9be59f6d04c95c48669567650c71bf4d629f0d1258",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0/config.yaml": "dab3c963ed85e238f287b14d07e8ba934b59e33b4f79f5bb36cf0a294a3d0a5f",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0/final_val.json": "4675902aa3ff1539fa1c77d35cd1d2f3753f70855bf7dc94df62fa09ff02bc57",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0/last.pt": "f93823c620fe715e986a7d01cf452f989b6068332197c10e07cdf1c3d9addb41",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0/log.csv": "ae8f1bbbbd874e34d97986a892fef125dac444df18dd8949cdec88f7221cbb2d",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0/metrics.jsonl": "41594d8214af63ae5d7ad4063916f87155b8c972c315ca62cd7c725e7d55cc2c",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0/provenance.json": "cf53e1c940fe8fcef0e6d8defa00168c0618ef5d8cce049e1f5149765aea1e01",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0/resume.pt": "439d87d28085ff9abf2c12674749aa640a27ab418043da16cb5969eff2120cb9",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0_test/samples.csv": "0aa673f7e73122adb4e4474d22b69da0dae255e0e48d3b4a259307cfe1bc6e3f",
+        "runs/E024_dual_prior/E024_P2_Direct_y_k2_fold0_s0_test/summary.json": "f0662212f08cb1b1cdfbb7209366af9999f9ac1f4562d3b5fc49a88acfa6bb39",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0/best.pt": "440c47945d9e42ee18eaafc9984d7f15891e9c2e6ab05b06769397ef19629924",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0/config.yaml": "ed2877678bdbd245dcc72e5ef55b661497db29e3450821092fd34ca6bc9aa730",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0/final_val.json": "a16b95b0b8fa06db2765c3ad5faca1129603ea16fa014e2380d76a0b3b7d1ade",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0/last.pt": "6aa3d60bf2197dc1de513da3a2b89d009ae0d17d85c07d1e70a869df58e6616a",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0/log.csv": "e24116c9ec75efafa528acae5b0c24b4fc9650bbd269d33309c760edac4e357f",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0/metrics.jsonl": "369d34fafc568cd37a8bd6f482b78f5ab0e10fe8b5d907336a340872820337f6",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0/provenance.json": "9ce3e59f4af66225ab3a47bb1a1e0f0134bf0fce140714478cb9104298c65c29",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0/resume.pt": "ad3ad28b9d49d577ed1219610d1b09a5bc2ab3e26c241f0597d8f5b876af3192",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0_test/samples.csv": "4b23e2b62b873a75ef2c0592bdd6ed86f16fdd31d27616b7d35c21c687d68ade",
+        "runs/E024_dual_prior/E024_P2_DualI_y_k2_fold0_s0_test/summary.json": "3bec60e14e092f718f4a045c5200f5e8a92e691fac585c37c3ab7cebdef072d3",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/best.pt": "6d14bf2b1a260aef5287bfdc873eb40bed151edb4f4f977f2194c267719633ec",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/config.yaml": "d6830b20f09f076aa358955c053bc716a95f013e586f3a8e9cbc24a990722e47",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/final_val.json": "5eed4e66110e262e7f1a85fa1914355b6ad4cdf6b478b96ae7ac81cc49f19cdb",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/last.pt": "82f3b2cbeff0d71a1839bbc1eeff65a432e795fdd441ce35aa22085caf741fe8",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/log.csv": "9fbfff57c8ed9e6df0be517ec9ae7a5edf77440fd425333ec8b319fcfe77ba7c",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/metrics.jsonl": "f4f27839b76af0dcca3da11d6475b777369f98662af77b86e76ccbb78ab4ec53",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/provenance.json": "74f920e8c9f8fb106b3fe154bc419f0925b96dd77a30fd69fedb6b9504c0015e",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0/resume.pt": "0457412eae05e0b0ff8e824ac7eb13e09d086ee3af181852a3a458573f8a2e0a",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle/best.pt": "2743170fcafcf1bfb706d75c9b45d495ccf6c3bd69cd985e2c8e21087c4d33bf",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle/config.yaml": "4a0c7332d79e12e3cbcdab4a8c0717bb9313afab53c7da2f22bd8c9cb901286d",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle/final_val.json": "b127cacdc996c4633bcef42952cf4e1c1aaf5403dab7582db2b171f01678aa1b",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle/last.pt": "22e71fa53719ecca956503c1e7c0e2d3d65a99c1460c5c9110ac35273c0f3e8a",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle/log.csv": "b55ca8edbecc41d92b89d102a92b8ebe8304b386198e45de93ecfec58cda6b14",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle/metrics.jsonl": "07a50abcd383155d1c064651239869aa2f00389ea0747b66a9d997d90808063b",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle/provenance.json": "b669821c758ebbb63b687575b210d8226240271fbd785f0374e280aa7c96e1dd",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle/resume.pt": "c869af0f6d28736a9a7b89bf23fc5d0c9021ed51134a1b0f5a4151066053bbfd",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle_test/samples.csv": "aa7cd7744ef719f64afc44917bea86d31796a1a4207baa9fd94b0959659972e7",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle_test/summary.json": "d1c4e663a047343508ce1834f9d73b046ed8853ec88bba40faa08f7b8477a5a7",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros/best.pt": "82ce58f0f9447549df13a51f09772d3c82dfc53d1791ecdfc187b60cc3aede4d",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros/config.yaml": "8124c7db536a8945c643bf284762cd297f74e26bd0275e139e8d8ee3255b3516",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros/final_val.json": "0445f440e0fb2a37d63c258582a742860a14792127ed707fa219e90116ce4717",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros/last.pt": "15d48e2d58fe2332dd4e959c43c8e17fd75cbca81432076d6a115fce80403784",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros/log.csv": "4111959c299bd23c9f364a668b1deae2e2ff7ace61be9e89f276e5202209301e",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros/metrics.jsonl": "802a204dd5e11f527fb61efbf7f5edcf436686f72019df5300b5cff0bfd93967",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros/provenance.json": "a17319be1a938de518ac2ead0f660df4cd49aa60cdf30d70d79529c0fb9f3217",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros/resume.pt": "150068ca85302448a9cc4f0b0beacb09489e454c7fbb7104ebbcfb6e25c0632d",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros_test/samples.csv": "9ee7c3ee07d1f45e85c3f0636c34ffac3df313bced3e136246a2a430cc0e25f6",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_ctrlzeros_test/summary.json": "52c4bfe37716637b3fc4b379ea415d835973984e851625f5fe4c2c6c7dbe31ff",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_test/samples.csv": "6671bfaed10f1fce83e84bc1a1933a24080cdc817c22e36283054a11266651f9",
+        "runs/E024_dual_prior/E024_P2_DualW_y_k2_fold0_s0_test/summary.json": "ad0e2dc1f6a0cf7e2dacecef2c3896bccebd2b216e1e346289b8d5644779a805",
+        "runs/E024_dual_prior/E024_P2_I0_y_k2_fold0_test/samples.csv": "fb974302c90e5b40bdce943868e0ec0a5483e38969a5559fc32bfb3205d41d46",
+        "runs/E024_dual_prior/E024_P2_I0_y_k2_fold0_test/summary.json": "995676d54ea4fd0d0b71e04dc26a8ea528552eff0804db883ab180515dcbdd6b",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0/best.pt": "4301fa3b3546ab46fe7a818dee851d29708d26f7a0b0500280f8d5e529d97d4b",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0/config.yaml": "8d01035b09a3487352c61de63310c454abe1a764e6abf7166adf4afee6dbd378",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0/final_val.json": "b74f69e7c0855f290b46652825f0f12f33ba8f6ddba2962a3924e6260cc5ce66",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0/last.pt": "c823a8f406be7b1a050401d2c8255d9efbd178da2095547a3f0d71ad377ed7b8",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0/log.csv": "1c440c8808730eb0598539b8e74e9a416e7a3e42860eaf574da23f4f7407d001",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0/metrics.jsonl": "d5c2b5892499180c116dc7a93bf65971cac5c17770431753e9c282fff2fec22c",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0/provenance.json": "e5a77ecb8ebc60f45206522a237efb0c460421bda48a5390560359293fb32cdb",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0/resume.pt": "736a8d1cf255b2915955b34abd8cad805087ed8a81f0a031dec7b5fbc73ac7fd",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0_test/samples.csv": "7b597bab8919ea51bdcf706fe161f96b2da4d0ffaf60ec7ba339d7726d8ab48c",
+        "runs/E024_dual_prior/E024_P2_ResidualI_y_k2_fold0_s0_test/summary.json": "e6d79f9e9691851e4e7c15c610a4e3b07345c51724f4e839f92d6ef7a12fb663",
+        "runs/E024_dual_prior/E024_P2_W0_y_k2_fold0_test/samples.csv": "fb974302c90e5b40bdce943868e0ec0a5483e38969a5559fc32bfb3205d41d46",
+        "runs/E024_dual_prior/E024_P2_W0_y_k2_fold0_test/summary.json": "89cd37625946aef419e501ac7cf805b32cf3866c806d34c1cd83a5babce0d702",
+        "runs/E024_dual_prior/figures/qual_y_k2/error_M2_FOVI_S1_vessels.png": "99138853156a8c366faedfa60d992d46df2358218be11f7e83c5779b76b1f6ff",
+        "runs/E024_dual_prior/figures/qual_y_k2/profile_M2_FOVI_S1_vessels.png": "a9c775b475699a4fa75c846c8cf5d704acc795fee09280c2fd08bbd0d179bdf4",
+        "runs/E024_dual_prior/figures/qual_y_k2/qualitative_M2_FOVI_S1_vessels.json": "a81e3aa4f80c7834eaee46cb2c49457b240c47f3e2e5004ca703b5e72cee06a9",
+        "runs/E024_dual_prior/figures/qual_y_k2/qualitative_M2_FOVI_S1_vessels.png": "4be092cde0c268a80db2872b9f7426bb465930975d1fd93da954af451ad67f6b",
+        "runs/E024_dual_prior/figures/qual_y_k2/support_M2_FOVI_S1_vessels.png": "c917a5a5c8f4e09a83695a15e673a6513b6000fb0bf733dee1353418a1c7fbc2",
+        "runs/E024_dual_prior/ladder_table.md": "1fbda870bd8d0bfeb4505ade3c295ce3ada6e8ae7055caedf2342e4dbe168fb4",
+        "runs/E024_dual_prior/psf_estimate/psf_estimate.json": "356e2a1d97dcb930c29822fc4c9ddd487707b3263e31dc050f9e7434f0cf8442",
+        "runs/E024_dual_prior/psf_estimate/psf_estimate.md": "fbddc81128b53ca83f286cff85c7cf500450d10a54eddbface91a117703b10e4",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVII_S1_vessels_pred_mask.tif": "3067e813b8df675e80ae37d616bdedf9b31e94ff6a2644b154852c091533156e",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVII_S1_vessels_recon.json": "80b1ebf5ef7eb2a352af751a839a3e00a41f007f847fa2ae9dc547348433e14a",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVII_S1_vessels_ref_mask.tif": "c8ccca6091f774e12c63ba0e8f5dc26b6daf995a0075a64633347463c2f583ef",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVII_S2_vessels_pred_mask.tif": "804d51d8be4587e8327c72c41b4f75895114eacaa0276a3b465c56568febe3cc",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVII_S2_vessels_recon.json": "b69a56e4a1d33a92c3c73d5f890bff0dfbf02e54037773ec67e8b3e4c4262182",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVII_S2_vessels_ref_mask.tif": "3dd0b1301e4c4d72a8f8ea840a8e69951768c8af1717479e9bcadfcdb62aa22f",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVI_S1_vessels_pred_mask.tif": "70c6753d580cc72b1d0d1e9d29a7872b060462e96151d703dc1ca3d81d9aee26",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVI_S1_vessels_recon.json": "331d5502b1fe81b5f75a3fa08aff0da31390adb5830f01c3a6f0d9d128410ad0",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVI_S1_vessels_ref_mask.tif": "3f0caa5287462853409cc802825a2754baece589903f3691f1cd9e126c975e01",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVI_S2_vessels_pred_mask.tif": "354dd681aa48f4e457edb4e0f257224fb4adcd0d9726ee5420d04407675913ac",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVI_S2_vessels_recon.json": "06515ae298457f4070b6c0825056162e781b1f9513a59ed3119fd4f83d62c058",
+        "runs/E024_dual_prior/structure_P2_DualW/P2_DualW_M2_FOVI_S2_vessels_ref_mask.tif": "df35eadddb75774f10042021fa2cbae9dda95824b72f342368bb634f7b2186f5",
+        "runs/E024_dual_prior/structure_P2_DualW/structure_summary.json": "a19952c887ef6c544c1e84bffef503ce6ffe66d221672aeb383ac5517e11a838",
+        "runs/E024_dual_prior/structure_P2_DualW/structure_summary.md": "6cc1bad29a01372987be1decdfb548f76d450906dd8c9988cbba2e9ea30f8890",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVII_S1_vessels_pred_mask.tif": "10b4d5026f04d80d651638a6a26786d8ac552db10a8a62d6c05c4aba8c1150fd",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVII_S1_vessels_recon.json": "d8d20d835a5335da98ce415a5c53e41d63d7e7a034cd48bed6b4daa3f4f505b1",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVII_S1_vessels_ref_mask.tif": "c8ccca6091f774e12c63ba0e8f5dc26b6daf995a0075a64633347463c2f583ef",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVII_S2_vessels_pred_mask.tif": "7ed410f17bd58fb5ef05fb3fcb613a23745e660ac1e35e93b3e26d2d59a0fe6d",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVII_S2_vessels_recon.json": "865d56b9f43341fa69e5445771807c40eeee87ea0ccee3ed4bd6259ef95f7c88",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVII_S2_vessels_ref_mask.tif": "3dd0b1301e4c4d72a8f8ea840a8e69951768c8af1717479e9bcadfcdb62aa22f",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVI_S1_vessels_pred_mask.tif": "070027b5f1b802cbdd8203d32ad67c7afee36b1069a05a185dcd48015e4f9f64",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVI_S1_vessels_recon.json": "fb7f43d298724a3447e58cbb38a5bcd06bf2d6f3ba614929d18d9020a249df36",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVI_S1_vessels_ref_mask.tif": "3f0caa5287462853409cc802825a2754baece589903f3691f1cd9e126c975e01",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVI_S2_vessels_pred_mask.tif": "927f9cd0e8809b785490f2a439fe874e6d09b10ea21acf1e701342d4df06812b",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVI_S2_vessels_recon.json": "1265de6deaffc4b96039f287708c403484741af19a3430ecfbfdcc4400a94489",
+        "runs/E024_dual_prior/structure_P2_I0/P2_I0_M2_FOVI_S2_vessels_ref_mask.tif": "df35eadddb75774f10042021fa2cbae9dda95824b72f342368bb634f7b2186f5",
+        "runs/E024_dual_prior/structure_P2_I0/structure_summary.json": "eb33063be75b3c0784789fd16860ae3437d07b7f4e8d3d9ac4a2f4b3721142a4",
+        "runs/E024_dual_prior/structure_P2_I0/structure_summary.md": "ca5b67d7690d7479554cfe54c02c4f02ab41e61877cacee42eb77e5619052181",
+        "runs/E024_dual_prior/structure_compare.md": "e43ff11f61cf0edec4694f3f1173e80888b7b0707c1af96197b5da1fddbca817"
+      },
+      "tracked_files": 37,
+      "top_level": [
+        "E024_P2_Direct_y_k2_fold0_s0",
+        "E024_P2_Direct_y_k2_fold0_s0_test",
+        "E024_P2_DualI_y_k2_fold0_s0",
+        "E024_P2_DualI_y_k2_fold0_s0_test",
+        "E024_P2_DualW_y_k2_fold0_s0",
+        "E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle",
+        "E024_P2_DualW_y_k2_fold0_s0_ctrlshuffle_test",
+        "E024_P2_DualW_y_k2_fold0_s0_ctrlzeros",
+        "E024_P2_DualW_y_k2_fold0_s0_ctrlzeros_test",
+        "E024_P2_DualW_y_k2_fold0_s0_test",
+        "E024_P2_I0_y_k2_fold0_test",
+        "E024_P2_ResidualI_y_k2_fold0_s0",
+        "E024_P2_ResidualI_y_k2_fold0_s0_test",
+        "E024_P2_W0_y_k2_fold0_test",
+        "figures",
+        "ladder_table.md",
+        "psf_estimate",
+        "structure_P2_DualW",
+        "structure_P2_I0",
+        "structure_compare.md"
+      ],
+      "category": "A",
+      "category_meaning": "correct run, result supports the claim",
+      "action": "keep",
+      "reason": "PR2 dual-prior ladder; its no-Wiener-gain result is the published evidence for plan SS8.2 (docs/PHASE1_PR2_E024_RESULTS.md)",
+      "referenced_by": [
+        "Project log/Project_log.md",
+        "docs/PHASE1_PR2_ACCEPTANCE.md",
+        "docs/PHASE1_PR2_E024_RESULTS.md",
+        "docs/PHASE1_PR2_IMPLEMENTATION_PLAN.md",
+        "docs/PHASE1_PR2_PR_DRAFT.md",
+        "docs/PHASE1_PR2_PSF_ESTIMATE.md",
+        "docs/PHASE1_PR2_RUNBOOK.md",
+        "docs/RESULTS.md",
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
+        "spur_mpm/experiments/run_e024.sh",
+        "spur_mpm/scripts/audit_runs.py",
+        "spur_mpm/scripts/backfill_model_control.py",
+        "spur_mpm/scripts/compare_structure.py",
+        "spur_mpm/scripts/estimate_psf.py"
+      ],
+      "archive_destination": "runs/E024_dual_prior"
+    },
+    {
+      "path": "runs/E025_adaptive_dual_prior",
+      "kind": "dir",
+      "run_id": "E025_adaptive_dual_prior",
+      "bytes": 3553,
+      "file_count": 2,
+      "sha256": "f29153ad94ade55f61dc6dcb9726e0da070945fe65ac01302e2dbf47b6378891",
+      "sha256_kind": "manifest of (relpath,size); per-file hashes for the first 2 files under 64 MiB",
+      "file_sha256": {
+        "runs/E025_adaptive_dual_prior/fold0_y_k4_prior_selection.json": "42e95cc3f4fe31c936149bda4976c20941a594ea1bdeba24a7d87877280b384a",
+        "runs/E025_adaptive_dual_prior/logs/select_1901.log": "a7572354b2f0f8c98d76bbc3c7619383693348bd570dec5a279cf53dfbe77692"
+      },
+      "tracked_files": 0,
+      "top_level": [
+        "fold0_y_k4_prior_selection.json",
+        "logs"
+      ],
+      "category": "B",
+      "category_meaning": "correct run, negative result -- evidence, keep it",
+      "action": "keep",
+      "reason": "PR3 y-only negative control; kept whatever sign it comes out with",
+      "referenced_by": [
+        "docs/PHASE1_PR3_IMPLEMENTATION_AND_RUNBOOK.md",
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
+        "spur_mpm/experiments/run_e025.sh",
+        "spur_mpm/scripts/audit_runs.py"
+      ],
+      "archive_destination": "runs/E025_adaptive_dual_prior"
+    },
+    {
+      "path": "runs/E026_psras_condition",
+      "kind": "dir",
+      "run_id": "E026_psras_condition",
+      "bytes": 674440580,
+      "file_count": 53,
+      "sha256": "762139f55f00d4d682950f38fc8beec567f817426df7aa3ed40bff6c6e3ec530",
+      "sha256_kind": "manifest of (relpath,size); per-file hashes for the first 51 files under 64 MiB",
+      "file_sha256": {
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_I0_test/samples.csv": "9edb08c196cd6a0a0bd81c67186b74f5f0e634ebecf2de9dca97f062a1627f61",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_I0_test/summary.json": "f269ae1ba212fd2f214393564e8850d31226393fb64ae780827a6813cb31c52c",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp/best.pt": "2c3efcd6a7b5490311af3c6db3d4314724ecaa0ef6e4e3ddb529c3f45d07a137",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp/config.yaml": "0c39e1a9f8181e6ad25b591b9ab8b1690582992dc3515a7964b38b952159107b",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp/final_val.json": "9f7b0c5322f9ae5fd7460efed2cb4df0ebfceace0b0122c3d8b98032053ceceb",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp/last.pt": "e29de4453764605a0301ab0daa7ee62500b85ad5cc1729338e10327136079e2b",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp/log.csv": "31087659df2872709898bc0e86bbb899849dfc3b65205c846181625dba83cbc2",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp/metrics.jsonl": "c3eda4b1ed43eb8078d29122c816a5f7cbcf7f24a0e6d56017387f5f50552d53",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp/provenance.json": "83b9e40e223bba70dcb35804f4cd6c55ca750846bcbf7cb2e58b625575728273",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp/resume.pt": "5f368cf9051e366bdbcfb18c0b39cd68333f3c1816a24ecf0116bd623ef90b31",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp_test/samples.csv": "e98b421a021f0ebaacb8fcd577eabc560e4c4b753b8549340232f824c268c9ab",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp_test/summary.json": "f066d008e53374706b60350edf300c0e1baf8ead60b799deb80728d2df076e39",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener/best.pt": "ce35c94b3b73dad7f9a9db388669e24c06754b5be9b65c718add72042660098f",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener/config.yaml": "3ab2479ea4cbd89e8a296e596481c8fcfdbe986900de27107b5810b19f08c364",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener/final_val.json": "0576a193d83f21c2712f16f2f65419c3c9a7e313f9d96b11a6c661b15efc8a7e",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener/last.pt": "cfaec2ec4524045c8cab5155a95bb141b45c9c6f2df5720479b43e18c8d05993",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener/log.csv": "d0584a915bc474c195ea4d6bfdf7c3fae7e72f24ef5fce3f2a27abc780ab4a65",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener/metrics.jsonl": "10aeefc22a188d5e22e57e199bff814d2256a78e02d5265c3af7845204da4214",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener/provenance.json": "7c39d3aeb319918470e5ad10e01ad8e9855ced164e6b83b15e9e5bd143b82cc8",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener/resume.pt": "17a9c59371e1ecdffc573045b9b13156409fd73f7ea40f62dcc54e9b3c1407d4",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener_test/samples.csv": "84788cf2db82ff0374f1791d5f0e622e5fcf0d22a38059cdcbe1235a045a5303",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener_test/summary.json": "7d8d3ef1a9f856a1796b00f009c97c1ef9547613a583e7adc280c26ce6fca59f",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI/best.pt": "d0e70f30141c660b67eb662c29fbcbb751032f5a5f990d260f5e40ca662bc242",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI/config.yaml": "112108f748edb5f4783cf71912a3d95d9aacd4f55d596d62ecbb57acf8e18464",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI/final_val.json": "54ecca642b56dce0cd0936c40b2d3b8d97f41d36b3a6241b0c16417093783648",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI/last.pt": "3edc6037a65b1280779468c841e9741648f86782ff67eed805dc42c419fcb635",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI/log.csv": "6279f7a85a009be9073856deb6758b7a5b796d820da166bd5631bcf3fb160a90",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI/metrics.jsonl": "c680d2296730d35ab5271762570497e5943159afa4d8cbe17eb94a2581dfa49a",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI/provenance.json": "15c57e4b4a34bd3599dcedbe1b7fd7dab33fd3d0f1894d018cf3a7e404302a43",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI/resume.pt": "cc38139a12f03d495d58e8a530b7dab088ed37a4f3f99b0fc0da8ae72e3a0404",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI_test/samples.csv": "c4ef8a3a291822d7d9e485db11a6f8cc37e930ebce080552a7e6219b5107b312",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI_test/summary.json": "968dd82d68b78ae01c322d2909bbedf63fbc92d599a584aa1808afe6f718ab43",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_W0_full3d_test/samples.csv": "3fd5b78ccca2c8bbebc16c7e22c54dcaf9027cfc038930690e3f8b671bf0adf1",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_W0_full3d_test/summary.json": "7c9b3a586bd08d0e505340e9b5d6af3c58b38a8c98907dcc8c6afadc7728baf8",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_W0_legacy_test/samples.csv": "5c3c40508f95a9d0733704a3583439a9e954d8521fd1c0143095300b38d8f3ab",
+        "runs/E026_psras_condition/E026_matched_synthetic_yz_k2_kz2_fold0_s0_W0_legacy_test/summary.json": "c8ca7ef4192ae94bd645cf730f0f61baba9cf32f109aec305a71515d07633d49",
+        "runs/E026_psras_condition/E026_real_yz_k2_kz2_fold0_s0_I0_test/samples.csv": "2b9c02a8e28cc0ef62e2569f340f245e5a0a76e0346d34a27799e1c6f4143d23",
+        "runs/E026_psras_condition/E026_real_yz_k2_kz2_fold0_s0_I0_test/summary.json": "96772f6db38c53fd33272be759b394db2c917bd7132ef3aad8591de3c3d6bc08",
+        "runs/E026_psras_condition/E026_real_yz_k2_kz2_fold0_s0_W0_full3d_test/samples.csv": "2b9c02a8e28cc0ef62e2569f340f245e5a0a76e0346d34a27799e1c6f4143d23",
+        "runs/E026_psras_condition/E026_real_yz_k2_kz2_fold0_s0_W0_full3d_test/summary.json": "e929e76d603ad1f6a5b5137631697e0e9ef15d3d81d44fd40de1c66c9325f90f",
+        "runs/E026_psras_condition/fold0_yz_k2_kz2_selection.json": "959496fb1ce211fdfe0696c0e886e44f8185141b8cb40e5baa2cabee6eb9612f",
+        "runs/E026_psras_condition/logs/matched_synthetic_1851.log": "ae15475e406205276d5706ec9f68f4edf67b8f91b5c30bcf8f9319bf393acfb4",
+        "runs/E026_psras_condition/logs/real_2127.log": "82ca6089f8933e7a5a495fa3009b997fc3d9e1f89ca5198d7f76385ecd284332",
+        "runs/E026_psras_condition/logs/real_select_1853.log": "05e1648befa3f99ee7ca1c082c59ab63c3430d5a95a828e3c58a64e8031da606",
+        "runs/E026_psras_condition/logs/structure_I0.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "runs/E026_psras_condition/preflight/preflight_matched_synthetic.json": "1fece93c0f791f8aad31ba9a3d82cc8064d121c48a95707917e2cb118e46c025",
+        "runs/E026_psras_condition/preflight/preflight_matched_synthetic.png": "af3bd081bfc7c5b9dbaccd2138af77d13213a3d005d10181f42fc226a2ed7b9b",
+        "runs/E026_psras_condition/preflight/preflight_real.json": "1c7bd00bd5063810eda84c5aadeb51180c45b6e212b171d66b972ad8832a7860",
+        "runs/E026_psras_condition/preflight/preflight_real.png": "34c436bb8e47bf43c928636fdc2404c00819f314dcb7a3ead8f4174ddc3bfbbc",
+        "runs/E026_psras_condition/structure_I0/P2_I0_M2_FOVII_S1_vessels_recon.json": "27da0c088ead01812213cb86f51168515b11dba4603e3eaac65ffbf7cf21f218",
+        "runs/E026_psras_condition/structure_I0/P2_I0_M2_FOVII_S1_vessels_recon.mask.npy": "dd8bd74dbb060020fd91502d085169bacb8f97b1d470d7161e25bd065b78aae6"
+      },
+      "tracked_files": 0,
+      "top_level": [
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_I0_test",
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp",
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_interp_test",
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener",
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_P3_wiener_test",
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI",
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_ResidualI_test",
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_W0_full3d_test",
+        "E026_matched_synthetic_yz_k2_kz2_fold0_s0_W0_legacy_test",
+        "E026_real_yz_k2_kz2_fold0_s0_I0_test",
+        "E026_real_yz_k2_kz2_fold0_s0_W0_full3d_test",
+        "fold0_yz_k2_kz2_selection.json",
+        "logs",
+        "preflight",
+        "structure_I0"
+      ],
+      "category": "B",
+      "category_meaning": "correct run, negative result -- evidence, keep it",
+      "action": "keep",
+      "reason": "PR3 historical-condition re-check; its matched_synthetic null is evidence (docs/PHASE1_PR3_E026_RESULTS.md)",
+      "referenced_by": [
+        "docs/PHASE1_PR3_E026_RESULTS.md",
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json",
+        "spur_mpm/experiments/run_e026_historical.sh",
+        "spur_mpm/scripts/audit_runs.py"
+      ],
+      "archive_destination": "runs/E026_psras_condition"
+    },
+    {
+      "path": "runs/_smoke_pr3",
+      "kind": "dir",
+      "run_id": "_smoke_pr3",
+      "bytes": 31485448,
+      "file_count": 7,
+      "sha256": "93a07060a4f985cb3caf2d68fad9b6133d4d8104353873e2cbe0dbfcbf9ab194",
+      "sha256_kind": "manifest of (relpath,size); per-file hashes for the first 7 files under 64 MiB",
+      "file_sha256": {
+        "runs/_smoke_pr3/smoke_pr3_aux/best.pt": "3e504cbdee72fee9689cf4dd6594e19a3af94e81bddda43c8ee81ccb0d1fcc9d",
+        "runs/_smoke_pr3/smoke_pr3_aux/config.yaml": "7965376d919dd33ff421cd86157310757d07206faf7bef182b74c45fdaa3cc53",
+        "runs/_smoke_pr3/smoke_pr3_aux/final_val.json": "3e892d3a9657cf5a2f76d89b4e67303bf2fa067bcb0dbbb030299f3dd163859f",
+        "runs/_smoke_pr3/smoke_pr3_aux/last.pt": "53da2407213c006521317a0df0dc3a6872d14f968fbf37206811fe78a8e8ebc5",
+        "runs/_smoke_pr3/smoke_pr3_aux/log.csv": "338b877c4216d3358aa53cca6e7c2670ddc0564d50f81b735a5f747931068aef",
+        "runs/_smoke_pr3/smoke_pr3_aux/metrics.jsonl": "b4c1b114a01ea1b4ed74a0a7611bac7b2e566c5fe30d8278d39f17c2c416acae",
+        "runs/_smoke_pr3/smoke_pr3_aux/provenance.json": "80d1592cd39d27cb0718e5211b2d109f16cffc35dc8240a4c67801d9ac709b4c"
+      },
+      "tracked_files": 0,
+      "top_level": [
+        "smoke_pr3_aux"
+      ],
+      "category": "review",
+      "category_meaning": "unclassified -- a human decides before anything is touched",
+      "action": "review",
+      "reason": "no rule covers this path; inspect before acting",
+      "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/cleanup_candidates.json"
+      ],
+      "archive_destination": "runs/_smoke_pr3"
     },
     {
       "path": "runs/pilot_S1_fold0",
@@ -1557,10 +1954,16 @@
       ],
       "category": "D",
       "category_meaning": "smoke, temporary or regenerable artefact",
-      "action": "delete",
-      "reason": "one-off pilot run before the E002 cohort existed",
-      "referenced_by": [],
-      "archive_destination": null
+      "action": "review",
+      "reason": "one-off pilot run before the E002 cohort existed; but 5 tracked file(s) refer to it, e.g. docs/archive/ARCHIVE_MANIFEST_20261110.md",
+      "referenced_by": [
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/CLEANUP_REPORT_20261110.md",
+        "docs/archive/cleanup_candidates.json",
+        "spur_mpm/scripts/audit_runs.py",
+        "spur_mpm/tests/test_archive_safety.py"
+      ],
+      "archive_destination": "runs/pilot_S1_fold0"
     },
     {
       "path": "runs/smoke",
@@ -1591,9 +1994,14 @@
       "category": "D",
       "category_meaning": "smoke, temporary or regenerable artefact",
       "action": "review",
-      "reason": "smoke-test run with random weights; runs/smoke/audit is the data audit; but 1 tracked file(s) refer to it, e.g. README.md",
+      "reason": "smoke-test run with random weights; runs/smoke/audit is the data audit; but 6 tracked file(s) refer to it, e.g. README.md",
       "referenced_by": [
-        "README.md"
+        "README.md",
+        "docs/archive/ARCHIVE_MANIFEST_20261110.md",
+        "docs/archive/CLEANUP_REPORT_20261110.md",
+        "docs/archive/cleanup_candidates.json",
+        "spur_mpm/scripts/audit_runs.py",
+        "spur_mpm/tests/test_archive_safety.py"
       ],
       "archive_destination": "runs/smoke"
     }
