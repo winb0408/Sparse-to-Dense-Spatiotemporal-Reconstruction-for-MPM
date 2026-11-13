@@ -97,6 +97,42 @@ mutually indistinguishable (≤0.07 dB, ≤0.012 Dice apart from each other).
 `W0_full3d`'s Dice gain over `I0` (+0.077) is in the same direction but from a
 single-volume group with no estimable interval.
 
+### 3.1 The structure report of the floor (one arm so far, read it as a baseline shape)
+
+`structure_I0` for this group finished (whole-volume reconstruction, 4 test
+volumes, vesselness binarisation with the threshold fitted on the reference
+only). It is the parameter-free interpolation floor, so it says what *any* arm
+in this group has to improve on, not what the trained arms did.
+
+| volume | Dice | clDice | skelF1 | precision | recall | mean radius µm ref→pred | skeleton components ref→pred | scored planes |
+|---|---|---|---|---|---|---|---|---|
+| M2_FOVII_S1 | 0.8951 | 0.9156 | 0.8348 | 0.935 | 0.754 | 2.30 → 2.37 | 1580 → 497 | 146/203 (72 %) |
+| M2_FOVII_S2 | 0.8204 | 0.6691 | 0.5779 | 0.919 | 0.421 | 1.76 → 2.37 | 11664 → 890 | 134/202 (66 %) |
+| M2_FOVI_S1 | 0.8711 | 0.7444 | 0.6630 | 0.931 | 0.515 | 1.89 → 2.38 | 17833 → 973 | 119/201 (59 %) |
+| M2_FOVI_S2 | 0.6676 | 0.3066 | 0.2372 | 0.896 | 0.137 | 1.24 → 2.22 | 31094 → 786 | 51/152 (34 %) |
+| mean | 0.8136 | 0.6589 | 0.5782 | 0.920 | 0.457 | 1.80 → 2.33 | 15543 → 787 | — |
+
+Three things this table binds, beyond the numbers themselves:
+
+- **The mean is not a comparable scalar.** Dice ranges 0.67–0.90 and clDice
+  0.31–0.92 across four volumes of one test animal. Quoting "clDice 0.659"
+  without the per-volume spread would invent a precision the data does not have.
+- **Every row is scored only on the planes that survived gating.** The
+  reference mask fills more than 15 % of a plane on the top and bottom of the
+  stack, so both masks are emptied there; between 28 % and 66 % of the planes
+  are excluded depending on the volume. The scored share is part of the number.
+- **The floor's failure mode is recall, not precision, and it is depth-graded.**
+  Precision stays 0.90–0.94 while recall falls 0.75 → 0.14 from FOVII_S1 to
+  FOVI_S2; skeleton components collapse from 15 543 to 787 and mean radius
+  inflates from 1.80 to 2.33 µm. That is interpolation thickening and merging
+  fine branches, and it is exactly the effect the missing-region and
+  fine-vessel analysis in §4 has to test — which is why the PSNR table alone
+  cannot carry the verdict.
+
+This is 1 of the group's 6 structure reports. The other five, the three
+`compare_structure` pairs and the qualitative figures are queued; until they
+land, nothing here distinguishes any arm from the floor.
+
 This is a 3000-step mechanism pilot, one fold, one seed, and one test volume.
 Scaling to multi-seed / multi-fold is **`NOT_RUN` by design**: the initial
 result shows no credible gain, so spending seeds on it would only make a null
@@ -116,7 +152,8 @@ implied:
 | `P2_ResidualI` | `NOT_RUN` |
 | `P3_interp` | `NOT_RUN` |
 | `P3_wiener` | `NOT_RUN` |
-| analysis (structure/qualitative) for both E026 groups | `NOT_RUN` |
+| analysis for the `real` group | `NOT_RUN` |
+| analysis for the `matched_synthetic` group | **partial** — `structure_I0` done (§3.1); the other five reports, the three `compare_structure` pairs and the qualitative figures are queued |
 
 The floors were re-run on the frozen train-only selection, i.e. no test animal
 touched the kernel choice. Two facts constrain what the remaining arms can show,
@@ -156,7 +193,7 @@ kernel is forced to make the search look different.
 | runs (6 arms + 4–6 floor/arm evals) | `runs/E026_psras_condition/E026_<group>_yz_k2_kz2_fold0_s0_*` |
 | preflight (train volume, Y/M/target/candidates) | `docs/evidence/e026_preflight_20261113/` |
 | operator-order diagnostic | `docs/evidence/e026_operator_context_20261113/operator_context.json` |
-| structure reports / comparisons | `runs/E026_psras_condition/structure_*`, `structure_compare_*.md` |
+| structure reports / comparisons | `runs/E026_psras_condition/structure_<TAG>_<arm>/`, `structure_compare_<TAG>_<A>_vs_<B>.md` (scoped by group: the two groups share this directory and an unscoped name made them collide) |
 | collected table | `runs/E026_psras_condition/table_*.md` |
 | qualitative figures (frozen view spec) | `runs/E026_psras_condition/figures/` |
 | full test suite | `docs/evidence/pytest_20261113_pr3_full.log` (425 passed) |
