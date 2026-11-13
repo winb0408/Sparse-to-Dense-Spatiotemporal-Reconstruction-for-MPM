@@ -1,3 +1,5 @@
+> **2026-11-13 PSRAS history recheck / updated execution order:** Read [PHASE1_PR3_HISTORICAL_RECHECK.md](PHASE1_PR3_HISTORICAL_RECHECK.md) BEFORE E025/E026 GPU work. Old EXP-024 gains occurred in known-kernel YZ settings, and the historical b4f uses measured-plane lateral Wiener followed by axial interpolation, **not** current full-3D fill-all Wiener. New `run_e026_historical.sh` provides two separately labelled 25%-retained YZ groups (matched-synthetic known H, real-data train-only effective H), plus the `P3_Wlegacy` no-learning operator. The Y-only E025 remains a useful low-gain control. DeepSeek MUST run tests before either group. Any script/test error should be fixed and logged rather than hidden; no results yet.
+
 # PR3: Adaptive effective Wiener prior + lightweight dual-branch test (E025)
 
 **Status:** CODE COMMITTED / TESTS NOT YET EXECUTED / GPU TRAINING NOT RUN.  
