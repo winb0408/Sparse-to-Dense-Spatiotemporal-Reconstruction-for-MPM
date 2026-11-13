@@ -32,7 +32,10 @@ if [[ "$SOURCE_KIND" == real ]]; then
     else
       python -m spur_mpm.scripts.select_adaptive_prior \
         --index "$INDEX" --split "$SPLIT" --fold "$FOLD" \
-        --mode yz --ky "$KY" --kz "$KZ" --out "$SEL"
+        --mode yz --ky "$KY" --kz "$KZ" \
+        --sigmas-xy 0 0.5 0.98 \
+        --sigmas-z 0 2.5 5 7.5 \
+        --lambdas 0.005 0.01 0.05 --out "$SEL"
     fi
   fi
   [[ "$STAGE" == select ]] && exit 0
