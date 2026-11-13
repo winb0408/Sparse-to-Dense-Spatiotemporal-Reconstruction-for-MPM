@@ -58,6 +58,8 @@ class Arm:
     consistency: str = "off"
     #: Which P2 experiment family this arm belongs to (provenance for figures).
     family: str = ""
+    # PR3 only: independent small auxiliary reconstruction heads.
+    branch_auxiliary: bool = False
 
     def to_dict(self) -> dict:
         return {"name": self.name, "features": list(self.features),
@@ -67,7 +69,8 @@ class Arm:
                 "obs_features": list(self.obs_features),
                 "phys_features": list(self.phys_features),
                 "residual": self.residual, "use_gate": self.use_gate,
-                "consistency": self.consistency, "family": self.family}
+                "consistency": self.consistency, "family": self.family,
+                "branch_auxiliary": self.branch_auxiliary}
 
 
 ARMS: dict[str, Arm] = {
@@ -140,6 +143,17 @@ ARMS: dict[str, Arm] = {
                     description="two branches, physics branch sees I0, W0 and "
                                 "W0-I0: does the Wiener candidate add anything "
                                 "beyond I0 and capacity"),
+    "P3_DualAdaptive": Arm("P3_DualAdaptive",
+                    _BASE_FEATURES + ("interp", "wiener", "phys_delta",
+                                      "u_sampling", "u_physics"),
+                    "wiener_fill_all", "dense",
+                    obs_features=("y", "mask", "u_sampling"),
+                    phys_features=("interp", "wiener", "phys_delta", "mask",
+                                   "u_physics"),
+                    residual=True, use_gate=True, family="pr3",
+                    branch_auxiliary=True,
+                    description="two independent lightweight auxiliary heads; "
+                                "candidate PSF chosen on train/validation only"),
     "P2_DualWU": Arm("P2_DualWU",
                      _BASE_FEATURES + ("interp", "wiener", "phys_delta",
                                        "u_sampling", "u_physics"),
@@ -203,7 +217,8 @@ def build_model(arm: Arm | str, context_depth: int, base: int = 48,
             window=window, depths=tuple(depths), heads=tuple(heads),
             residual=bool(arm.residual), use_gate=bool(arm.use_gate),
             consistency=arm.consistency if consistency is None else consistency,
-            phys_control=phys_control, collect_aux=collect_aux)
+            phys_control=phys_control, collect_aux=collect_aux,
+            branch_auxiliary=arm.branch_auxiliary)
     if arm.fusion and "x0" not in arm.features:
         raise ValueError(f"arm {arm.name}: fusion requires x0 in the feature set")
     if arm.dual:
