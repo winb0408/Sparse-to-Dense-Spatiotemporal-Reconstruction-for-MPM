@@ -2596,3 +2596,46 @@ E024 两条都不满足，所以这是同一个物理事实的两面，不是复
 `real` 组（冻结选择 = **恒等核**，λ=0.005）21:27 开跑；E025 `y_k4` 负对照未跑；
 组内 `STAGE=analysis`（结构报告、定性图）未跑。完整结果文档
 `docs/PHASE1_PR3_E026_RESULTS.md`。
+
+## 2026-11-13 21:44 GPU 2 再次掉卡：E026 real 组在第三层地板评测处中断
+
+**现象**：`nvidia-smi -L` 只剩 GPU 0/1/3，GPU 2 那一行变成
+`Unable to determine the device handle for gpu 0000:86:00.0: Unknown Error`；
+`--query-gpu` 直接失败。掉卡发生在 21:44，正在跑的 `P3_Wlegacy` 地板评测从此不再输出。
+
+**时间线**（日志与文件 mtime）：21:27 以 `GPU=2` 启动 real 组，启动时 20569/49140 MiB
+= **41.9 %**，在 50 % 门限之下；21:35 I0 地板评测正常写出（7 分钟）；21:44 W0_full3d
+正常写出（9 分钟）并开始 W0_legacy；~21:44 掉卡；22:00 发现日志停在 21:44、进程处于 `R`
+态空转（dataloader worker 在睡），22:02 发 SIGTERM 清掉，同组无残留进程。
+
+**保住什么**：`I0` 与 `W0_full3d` 两个地板评测。它们的 `summary.json` **只有 `arm` 一个
+字段不同**——恒等核下 `wiener_fill_all` 短路成插值，这就是构造性退化的直接证据。
+
+**丢了什么**：`P3_Wlegacy` 地板评测（可重跑，没留下半成品目录，重跑不会被覆盖守卫拦住）
+以及其后的全部：real 组三个训练臂、E026 两组的 `STAGE=analysis`、E025（还没开始）。
+
+**归因**：从普通用户侧无法定因，但可以排除"我们 OOM"：同一形状的两个地板评测刚在同一张卡上
+各跑 7/9 分钟正常结束，本项目启动时在门限内，而这张卡本身就是日志里记过的"填满会崩"的那张。
+真正的设备级故障，`nvidia-smi --gpu-reset` 需要 root 且设备还得在驱动视野里；掉卡通常只能
+靠整机重启，这两件都不是本会话能做的。
+
+**处置**：立即停止 GPU 2 上的一切启动；清掉空转进程；不碰别人的 GPU 0/1/3；在 `nvidia-smi -L`
+重新列出 GPU 2 之前不在这张卡上再起任务。证据与完整记录：
+`docs/evidence/gpu2_falloff_20261113/`。
+
+**把约束写进代码（第二次）**：上次（11-11）只把"内存门限"写进了 `run_e024.sh`，这次的事故
+说明**"设备可见"也必须检查**——`CUDA_VISIBLE_DEVICES=2` 对一张已经掉卡的设备不会报错，只会
+让任务永远等下去。所以新增共享守卫 `spur_mpm/experiments/_gpu_gate.sh`：
+
+- `gpu_guard <idx>`：先用 `nvidia-smi -L` 检查设备**在不在驱动列表里**，不在就拒绝启动并把
+  `nvidia-smi -L` 的原文打出来；GPU 2 额外做"启动时占用必须 < 50 %"的检查，读不到占用就
+  按"不空闲"处理（沉默不是证据）。
+- `run_e025.sh` / `run_e026_historical.sh` 非 DRY 启动时都调用它；
+- 四个 GPU 阶段（eval / train / structure_report / qualitative_figures）都套上
+  `timeout "$JOB_TIMEOUT"`（默认 9000 s，远高于单臂 ~45 分钟），让"停住不动"变成失败而不是
+  无限空转。
+
+**顺带**：`audit_runs.py` 的策略表补上 E024/E025/E026 三个目录，否则它们每次都被标成
+`review`（"没有规则覆盖"）——其中 E024 归 A、E025/E026 归 B（负结果也是证据）。审计本身
+没有任何 `delete` 候选：11 keep、21 keep-evidence、3 review，共 7.0 GB，逐条理由在
+`docs/archive/cleanup_candidates.json`。

@@ -1,0 +1,10 @@
+timestamp: 2026-11-13T22:01:39+08:00
+--- nvidia-smi -L
+GPU 0: NVIDIA RTX A6000 (UUID: GPU-8d50299a-1dfc-22df-a35b-fb86f97ce1c2)
+GPU 1: NVIDIA RTX A6000 (UUID: GPU-efb61110-a487-7615-a6e6-6b38ddf19d29)
+Unable to determine the device handle for gpu 0000:86:00.0: Unknown Error
+GPU 3: NVIDIA RTX A6000 (UUID: GPU-1863f6da-2096-588d-d7c8-e772689f4c50)
+--- nvidia-smi query
+Unable to determine the device handle for GPU0000:86:00.0: Unknown Error
+--- loadavg
+204.77 226.53 221.07 71/12899 4128243

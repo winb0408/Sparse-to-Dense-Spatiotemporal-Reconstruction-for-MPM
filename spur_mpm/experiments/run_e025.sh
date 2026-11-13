@@ -39,6 +39,15 @@ if [[ "$STAGE" == "select" ]]; then exit 0; fi
 if [[ "$DRY" != "1" && -z "$GPU" ]]; then
   echo "Set GPU=<owned device index> for compute runs" >&2; exit 2
 fi
+# Launch gate: the device must be visible, and GPU 2 must be under half full.
+# A dead handle hangs the job instead of failing it (GPU 2, 2026-11-13).
+if [[ "$DRY" != "1" ]]; then
+  source spur_mpm/experiments/_gpu_gate.sh
+  gpu_guard "$GPU" || exit 2
+fi
+# Every GPU stage is bounded: a job that stops making progress must fail loudly
+# rather than spin. 9000 s is far above a 3000-step arm and a full test eval.
+JOB_TIMEOUT="${JOB_TIMEOUT:-9000}"
 if [[ ! -s "$SEL" ]]; then
   if [[ "$DRY" == "1" ]]; then
     echo "DRY: selection missing at $SEL; run STAGE=select DRY=0 first"
@@ -83,7 +92,14 @@ run_eval () {
     printf 'DRY eval: %q ' python -m spur_mpm.evaluate "${args[@]}"
     echo; return 0
   fi
-  CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.evaluate "${args[@]}"
+  # Resume, never overwrite: skip an evaluation that already wrote its summary
+  # so an interrupted group can be restarted. A directory without one is a
+  # half-run and is left for a human to inspect.
+  if [[ -s "$OUT/${name}_test/summary.json" ]]; then
+    echo "skip eval $name: $OUT/${name}_test already has summary.json"
+    return 0
+  fi
+  CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.evaluate "${args[@]}"
 }
 run_train () {
   local name="$1" arm="$2" ctrl="$3" aw="$4"
@@ -96,11 +112,17 @@ run_train () {
     printf 'DRY train: %q ' python -m spur_mpm.train "${args[@]}"
     echo; return 0
   fi
+  # A run counts as done only when the checkpoint AND its final validation
+  # exist; a half-run is neither skipped nor overwritten.
+  if [[ -s "$OUT/$name/final_val.json" && -s "$OUT/$name/best.pt" ]]; then
+    echo "skip train $name: $OUT/$name is complete"
+    return 0
+  fi
   if [[ -e "$OUT/$name" ]]; then
     echo "Refusing existing run: $OUT/$name (archive before a different run)" >&2
     exit 3
   fi
-  CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.train "${args[@]}"
+  CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.train "${args[@]}"
 }
 if [[ "$STAGE" == "floors" || "$STAGE" == "all" ]]; then
   run_eval "${tag}_P2_I0" P2_I0
@@ -150,7 +172,7 @@ if [[ "$STAGE" == "analysis" || "$STAGE" == "all" ]]; then
       echo; return 0
     fi
     [[ ! -e "$dir" ]] || { echo "Refuse overwrite: $dir" >&2; return 3; }
-    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.structure_report \
+    CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.scripts.structure_report \
       "${args[@]}" > "$OUT/logs/structure_$label.log" 2>&1 || {
         echo "STRUCTURE FAILED $label (see $OUT/logs/structure_$label.log)" >&2
         return 1; }
@@ -203,12 +225,12 @@ if [[ "$STAGE" == "analysis" || "$STAGE" == "all" ]]; then
     echo
   else
     mkdir -p "$fig_dir"
-    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.qualitative_figures \
+    CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.scripts.qualitative_figures \
       "${fig_common[@]}" "${fig_a[@]}" --set "model.phys_control=none" \
       --save-view-spec "$fig_dir/viewspec_${tag}.json" \
       > "$OUT/logs/qualfig_none.log" 2>&1 \
       || echo "qualitative figures (none) failed" >&2
-    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.qualitative_figures \
+    CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.scripts.qualitative_figures \
       "${fig_common[@]}" "${fig_b[@]}" --set "model.phys_control=interp_only" \
       --view-spec "$fig_dir/viewspec_${tag}.json" --tag _interp \
       > "$OUT/logs/qualfig_interp.log" 2>&1 \
