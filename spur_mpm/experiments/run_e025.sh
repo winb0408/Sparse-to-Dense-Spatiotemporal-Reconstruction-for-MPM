@@ -20,7 +20,7 @@ BATCH="${BATCH:-8}"
 ACCUM="${ACCUM:-1}"
 GPU="${GPU:-}"
 DRY="${DRY:-1}"
-STAGE="${STAGE:-all}" # select | floors | train | all
+STAGE="${STAGE:-all}" # select | floors | train | analysis | all
 SEL="$OUT/fold${FOLD}_y_k${KY}_prior_selection.json"
 mkdir -p "$OUT"
 
@@ -118,4 +118,102 @@ if [[ "$STAGE" == "train" || "$STAGE" == "all" ]]; then
     run_eval "$name" "$arm" "$OUT/$name/best.pt" "$ctrl"
   done
 fi
+# ---- analysis: structure reports, comparison, qualitative figures ----------
+# Same shape as run_e026_historical.sh STAGE=analysis, for the y-only protocol.
+# The two groups must be analysed by the same tools with the same flags, or a
+# difference between them could be a difference in how they were scored.
+if [[ "$STAGE" == "analysis" || "$STAGE" == "all" ]]; then
+  [[ "$DRY" == 1 || -n "$GPU" ]] || {
+    echo "Set GPU=<owned GPU index> for analysis (it reconstructs volumes)" >&2
+    exit 2
+  }
+  set_tail=("${common[@]:6}")   # common is (--config X --fold F --seed S --set ...)
+  fig_dir="$OUT/figures/${tag}"
+  arms=(
+    "I0|P2_I0||none"
+    "W0|P2_W0||none"
+    "ResidualI|P2_ResidualI|$OUT/${tag}_residual/best.pt|none"
+    "P3_interp|P3_DualAdaptive|$OUT/${tag}_dual_interp/best.pt|interp_only"
+    "P3_wiener|P3_DualAdaptive|$OUT/${tag}_dual_wiener/best.pt|none"
+  )
+  mkdir -p "$OUT/logs"
+  run_structure () {
+    local label="$1" arm="$2" ckpt="$3" ctrl="$4"
+    local dir="$OUT/structure_$label"
+    local args=(--arm "$arm" --out "$dir" --device cuda:0
+                --config "$CFG" "${set_tail[@]}"
+                --set "model.phys_control=$ctrl")
+    [[ -n "$ckpt" ]] && args+=(--ckpt "$ckpt")
+    [[ -n "${SAMPLES:-}" ]] && args+=(--samples $SAMPLES)
+    if [[ "$DRY" == 1 ]]; then
+      printf 'DRY structure:'; printf ' %q' python -m spur_mpm.scripts.structure_report "${args[@]}"
+      echo; return 0
+    fi
+    [[ ! -e "$dir" ]] || { echo "Refuse overwrite: $dir" >&2; return 3; }
+    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.structure_report \
+      "${args[@]}" > "$OUT/logs/structure_$label.log" 2>&1 || {
+        echo "STRUCTURE FAILED $label (see $OUT/logs/structure_$label.log)" >&2
+        return 1; }
+    echo "structure $label done"
+  }
+  for spec in "${arms[@]}"; do
+    IFS='|' read -r label arm ckpt ctrl <<< "$spec"
+    if [[ -n "$ckpt" && "$DRY" != 1 && ! -s "$ckpt" ]]; then
+      echo "skip structure $label: no checkpoint (arm is NOT_RUN)" >&2
+      continue
+    fi
+    run_structure "$label" "$arm" "$ckpt" "$ctrl" || true
+  done
+
+  if [[ "$DRY" == 1 ]]; then
+    for pair in "P3_wiener P3_interp" "P3_wiener I0"; do
+      echo "DRY compare_structure: $pair"
+    done
+  else
+    for pair in "P3_wiener P3_interp" "P3_wiener I0"; do
+      set -- $pair
+      [[ -d "$OUT/structure_$1" && -d "$OUT/structure_$2" ]] || continue
+      python -m spur_mpm.scripts.compare_structure \
+        --runs "$OUT/structure_$1" "$OUT/structure_$2" \
+        > "$OUT/structure_compare_$1_vs_$2.md" 2>&1 \
+        || echo "compare_structure $pair failed" >&2
+    done
+    python -m spur_mpm.scripts.collect_results \
+      --pattern "$OUT/${tag}_*_test" --index "$INDEX" \
+      --out "$OUT/table_${tag}.md" > "$OUT/logs/collect.log" 2>&1 \
+      || echo "collect_results failed" >&2
+  fi
+
+  fig_common=(--config "$CFG" --fold "$FOLD" --index "$INDEX" "${set_tail[@]}"
+              --out "$fig_dir" --device cuda:0 --error-on-missing)
+  fig_a=(--arm "I0/P2_I0" --arm "W0/P2_W0")
+  [[ -s "$OUT/${tag}_residual/best.pt" ]] && \
+    fig_a+=(--arm "ResidI/P2_ResidualI=$OUT/${tag}_residual/best.pt")
+  [[ -s "$OUT/${tag}_dual_wiener/best.pt" ]] && \
+    fig_a+=(--arm "P3_W/P3_DualAdaptive=$OUT/${tag}_dual_wiener/best.pt")
+  fig_b=(--arm "I0/P2_I0")
+  [[ -s "$OUT/${tag}_residual/best.pt" ]] && \
+    fig_b+=(--arm "ResidI/P2_ResidualI=$OUT/${tag}_residual/best.pt")
+  [[ -s "$OUT/${tag}_dual_interp/best.pt" ]] && \
+    fig_b+=(--arm "P3_int/P3_DualAdaptive=$OUT/${tag}_dual_interp/best.pt")
+  if [[ "$DRY" == 1 ]]; then
+    printf 'DRY qualfig (phys_control=none):'; printf ' %q' python -m spur_mpm.scripts.qualitative_figures "${fig_common[@]}" "${fig_a[@]}" --set "model.phys_control=none" --save-view-spec "$fig_dir/viewspec_${tag}.json"
+    echo
+    printf 'DRY qualfig (phys_control=interp_only):'; printf ' %q' python -m spur_mpm.scripts.qualitative_figures "${fig_common[@]}" "${fig_b[@]}" --set "model.phys_control=interp_only" --view-spec "$fig_dir/viewspec_${tag}.json" --tag _interp
+    echo
+  else
+    mkdir -p "$fig_dir"
+    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.qualitative_figures \
+      "${fig_common[@]}" "${fig_a[@]}" --set "model.phys_control=none" \
+      --save-view-spec "$fig_dir/viewspec_${tag}.json" \
+      > "$OUT/logs/qualfig_none.log" 2>&1 \
+      || echo "qualitative figures (none) failed" >&2
+    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.qualitative_figures \
+      "${fig_common[@]}" "${fig_b[@]}" --set "model.phys_control=interp_only" \
+      --view-spec "$fig_dir/viewspec_${tag}.json" --tag _interp \
+      > "$OUT/logs/qualfig_interp.log" 2>&1 \
+      || echo "qualitative figures (interp_only) failed" >&2
+  fi
+fi
+
 echo "E025 stage=$STAGE finished. Preserve every correct positive/negative run."
