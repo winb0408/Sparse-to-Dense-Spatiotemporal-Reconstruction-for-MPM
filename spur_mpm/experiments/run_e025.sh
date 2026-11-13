@@ -68,7 +68,7 @@ tag="E025_y_k${KY}_fold${FOLD}_s${SEED}"
 run_eval () {
   local name="$1" arm="$2" ckpt="${3:-}" ctrl="${4:-none}"
   local args=(--arm "$arm" --split test --out "$OUT/${name}_test"
-              "${common[@]}" --set "data.patch_hw=[512,512]"
+              "${common[@]}" --set "data.patch_hw=[256,256]"
               --set "model.phys_control=$ctrl")
   [[ -n "$ckpt" ]] && args+=(--ckpt "$ckpt")
   if [[ "$DRY" == "1" ]]; then
