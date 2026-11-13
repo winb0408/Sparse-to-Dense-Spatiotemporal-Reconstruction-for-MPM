@@ -261,6 +261,12 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
     opt = torch.optim.AdamW(model.parameters(), lr=float(cfg["train"]["lr"]),
                             weight_decay=float(cfg["train"]["weight_decay"]))
     agree = float(cfg["loss"].get("dual_agree", 0.0))
+    aux_obs = float(cfg["loss"].get("branch_obs_weight", 0.0))
+    aux_phys = float(cfg["loss"].get("branch_phys_weight", 0.0))
+    if (aux_obs < 0 or aux_phys < 0):
+        raise ValueError("branch auxiliary weights must be nonnegative")
+    if (aux_obs or aux_phys) and not arm.branch_auxiliary:
+        raise ValueError("branch auxiliary weights require a PR3 auxiliary arm")
     steps = int(cfg["train"]["steps"])
     warmup = int(cfg["train"].get("warmup_steps", 0))
     accum = max(1, int(cfg["train"].get("accum", 1)))
@@ -344,6 +350,29 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
             else:
                 res = train_crit(pred, batch["target"].to(device))
                 loss = res["loss"]
+                # Optional PR3 branch-specific supervision; primary objective
+                # remains the original L1 + MS-SSIM. Observation head improves
+                # direct sparse reconstruction; physics head learns to correct
+                # the candidate instead of being forced to copy its artifacts.
+                if arm.branch_auxiliary and (aux_obs or aux_phys):
+                    truth = batch["target"].to(device)
+                    aux = out.get("aux", {})
+                    for key, weight, label in (
+                            ("observation_prediction", aux_obs, "branch_obs_l1"),
+                            ("physics_prediction", aux_phys, "branch_phys_l1")):
+                        if weight > 0:
+                            if key not in aux:
+                                raise RuntimeError(f"required PR3 auxiliary output {key} missing")
+                            a_pred = _select_centre(aux[key].float(),
+                                                     batch["center_index"])
+                            # Missing area only; measured values should not
+                            # dominate what the two branches learn to fill.
+                            missing = 1.0 - batch["acq_mask"].to(device)
+                            denom = missing.sum().clamp_min(1.0)
+                            auxiliary = ((a_pred - truth).abs() * missing).sum() / denom
+                            loss = loss + weight * auxiliary
+                            res[label] = auxiliary.detach()
+                    res["loss"] = loss
 
         if step % accum == 0:
             opt.zero_grad(set_to_none=True)
