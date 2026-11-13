@@ -120,6 +120,11 @@ ARMS: dict[str, Arm] = {
                  needs_training=False, family="pr2",
                  description="fill-first Wiener W0 with no network; needs a "
                              "labelled H to mean anything beyond interpolation"),
+    "P3_Wlegacy": Arm("P3_Wlegacy", _BASE_FEATURES, "wiener_fill_first",
+                       "none", needs_training=False, family="pr3",
+                       description="historical PSRAS fill-first: lateral Wiener "
+                                   "on measured planes, then Z interpolation; "
+                                   "NOT full-volume 3D Wiener"),
     "P2_Direct": Arm("P2_Direct", _BASE_FEATURES, "bilinear", "dense",
                      obs_features=("y", "mask"), family="pr2",
                      description="Y+M -> image, no residual, no physics branch "
