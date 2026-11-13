@@ -35,6 +35,15 @@ physics:
   # a blur without a label is refused at the first batch (PR2 §2), because the
   # two sources license different conclusions.
   psf_source: null
+  # Independent forward degradation, NEVER implicitly equal to the prior PSF.
+  # Real recorded dense GT already contains optical blur: keep identity here.
+  # Set nonidentity ONLY for a labelled synthetic-extra-degradation experiment.
+  forward_extra_psf:
+    sigma_xy_um: 0.0
+    sigma_z_um: 0.0
+    voxel_xy_um: 0.98
+    voxel_z_um: 5.0
+  forward_extra_psf_source: null
   lam: 0.01          # Wiener regularisation
   u_kind: geo        # geo | phys | mean   (U channel source)
   geo_mode: per_axis # per_axis | physical
