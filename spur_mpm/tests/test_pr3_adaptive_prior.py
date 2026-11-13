@@ -117,3 +117,42 @@ def test_adaptive_kernel_selection_is_training_only(monkeypatch):
     assert len(result["candidates"]) == 2
     assert result["selected"]["psf_source"] in (
         "identity", "estimated_from_data")
+
+
+def test_historical_lateral_then_axial_operator_differs_from_global_3d():
+    """The old PSRAS YZ b4f was NOT one full 3-D Wiener on filled Z."""
+    from spur_mpm.physics.acquisition import AcquisitionConfig, observe
+    from spur_mpm.physics.wiener import wiener_fill_all, warm_start
+    x = torch.rand((5, 24, 24), generator=torch.Generator().manual_seed(91))
+    h = PSFConfig(sigma_xy_um=0.98, sigma_z_um=7.5,
+                  voxel_xy_um=0.98, voxel_z_um=5.0)
+    obs = observe(x, AcquisitionConfig(sampling=SamplingSpec(mode="yz",
+                                   ky=2, kz=2), psf=h))
+    legacy = warm_start(obs.y, obs.mask, h, lam=0.01,
+                        mode="wiener_fill_first")
+    new3d = wiener_fill_all(obs.y, obs.mask, h, lam=0.01)
+    assert torch.isfinite(legacy).all() and torch.isfinite(new3d).all()
+    assert not torch.allclose(legacy, new3d, atol=1e-5, rtol=1e-4)
+
+
+def test_matched_synthetic_yz_uses_known_h_once_and_target_remains_d():
+    """Virtual known-H experiment is restorative Y=M*H(D), target D."""
+    from spur_mpm.physics.acquisition import AcquisitionConfig, observe
+    from spur_mpm.physics.psf import gaussian_otf_3d
+    from spur_mpm.physics.acquisition import blur_3d_fft
+    dense = np.random.default_rng(51).random((5, 16, 16)).astype("float32")
+    h = PSFConfig(sigma_xy_um=0.98, sigma_z_um=7.5,
+                  voxel_xy_um=0.98, voxel_z_um=5.0)
+    cfg = ItemConfig(sampling=SamplingSpec(mode="yz", ky=2, kz=2),
+                     psf=h, psf_source="synthetic_extra_degradation",
+                     forward_psf=h,
+                     forward_psf_source="synthetic_extra_degradation",
+                     warm_start_kind="wiener_fill_all",
+                     features=("y", "mask", "interp", "wiener"))
+    item = _make_item(dense, _geom(), cfg, 0, 0, 0, 1)
+    y, mask = item["inputs"][0:5], item["inputs"][5:10].bool()
+    assert torch.equal(item["target"], torch.from_numpy(dense[2]))
+    expected_hx = blur_3d_fft(torch.from_numpy(dense), h)
+    assert torch.allclose(y[mask], expected_hx[mask], atol=1e-6)
+    assert not torch.allclose(y[mask], torch.from_numpy(dense)[mask], atol=1e-4)
+    assert int(mask.sum()) > 0 and not bool(mask.all())
