@@ -39,7 +39,8 @@ if [[ "$STAGE" == "select" ]]; then exit 0; fi
 if [[ "$DRY" != "1" && -z "$GPU" ]]; then
   echo "Set GPU=<owned device index> for compute runs" >&2; exit 2
 fi
-# Launch gate: the device must be visible, and GPU 2 must be under half full.
+# Launch gate: the device must be visible to the driver and under the occupancy
+# ceiling (60 %, `_gpu_gate.sh`).
 # A dead handle hangs the job instead of failing it (GPU 2, 2026-11-13).
 if [[ "$DRY" != "1" ]]; then
   source spur_mpm/experiments/_gpu_gate.sh
@@ -161,7 +162,9 @@ if [[ "$STAGE" == "analysis" || "$STAGE" == "all" ]]; then
   mkdir -p "$OUT/logs"
   run_structure () {
     local label="$1" arm="$2" ckpt="$3" ctrl="$4"
-    local dir="$OUT/structure_$label"
+    # Scoped by the run tag: this OUT dir holds one group per ky, and an
+    # unscoped `structure_I0` would make a second ky skip its own analysis.
+    local dir="$OUT/structure_${tag}_${label}"
     local args=(--arm "$arm" --out "$dir" --device cuda:0
                 --config "$CFG" "${set_tail[@]}"
                 --set "model.phys_control=$ctrl")
@@ -171,10 +174,16 @@ if [[ "$STAGE" == "analysis" || "$STAGE" == "all" ]]; then
       printf 'DRY structure:'; printf ' %q' python -m spur_mpm.scripts.structure_report "${args[@]}"
       echo; return 0
     fi
+    # Resume, never overwrite: a finished report has structure_summary.json,
+    # anything else in that directory is a half-run and still refuses.
+    if [[ -s "$dir/structure_summary.json" ]]; then
+      echo "skip structure $label: $dir already has structure_summary.json"
+      return 0
+    fi
     [[ ! -e "$dir" ]] || { echo "Refuse overwrite: $dir" >&2; return 3; }
     CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.scripts.structure_report \
-      "${args[@]}" > "$OUT/logs/structure_$label.log" 2>&1 || {
-        echo "STRUCTURE FAILED $label (see $OUT/logs/structure_$label.log)" >&2
+      "${args[@]}" > "$OUT/logs/structure_${tag}_${label}.log" 2>&1 || {
+        echo "STRUCTURE FAILED $label (see $OUT/logs/structure_${tag}_${label}.log)" >&2
         return 1; }
     echo "structure $label done"
   }
@@ -194,10 +203,10 @@ if [[ "$STAGE" == "analysis" || "$STAGE" == "all" ]]; then
   else
     for pair in "P3_wiener P3_interp" "P3_wiener I0"; do
       set -- $pair
-      [[ -d "$OUT/structure_$1" && -d "$OUT/structure_$2" ]] || continue
+      [[ -d "$OUT/structure_${tag}_$1" && -d "$OUT/structure_${tag}_$2" ]] || continue
       python -m spur_mpm.scripts.compare_structure \
-        --runs "$OUT/structure_$1" "$OUT/structure_$2" \
-        > "$OUT/structure_compare_$1_vs_$2.md" 2>&1 \
+        --runs "$OUT/structure_${tag}_$1" "$OUT/structure_${tag}_$2" \
+        > "$OUT/structure_compare_${tag}_$1_vs_$2.md" 2>&1 \
         || echo "compare_structure $pair failed" >&2
     done
     python -m spur_mpm.scripts.collect_results \
