@@ -13,6 +13,11 @@ OUT="${OUT:-runs/E025_adaptive_dual_prior}"
 FOLD="${FOLD:-0}"
 SEED="${SEED:-0}"
 KY="${KY:-4}"     # y_k4: 25% retained = 75% missing (NOT 75% retained)
+# Co-tenancy knob, same meaning as in run_e026_historical.sh: BATCH x ACCUM keeps
+# the effective batch at 8 while lowering peak activation memory. y_k4 with
+# context 1 is far smaller than the yz group, so the default (8 x 1) is kept.
+BATCH="${BATCH:-8}"
+ACCUM="${ACCUM:-1}"
 GPU="${GPU:-}"
 DRY="${DRY:-1}"
 STAGE="${STAGE:-all}" # select | floors | train | all
@@ -65,7 +70,8 @@ common=(--config "$CFG" --fold "$FOLD" --seed "$SEED"
         --set "physics.lam=$LAM"
         --set "physics.forward_extra_psf.sigma_xy_um=0"
         --set "physics.forward_extra_psf.sigma_z_um=0"
-        --set "physics.forward_extra_psf_source=null")
+        --set "physics.forward_extra_psf_source=null"
+        --set "train.batch=$BATCH" --set "train.accum=$ACCUM")
 tag="E025_y_k${KY}_fold${FOLD}_s${SEED}"
 run_eval () {
   local name="$1" arm="$2" ckpt="${3:-}" ctrl="${4:-none}"

@@ -138,4 +138,117 @@ if [[ "$STAGE" == train || "$STAGE" == all ]]; then
   run_eval "${TAG}_P3_wiener" P3_DualAdaptive \
     "$OUT/${TAG}_P3_wiener/best.pt"
 fi
+# ---- analysis: structure reports, comparison, qualitative figures ----------
+# Everything below reads finished runs; it launches no training. It exists
+# because "did Wiener help?" is answered by missing-region error and by whole-
+# volume skeleton metrics, not by a PSNR over a panel three quarters of which
+# every arm received. The arms and their controls are named ONCE here so the
+# figures cannot drift from the table.
+if [[ "$STAGE" == analysis || "$STAGE" == all ]]; then
+  [[ "$DRY" == 1 || -n "$GPU" ]] || {
+    echo "Set GPU=<owned GPU index> for analysis (it reconstructs volumes)" >&2
+    exit 2
+  }
+  # ``common`` is (--config X --fold F --seed S --set ...), six elements before
+  # the first --set. The reporting tools take their own subset of that:
+  # structure_report has no --fold/--seed, and an argparse error there would
+  # have looked like "analysis not needed".
+  set_tail=("${common[@]:6}")
+  fig_dir="$OUT/figures/${TAG}"
+  # label|arm|checkpoint|phys_control   (empty checkpoint = parameter-free floor)
+  arms=(
+    "I0|P2_I0||none"
+    "W0_full3d|P2_W0||none"
+    "W0_legacy|P3_Wlegacy||none"
+    "ResidualI|P2_ResidualI|$OUT/${TAG}_ResidualI/best.pt|none"
+    "P3_interp|P3_DualAdaptive|$OUT/${TAG}_P3_interp/best.pt|interp_only"
+    "P3_wiener|P3_DualAdaptive|$OUT/${TAG}_P3_wiener/best.pt|none"
+  )
+  run_structure () {  # run_structure <label> <arm> <ckpt> <ctrl>
+    local label="$1" arm="$2" ckpt="$3" ctrl="$4"
+    local dir="$OUT/structure_$label"
+    local args=(--arm "$arm" --out "$dir" --device cuda:0
+                --config "$CFG" "${set_tail[@]}"
+                --set "model.phys_control=$ctrl")
+    [[ -n "$ckpt" ]] && args+=(--ckpt "$ckpt")
+    [[ -n "${SAMPLES:-}" ]] && args+=(--samples $SAMPLES)
+    if [[ "$DRY" == 1 ]]; then
+      printf 'DRY structure:'; printf ' %q' python -m spur_mpm.scripts.structure_report "${args[@]}"
+      echo; return 0
+    fi
+    [[ ! -e "$dir" ]] || { echo "Refuse overwrite: $dir" >&2; return 3; }
+    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.structure_report \
+      "${args[@]}" > "$OUT/logs/structure_$label.log" 2>&1 || {
+        echo "STRUCTURE FAILED $label (see $OUT/logs/structure_$label.log)" >&2
+        return 1; }
+    echo "structure $label done"
+  }
+  mkdir -p "$OUT/logs"
+  for spec in "${arms[@]}"; do
+    IFS='|' read -r label arm ckpt ctrl <<< "$spec"
+    if [[ -n "$ckpt" && "$DRY" != 1 && ! -s "$ckpt" ]]; then
+      echo "skip structure $label: no checkpoint (arm is NOT_RUN)" >&2
+      continue
+    fi
+    run_structure "$label" "$arm" "$ckpt" "$ctrl" || true
+  done
+
+  # Pairwise skeleton comparison. Each pair answers one question and the tool
+  # refuses the pairs it cannot make honestly (different volume sets, different
+  # binarisation thresholds, different scored-plane shares).
+  if [[ "$DRY" == 1 ]]; then
+    for pair in "P3_wiener P3_interp" "P3_wiener I0" "W0_legacy W0_full3d"; do
+      echo "DRY compare_structure: $pair"
+    done
+  else
+    for pair in "P3_wiener P3_interp" "P3_wiener I0" "W0_legacy W0_full3d"; do
+      set -- $pair
+      [[ -d "$OUT/structure_$1" && -d "$OUT/structure_$2" ]] || continue
+      python -m spur_mpm.scripts.compare_structure \
+        --runs "$OUT/structure_$1" "$OUT/structure_$2" \
+        > "$OUT/structure_compare_$1_vs_$2.md" 2>&1 \
+        || echo "compare_structure $pair failed" >&2
+    done
+    python -m spur_mpm.scripts.collect_results \
+      --pattern "$OUT/${TAG}_*_test" --index "$INDEX" \
+      --out "$OUT/table_${TAG}.md" > "$OUT/logs/collect.log" 2>&1 \
+      || echo "collect_results failed" >&2
+  fi
+
+  # Qualitative figures. Two invocations, because phys_control is a property of
+  # the *model* and two P3 rows with different controls cannot share one figure
+  # without one of them being mislabelled. The view spec is frozen by the first
+  # and reused by the second, so the two figures show the same window.
+  fig_common=(--config "$CFG" --fold "$FOLD" --index "$INDEX" "${set_tail[@]}"
+              --out "$fig_dir" --device cuda:0 --error-on-missing)
+  fig_a=(--arm "I0/P2_I0" --arm "W0full/P2_W0" --arm "W0leg/P3_Wlegacy")
+  [[ -s "$OUT/${TAG}_ResidualI/best.pt" ]] && \
+    fig_a+=(--arm "ResidI/P2_ResidualI=$OUT/${TAG}_ResidualI/best.pt")
+  [[ -s "$OUT/${TAG}_P3_wiener/best.pt" ]] && \
+    fig_a+=(--arm "P3_W/P3_DualAdaptive=$OUT/${TAG}_P3_wiener/best.pt")
+  fig_b=(--arm "I0/P2_I0")
+  [[ -s "$OUT/${TAG}_ResidualI/best.pt" ]] && \
+    fig_b+=(--arm "ResidI/P2_ResidualI=$OUT/${TAG}_ResidualI/best.pt")
+  [[ -s "$OUT/${TAG}_P3_interp/best.pt" ]] && \
+    fig_b+=(--arm "P3_int/P3_DualAdaptive=$OUT/${TAG}_P3_interp/best.pt")
+  if [[ "$DRY" == 1 ]]; then
+    printf 'DRY qualfig (phys_control=none):'; printf ' %q' python -m spur_mpm.scripts.qualitative_figures "${fig_common[@]}" "${fig_a[@]}" --set "model.phys_control=none" --save-view-spec "$fig_dir/viewspec_${TAG}.json" --tag ""
+    echo
+    printf 'DRY qualfig (phys_control=interp_only):'; printf ' %q' python -m spur_mpm.scripts.qualitative_figures "${fig_common[@]}" "${fig_b[@]}" --set "model.phys_control=interp_only" --view-spec "$fig_dir/viewspec_${TAG}.json" --tag _interp
+    echo
+  else
+    mkdir -p "$fig_dir"
+    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.qualitative_figures \
+      "${fig_common[@]}" "${fig_a[@]}" --set "model.phys_control=none" \
+      --save-view-spec "$fig_dir/viewspec_${TAG}.json" \
+      > "$OUT/logs/qualfig_none.log" 2>&1 \
+      || echo "qualitative figures (none) failed" >&2
+    CUDA_VISIBLE_DEVICES="$GPU" python -m spur_mpm.scripts.qualitative_figures \
+      "${fig_common[@]}" "${fig_b[@]}" --set "model.phys_control=interp_only" \
+      --view-spec "$fig_dir/viewspec_${TAG}.json" --tag _interp \
+      > "$OUT/logs/qualfig_interp.log" 2>&1 \
+      || echo "qualitative figures (interp_only) failed" >&2
+  fi
+fi
+
 echo "E026 $TAG finished. No runs were removed. Keep correct negative results."

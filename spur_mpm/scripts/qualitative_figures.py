@@ -343,9 +343,25 @@ def _panel_metrics(pred: np.ndarray, ref: np.ndarray) -> dict | None:
             pass
     return out
 
+def missing_error(pred: np.ndarray, ref: np.ndarray, in_mask: np.ndarray,
+                  col: dict, spec: dict) -> np.ndarray:
+    """|pred - ref| on one panel, keeping only voxels the arm was never given.
+
+    An error map drawn over the whole panel puts every arm at zero on the
+    voxels it was *handed* and averages the rest away: on y_k4 three quarters of
+    the panel is measured, so the map reads "all arms are fine" no matter what
+    happens in the gap. Masking in volume space and taking the panel afterwards
+    keeps the populations separable, and an XZ/YZ cut that lies entirely on
+    measured rows comes out empty instead of quietly scoring them.
+    """
+    gap = ~np.asarray(in_mask, dtype=bool)
+    return take(np.where(gap, np.abs(np.asarray(pred) - np.asarray(ref)), np.nan),
+                col, spec)
+
+
 def render(vols: list[dict], out_dir: Path, dpi: int = 200,
            tag: str = "", spec: dict | None = None,
-           zoom: int = 96) -> list[Path]:
+           zoom: int = 96, error_on_missing: bool = False) -> list[Path]:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -451,6 +467,18 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
     eviews = {c: views[c] for c in ecols}
     errs = [{c: np.abs(take(v["pred"], col_meta[c], spec) - eviews[c])
              for c in ecols} for v in vols]
+    if error_on_missing:
+        # An arm is scored where it had to infer. Painting the error at voxels
+        # the arm was *handed* puts every arm at zero there and dilutes the only
+        # population that differs -- on y_k4 that is three quarters of the panel,
+        # so the map reads as "all arms are fine". Masking to the complement of
+        # the arm's own input makes the two populations separable, which is what
+        # the runbook's "error maps only on missing positions" asks for.
+        # Masked in volume space and *then* cut, so an XZ/YZ panel that happens
+        # to be all-measured comes out empty rather than averaging measured
+        # voxels into a smaller number.
+        errs = [{c: missing_error(v["pred"], ref, v["in_mask"], col_meta[c], spec)
+                 for c in ecols} for v in vols]
     # Row 0 is what the reconstruction cannot be blamed for: the measurements
     # the arm was given, minus the dense reference, on the voxels it did take.
     a_err = np.abs(given - ref)
@@ -473,14 +501,20 @@ def render(vols: list[dict], out_dir: Path, dpi: int = 200,
             _show(axes[i + 1][c], e[col], (0.0, vmax), cmap="inferno")
             mae_e = _mid(e[col])
             _note(axes[i + 1][c], "no data" if mae_e is None
-                  else f"MAE {mae_e:.4f}")
+                  else f"MAE {mae_e:.4f}" +
+                  ("\n(missing only)" if error_on_missing else ""))
     for r, lab in enumerate(["Measured"] + [v["arm"] for v in vols]):
         axes[r][0].text(-0.05, 0.5, lab, transform=axes[r][0].transAxes,
                         rotation=90, va="center", ha="right", fontsize=9)
-    fig.suptitle(f"{sample} -- |pred - reference|, one scale for every row "
-                 f"(0 to {vmax:.4f})", fontsize=10, y=0.995)
+    fig.suptitle(f"{sample} -- |pred - reference|" +
+                 (" on voxels the arm was never given" if error_on_missing
+                  else "") +
+                 f", one scale for every row (0 to {vmax:.4f})",
+                 fontsize=10, y=0.995)
     fig.text(0.5, 0.001, f"cyan = never measured | inferno | "
-                         f"MAE printed per panel, on the shown crop",
+                         f"MAE printed per panel, on the shown crop"
+                         + (" (masked to missing voxels)" if error_on_missing
+                            else ""),
              ha="center", va="bottom", fontsize=6.2, color="0.25")
     p2 = out_dir / f"error_{sample}{tag}.png"
     fig.savefig(p2, dpi=dpi, bbox_inches="tight", pad_inches=0.04)
@@ -809,6 +843,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="JSON manifest of protocol groups; writes "
                          "compare_<sample>_<levels>.png and a consistency "
                          "report, and exits non-zero if the invariants fail")
+    ap.add_argument("--error-on-missing", action="store_true",
+                    help="score and paint the error map only where the arm had "
+                         "to infer (complement of its own input mask). Off by "
+                         "default so existing figures are unchanged.")
     ap.add_argument("--figure-name", default=None,
                     help="file name for the --compare figure; default "
                          "compare_<sample>_<levels>.png. §4.4.1 asks for "
@@ -977,7 +1015,8 @@ def main(argv: list[str] | None = None) -> int:
                    "input_is_branch_union": v["dual"],
                    "metrics_on_shown_crop": v["metrics"]} for v in vols]},
         indent=2))
-    for p in render(vols, out_dir, dpi=args.dpi, tag=args.tag, spec=spec):
+    for p in render(vols, out_dir, dpi=args.dpi, tag=args.tag, spec=spec,
+                    error_on_missing=args.error_on_missing):
         print("wrote", p)
     print("ALL_DONE")
     return 0
