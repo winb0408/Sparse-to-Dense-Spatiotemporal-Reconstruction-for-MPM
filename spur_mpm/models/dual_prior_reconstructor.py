@@ -217,6 +217,18 @@ class DualPriorReconstructor(nn.Module):
         cond_dim = len(cond_names) * self.t if cond_names else 0
         self.fusion = _Fusion(dims, cond_dim, use_gate)
         self.decoder = _Decoder(dims, window, depths, heads, out_ch=self.t)
+        # PR3: lightweight per-branch diagnostics/auxiliary objectives. Each
+        # branch can learn independently from the shared dense reference.
+        # These heads NEVER receive GT as input and are disabled by default
+        # for historical PR2 arms; they are read only by PR3 training.
+        self.obs_head = nn.Conv2d(dims[0], self.t, 1)
+        self.phys_head = (nn.Conv2d(dims[0], self.t, 1)
+                          if self.phys is not None else None)
+        nn.init.zeros_(self.obs_head.weight)
+        nn.init.zeros_(self.obs_head.bias)
+        if self.phys_head is not None:
+            nn.init.zeros_(self.phys_head.weight)
+            nn.init.zeros_(self.phys_head.bias)
 
     # -- input slicing ------------------------------------------------------
     def _split(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -262,6 +274,16 @@ class DualPriorReconstructor(nn.Module):
             d_hat = d_raw
 
         aux = {"residual": r}
+        # The two independent views are supervised with small, optional losses
+        # on the same dense target. Observation estimates I0 correction;
+        # physics estimates a W0 correction. Neither branch is forced to copy
+        # Wiener artifacts; final fused output remains the deployed output.
+        if self.collect_aux:
+            aux["observation_prediction"] = (
+                (i0 if i0 is not None else v["y"]) + self.obs_head(f_obs[0]))
+            if self.phys_head is not None:
+                w0 = v.get("wiener", i0)
+                aux["physics_prediction"] = w0 + self.phys_head(f_phys[0])
         if i0 is not None:
             aux["interp"] = i0
         if self.collect_aux:
