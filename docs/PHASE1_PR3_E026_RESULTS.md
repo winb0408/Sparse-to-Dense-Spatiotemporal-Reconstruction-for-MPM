@@ -195,8 +195,8 @@ zoom 96 µm, full-z MIP), nine columns per arm as in §4.4, split by
 The picture is the table: the two Wiener orderings are one image, the two PR3
 arms are another that differs from `ResidualI` only in the last decimals, and
 the floors differ from the trained arms by a visibly thinner vessel call (the
-floor's `pred_fraction` 0.034 is a third of the reference, which is why its
-recall is 0.457). Artefacts:
+floor's `pred_fraction` 0.034 is a fifth of the reference's 0.164, which is why
+its recall is 0.457). Artefacts:
 `figures/E026_matched_synthetic_yz_k2_kz2_fold0_s0/qualitative_M2_FOVII_S1_vessels{,_interp}.png`
 with the `error_*`, `profile_*` and `support_*` panels and the `.npz` behind each.
 
