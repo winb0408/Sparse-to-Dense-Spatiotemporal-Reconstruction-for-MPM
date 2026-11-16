@@ -140,30 +140,30 @@ more precise.
 
 ## 4. `real` group
 
-**Partially run, then interrupted by a hardware fault.** Two of the three floors
-are complete and the rest is queued; the state of each arm is stated rather than
-implied:
+**Complete** (2026-11-13 13:56 → 2026-11-16 23:12: three floors, three trained
+arms, six structure reports, three `compare_structure` pairs, the collected table
+and both qualitative-figure passes).
 
-| arm | state |
-|---|---|
-| `I0` | **done** — `psnr_missing` 25.2246, `e_missing` 0.0435, Dice 0.6256, clDice 0.6003 |
-| `W0_full3d` | **done** — identical to `I0` in every field except `arm` |
-| `W0_legacy` | **done** (2026-11-14 09:53) — `psnr_missing` 25.22464868, i.e. the same as `I0` to 2.3e-8 dB |
-| `P2_ResidualI` | `NOT_RUN` |
-| `P3_interp` | `NOT_RUN` |
-| `P3_wiener` | `NOT_RUN` |
-| analysis for the `real` group | `NOT_RUN` |
-| analysis for the `matched_synthetic` group | **partial** — `structure_I0` done (§3.1); the other five reports, the three `compare_structure` pairs and the qualitative figures are queued |
+### 4.1 Window-level evaluation (758 windows, fold 0, test animal M2)
 
-All three floors now exist, and they are the third independent confirmation of
-§2's operator-order finding at this context length: `I0` 25.2246487021,
+| arm | `psnr_missing` | `e_missing` | Dice | clDice | `pred_fraction` |
+|---|---|---|---|---|---|
+| `I0` | 25.2246 | 0.04354 | 0.6256 | 0.6003 | 0.1670 |
+| `W0_full3d` | 25.2246 | 0.04354 | 0.6256 | 0.6003 | 0.1670 |
+| `W0_legacy` | 25.2246 | 0.04354 | 0.6256 | 0.6003 | 0.1670 |
+| `ResidualI` | **26.6106** | 0.03703 | 0.5862 | 0.5595 | 0.0779 |
+| `P3_interp` | **26.6458** | 0.03696 | 0.5836 | 0.5569 | 0.0765 |
+| `P3_wiener` | **26.6458** | 0.03696 | 0.5836 | 0.5569 | 0.0765 |
+
+All three floors exist and are the third independent confirmation of §2's
+operator-order finding at this context length: `I0` 25.2246487021,
 `W0_full3d` 25.2246487021 (identical to every printed digit), `W0_legacy`
-25.2246486795 — a difference of **2.3e-8 dB** between the two Wiener orderings,
-against the 1.24e-7 centre-plane prediction measured on a training volume. On
-real data at `T = 3` the ordering is not a variable.
+25.2246486795 — **2.3e-8 dB** between the two Wiener orderings, against the
+1.24e-7 centre-plane prediction measured on a training volume. On real data at
+`T = 3` the ordering is not a variable.
 
 The floors were re-run on the frozen train-only selection, i.e. no test animal
-touched the kernel choice. Two facts constrain what the remaining arms can show,
+touched the kernel choice. Two facts constrain what the trained arms can show,
 established from that selection file
 (`runs/E026_psras_condition/fold0_yz_k2_kz2_selection.json`) and from the
 operator definitions:
@@ -174,12 +174,129 @@ operator definitions:
   With `H = I`, `wiener_fill_all` returns `interp_linear` exactly, so
   `W0_full3d ≡ I0` by construction, not by coincidence.
 - With `H = I` the `interp_only` control and the uncontrolled PR3 arm receive the
-  same physics channel, so `P3_interp ≡ P3_wiener` by construction.
+  same physics channel, so `P3_interp ≡ P3_wiener` by construction. The
+  measurement confirms it to every printed digit — in the window table, in the
+  whole-volume structure report, in the qualitative crop metrics and in
+  `structure_compare_..._P3_wiener_vs_P3_interp.md` (Δ = 0.0000 on all four
+  volumes).
 
-So the informative `real` comparison reduces to `I0` (≡ `W0_full3d`) vs
-`P2_ResidualI` vs `P3_DualAdaptive`. All candidates and their errors stay in the
-selection file; the kernel is not re-tuned against test data, and no non-zero
-kernel is forced to make the search look different.
+So the informative `real` comparison reduces to `I0` (≡ `W0_full3d` ≡
+`W0_legacy`) vs `P2_ResidualI` vs `P3_DualAdaptive`.
+
+**What the trained arms do, in the window protocol:**
+
+- `psnr_missing` **+1.39 dB** (`ResidualI`) and **+1.42 dB** (`P3`) over the
+  floor, and MAE on missing voxels −0.0065 (≈ −15 %). PSNR is above the 1 dB
+  band, so this is the one place in the `real` group where a difference survives
+  the claim discipline. One test animal, so it is stated as a direction across
+  the fold, not as an established effect size.
+- Dice **−0.039 / −0.042** and clDice **−0.041 / −0.043** against the floor,
+  i.e. above the 0.03 band in the *negative* direction. This is not a rounding
+  artefact: it is the same phenomenon seen from the other side in §4.2, and it
+  is a conflict between two vessel protocols, which §4.3 resolves as far as the
+  data allows.
+- `pred_fraction` 0.1670 → 0.0765: the trained arms call less than half as much
+  vessel as the floor on the same reference.
+
+### 4.2 Whole-volume structure (4 test volumes, per-plane threshold fitted on the reference only, planes whose reference fills > 15 % gated out)
+
+| arm | Dice | clDice | skelF1 | precision | recall | mean radius µm ref→pred | skeleton components ref→pred |
+|---|---|---|---|---|---|---|---|
+| `I0` ≡ `W0_full3d` ≡ `W0_legacy` | 0.7778 | 0.6462 | 0.6103 | 0.550 | 0.690 | 1.80 → 1.63 | 15543 → 21516 |
+| `ResidualI` | 0.8329 | 0.7256 | 0.6619 | 0.778 | 0.585 | 1.80 → 2.01 | 15543 → 5914 |
+| `P3_interp` ≡ `P3_wiener` | 0.8323 | 0.7233 | 0.6580 | 0.785 | 0.576 | 1.80 → 2.02 | 15543 → 5536 |
+
+Per-volume, with the scored-plane share beside every number (the four volumes
+differ by a factor of two and the share of depth that is scorable ranges
+119/201–146/203 on the three informative volumes and 51/152 on the fourth):
+
+| volume | scored | I0 Dice / clDice | P3 Dice / clDice |
+|---|---|---|---|
+| M2_FOVII_S1 | 146/203 | 0.8895 / 0.8893 | 0.9128 / 0.9420 |
+| M2_FOVII_S2 | 134/202 | 0.8001 / 0.6541 | 0.8463 / 0.7357 |
+| M2_FOVI_S1 | 119/201 | 0.8210 / 0.6415 | 0.8718 / 0.7696 |
+| M2_FOVI_S2 | 51/152 | 0.6003 / 0.4000 | 0.6983 / 0.4458 |
+
+`P3 − I0` whole-volume: **+0.0545 Dice, +0.0771 clDice, +0.0477 skelF1**,
+positive on 4 of 4 volumes, and the mechanism is visible in the columns rather
+than only in the score: the floor's precision is 0.55 with 21 516 skeleton
+fragments against a reference tree of 15 543 (it over-calls and shatters), while
+the trained arms reach 0.78–0.79 precision with 5.5–5.9 k fragments (they
+under-call and merge). Neither is correct; they fail in opposite directions.
+
+### 4.3 The two vessel protocols disagree, and the reason is identifiable
+
+Window-level Dice says the network is **worse** by 0.04; whole-volume Dice says
+it is **better** by 0.055. That is not noise — the protocols score different
+references:
+
+| | window protocol (`evaluate.py`) | whole-volume protocol (`structure_report`) |
+|---|---|---|
+| threshold | one global Otsu **0.0290**, fitted on the pooled reference windows, applied to every arm | per-plane threshold fitted on the reference, **median 0.0414** |
+| plane gating | none | planes whose reference mask fills > 15 % are emptied on both sides |
+| reference foreground | **18.65 %** of scored voxels | **2.18 %** |
+
+A reference mask that covers 18.65 % of the tissue is not a vessel tree — this is
+the failure mode `segment_pair`'s own docstring documents ("a mask that fills a
+third of a plane turns the skeleton into a surface"). In the window protocol the
+floor wins by *matching that over-segmentation* (its `pred_fraction` 0.167 is
+close to the reference's 0.1865), not by reconstructing vessels better. In the
+whole-volume protocol the reference is a 2 % tree and the trained arms are
+closer to it.
+
+So: **the negative window-level vessel delta cannot be read as "the network
+degrades vessels"**, because its reference is inflated by haze that the floor
+happens to reproduce. Equally, the **positive whole-volume delta cannot be read
+as "the network improves structure"**: it is one test animal, and +0.055 Dice
+sits inside the 0.08 cross-animal spread quoted by the comparison tool itself.
+Both numbers are reported; neither carries a verdict. This is the "unify the
+evaluation semantics" item of the PR3 directive, and it stays open — the honest
+resolution is a re-run of the window protocol with per-plane thresholds and
+gating, which is **`NOT_RUN`** and would change a published metric for every
+earlier experiment, so it is not done here on a pilot's authority.
+
+Depth-stratified window Dice, reported because the directive asks for deep
+structures and because it shows where the two protocols part company:
+
+| depth | I0 Dice | P3 Dice | difference |
+|---|---|---|---|
+| 0–200 µm | 0.7184 | 0.7369 | +0.019 |
+| 200–400 µm | 0.7431 | 0.7504 | +0.007 |
+| 400–600 µm | 0.6716 | 0.6615 | −0.010 |
+| 600–800 µm | 0.4934 | 0.4017 | **−0.092** |
+| 800–1000 µm | 0.4562 | 0.2917 | **−0.165** |
+
+The entire window-protocol deficit is deep, where the global threshold pulls the
+reference furthest into haze; the same windows show `psnr_missing` improving by
+~1.4 dB at every depth. Per the standing rule, depth conclusions are made on
+vessel metrics, not PSNR — and on this metric the trained arms are worse below
+600 µm under the window protocol, better under the whole-volume one.
+
+### 4.4 Qualitative figures
+
+Two passes sharing one frozen view spec (sample `M2_FOVII_S1`, plane z = 101,
+y = x = 128, ROI [160, 0, 96], zoom 96 µm, MIP over the full z range), nine
+columns per arm: XY, XZ, YZ, a zoomed patch, the z-MIP, plus measured-vs-skipped
+plane and row pairs so the acquisition mask is visible next to the error. The
+second pass exists because `phys_control` is a property of the model: `P3_wiener`
+and `P3_interp` cannot share one figure without one of them being mislabelled.
+
+Metrics on the shown crop (one volume, one plane — descriptive only):
+
+| arm | psnr | MAE | Dice | clDice | `e_missing` | `pred_fraction` |
+|---|---|---|---|---|---|---|
+| `I0` / `W0full` / `W0leg` | 24.9856 | 0.03683 | 0.6976 | 0.6924 | 0.04954 | 0.1479 |
+| `ResidualI` | 26.2055 | 0.03205 | 0.6708 | 0.6626 | 0.04244 | 0.0799 |
+| `P3_wiener` | 26.2506 | 0.03178 | 0.6709 | 0.6619 | 0.04231 | 0.0796 |
+| `P3_interp` | 26.2506 | 0.03178 | 0.6709 | 0.6619 | 0.04231 | 0.0796 |
+
+The figure is the picture of §4.3 at one plane: the three floors draw the same
+image to five decimals, the two PR3 arms draw the same image to five decimals,
+and the difference between floor and network is a visibly sparser vessel call on
+a reference that includes haze. Artefacts:
+`figures/E026_real_yz_k2_kz2_fold0_s0/qualitative_M2_FOVII_S1_vessels{,_interp}.png`
+plus the matching `error_*`, `profile_*`, `support_*` panels and the `.npz` behind
+each figure.
 
 ## 5. What is not claimed
 
@@ -189,9 +306,17 @@ kernel is forced to make the search look different.
   known kernel. It does not transfer to the recorded stacks without an
   independent PSF estimate — and with the identity kernel this cohort selects,
   there is nothing for the Wiener term to invert there either.
-- No multi-seed or multi-fold claim: fold 0, seed 0 only.
-- No arm of the `real` group beyond the two floors has a result yet; nothing in
-  §4 is a finding about real data except the identity-kernel collapse itself.
+- No multi-seed or multi-fold claim: fold 0, seed 0 only. The `real` group's
+  +1.4 dB missing-region PSNR and its structure deltas are each from one test
+  animal.
+- No claim that the network improves or degrades vessel structure: §4.3 shows
+  the two protocols disagree in sign and says why. The re-run that would settle
+  it (per-plane thresholds and gating in the window protocol) is `NOT_RUN`.
+- No claim from the qualitative figures beyond "the floors are one image and the
+  two PR3 arms are another": they are one plane of one volume, and their crop
+  metrics are descriptive.
+- No latency, throughput or peak-memory number from this group is reported as a
+  benchmark: the cards were shared throughout.
 
 ## 6. Artefacts
 
@@ -201,6 +326,7 @@ kernel is forced to make the search look different.
 | preflight (train volume, Y/M/target/candidates) | `docs/evidence/e026_preflight_20261113/` |
 | operator-order diagnostic | `docs/evidence/e026_operator_context_20261113/operator_context.json` |
 | structure reports / comparisons | `runs/E026_psras_condition/structure_<TAG>_<arm>/`, `structure_compare_<TAG>_<A>_vs_<B>.md` (scoped by group: the two groups share this directory and an unscoped name made them collide) |
+| qualitative figures (real, frozen view spec) | `runs/E026_psras_condition/figures/E026_real_yz_k2_kz2_fold0_s0/` (two passes, `viewspec_E026_real_*.json`) |
 | collected table | `runs/E026_psras_condition/table_*.md` |
 | qualitative figures (frozen view spec) | `runs/E026_psras_condition/figures/` |
 | full test suite | `docs/evidence/pytest_20261113_pr3_full.log` (425 passed) |
