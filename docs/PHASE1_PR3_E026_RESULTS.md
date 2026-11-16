@@ -1,11 +1,12 @@
 # E026 results — the historical PSRAS condition under this repository's observation model
 
-**Status:** `matched_synthetic` complete (six arms); `real` partial — two floors
-done, the rest interrupted by a GPU fault and queued, see §4. Every number below
-is traced to a run directory that contains its own `config.yaml`,
-`provenance.json` and `metrics.jsonl`; nothing here is transcribed from a log by
-hand, and every arm that has not produced a summary is marked `NOT_RUN` rather
-than left blank.
+**Status:** both groups complete — six arms, structure analysis and qualitative
+figures each, `real` finishing on 2026-11-16 23:12 and its matched-synthetic
+counterpart on 2026-11-17 05:03 after a GPU fault on 2026-11-13 forced a restart
+(§4). Every number below is traced to a run directory that contains its own
+`config.yaml`, `provenance.json` and `metrics.jsonl`; nothing here is transcribed
+from a log by hand, and every measurement that has not been run is marked
+`NOT_RUN` rather than left blank.
 
 Protocol: `sampling.mode=yz`, `ky=2`, `kz=2` → exactly 25 % of voxels retained,
 context `T = 2*kz - 1 = 3`, `patch_hw = 256x256`, 3000 training steps, fold 0.
@@ -129,9 +130,75 @@ Three things this table binds, beyond the numbers themselves:
   fine-vessel analysis in §4 has to test — which is why the PSNR table alone
   cannot carry the verdict.
 
-This is 1 of the group's 6 structure reports. The other five, the three
-`compare_structure` pairs and the qualitative figures are queued; until they
-land, nothing here distinguishes any arm from the floor.
+This is 1 of the group's 6 structure reports, and it describes the floor only.
+
+### 3.2 All six arms, whole-volume structure (finished 2026-11-17 05:03)
+
+Same protocol as §3.1, all six arms, plus the three `compare_structure` pairs:
+
+| arm | Dice | clDice | skelF1 | precision | recall | mean radius µm ref→pred | skeleton components ref→pred |
+|---|---|---|---|---|---|---|---|
+| `I0` | 0.8136 | 0.6589 | 0.5782 | 0.920 | 0.457 | 1.80 → 2.33 | 15543 → 786 |
+| `W0_full3d` | 0.8765 | 0.7261 | 0.6829 | 0.926 | 0.567 | 1.80 → 2.10 | 15543 → 3059 |
+| `W0_legacy` | 0.8765 | 0.7261 | 0.6829 | 0.926 | 0.567 | 1.80 → 2.10 | 15543 → 3059 |
+| `ResidualI` | 0.9091 | 0.8123 | 0.7938 | 0.886 | 0.727 | 1.80 → 1.92 | 15543 → 9396 |
+| `P3_interp` | 0.9146 | 0.8104 | 0.7942 | 0.900 | 0.720 | 1.80 → 1.93 | 15543 → 8964 |
+| `P3_wiener` | 0.9145 | 0.8070 | 0.7891 | 0.902 | 0.712 | 1.80 → 1.94 | 15543 → 8701 |
+
+Four things follow, and they are consistent with §3's PSNR verdict rather than a
+re-reading of it:
+
+1. **The PR3 comparison is still null.** `P3_wiener − P3_interp` = **+0.0001
+   Dice, +0.0034 clDice, +0.0051 skelF1**, with per-volume Dice of both signs
+   (+0.0003, −0.0005, +0.0016 across the scorable volumes). The structure
+   protocol, which §4.3 shows can disagree with the window protocol, here agrees
+   with it exactly: the physics channel buys nothing even when the kernel is
+   known and non-identity.
+2. **`W0_legacy ≡ W0_full3d` again, now with `H ≠ I`.** Δ = 0.0000 on all four
+   volumes, on the whole-volume structure protocol. §2's finding — that the two
+   Wiener orderings coincide at T = 3 — was measured on a *training* volume with
+   a synthetic kernel and then on the real test set. This is a third setting, and
+   the nullity does not depend on the kernel being identity.
+3. **In this group a non-identity kernel does move structure**, unlike on real
+   data: `W0_full3d − I0` = **+0.063 Dice, +0.067 clDice, +0.105 skelF1**, with
+   recall 0.457 → 0.567, mean radius 2.33 → 2.10 µm and skeleton fragments
+   786 → 3059 against a reference tree of 15 543. That is the Wiener term
+   actually inverting a blur it was told about, and it is the one place in E026
+   where the physics channel has a measurable effect — on a *synthetic* inverse
+   problem. It is still one test animal, and +0.063 Dice sits inside the 0.08
+   cross-animal spread, so it is a direction, not an effect size. It also
+   reinforces §3's verdict: the gain belongs to the known-kernel floor, and once
+   the two PR3 arms are both given the same physics channel that gain is already
+   in both of them.
+4. **Protocol agreement is conditional on the reference, not on the model.** In
+   this group the window protocol and the whole-volume protocol rank the arms
+   identically (trained ≫ floor; `P3` = `ResidualI`; `P3_wiener` = `P3_interp`).
+   On real data they disagreed (§4.3). The difference between the two settings is
+   the reference: 2.18 % foreground here and in §4.2, 18.65 % in the real
+   window protocol. That is the evidence behind §4.3's reading — the real-group
+   sign flip is a property of that reference, not of the network.
+
+### 3.3 Qualitative figures
+
+Two passes over the same frozen view spec (sample `M2_FOVII_S1`, z = 101,
+zoom 96 µm, full-z MIP), nine columns per arm as in §4.4, split by
+`phys_control` for the same reason. Metrics on the shown crop:
+
+| arm | psnr | Dice | clDice | `e_missing` | `pred_fraction` |
+|---|---|---|---|---|---|
+| `I0` | 24.8333 | 0.5413 | 0.5248 | 0.04208 | 0.0344 |
+| `W0_full3d` / `W0_legacy` | 25.0679 | 0.6145 | 0.5929 | 0.04125 | 0.0501 |
+| `ResidualI` | 25.3860 | 0.7017 | 0.6878 | 0.03984 | 0.0916 |
+| `P3_wiener` | 25.4226 | 0.6914 | 0.6755 | 0.03969 | 0.0822 |
+| `P3_interp` | 25.4358 | 0.6940 | 0.6791 | 0.03962 | 0.0848 |
+
+The picture is the table: the two Wiener orderings are one image, the two PR3
+arms are another that differs from `ResidualI` only in the last decimals, and
+the floors differ from the trained arms by a visibly thinner vessel call (the
+floor's `pred_fraction` 0.034 is a third of the reference, which is why its
+recall is 0.457). Artefacts:
+`figures/E026_matched_synthetic_yz_k2_kz2_fold0_s0/qualitative_M2_FOVII_S1_vessels{,_interp}.png`
+with the `error_*`, `profile_*` and `support_*` panels and the `.npz` behind each.
 
 This is a 3000-step mechanism pilot, one fold, one seed, and one test volume.
 Scaling to multi-seed / multi-fold is **`NOT_RUN` by design**: the initial
@@ -326,7 +393,7 @@ each figure.
 | preflight (train volume, Y/M/target/candidates) | `docs/evidence/e026_preflight_20261113/` |
 | operator-order diagnostic | `docs/evidence/e026_operator_context_20261113/operator_context.json` |
 | structure reports / comparisons | `runs/E026_psras_condition/structure_<TAG>_<arm>/`, `structure_compare_<TAG>_<A>_vs_<B>.md` (scoped by group: the two groups share this directory and an unscoped name made them collide) |
-| qualitative figures (real, frozen view spec) | `runs/E026_psras_condition/figures/E026_real_yz_k2_kz2_fold0_s0/` (two passes, `viewspec_E026_real_*.json`) |
+| qualitative figures, both groups (frozen view specs) | `runs/E026_psras_condition/figures/E026_{real,matched_synthetic}_yz_k2_kz2_fold0_s0/` (two passes each, `viewspec_*.json`) |
 | collected table | `runs/E026_psras_condition/table_*.md` |
 | qualitative figures (frozen view spec) | `runs/E026_psras_condition/figures/` |
 | full test suite | `docs/evidence/pytest_20261113_pr3_full.log` (425 passed) |
