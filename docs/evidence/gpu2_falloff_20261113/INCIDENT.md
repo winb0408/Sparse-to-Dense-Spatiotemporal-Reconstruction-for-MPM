@@ -52,6 +52,26 @@ therefore now refuse to start when `nvidia-smi -L` does not list the requested
 device, and every GPU stage carries a `timeout` so a stall fails instead of
 spinning forever (`spur_mpm/experiments/_gpu_gate.sh`).
 
+**2026-11-14 addition: the same fault had a second, quieter consequence.**
+The E026 `real` group was relaunched on GPU 3 at 09:43 and ran its `W0_legacy`
+floor to completion at 09:53. The training arm started in the same second and
+resolved `device=cpu`: `torch.cuda.is_available()` had become `False` while the
+driver still listed the card, so the old fallback quietly trained on the CPU at
+23 s/step (~19 hours instead of ~45 minutes) and wrote `"gpus": []` into its
+provenance. It was killed at step 250 when the session dropped. The run is
+quarantined at `runs/_invalid/20261114_cpu_fallback/` with its own README, and
+`spur_mpm/device.py` now makes that fallback a startup error
+(`SPUR_ALLOW_CPU=1` is the visible override). Same lesson as the visibility
+gate: a device that is merely *absent* must fail the launch, not change what
+the launch means.
+
+**GPU 2 came back.** `nvidia-smi -L` listed it again from 2026-11-14 ~13:50
+(UUID `GPU-5f186c75-3f86-9cea-7149-22cb30b860a9`), and another user's job was
+running on it immediately. The standing rule ("no launch until it is listed
+again") is therefore satisfied, but the queue still does not target it: it is
+the card that has both fallen off the bus and hung the server, and the other
+cards are usable right now.
+
 **Occupancy ceiling after the incident:** GPUs 0/1/3 are authorised for this work
 below 60 % occupancy (owner's instruction, 2026-11-13; the 50 % figure quoted
 above was for GPU 2 before it died). 60 % is justified by the measured footprint

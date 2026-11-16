@@ -42,6 +42,7 @@ from spur_mpm.data.datasets import (
     VolumeWindowDataset,
 )
 from spur_mpm.data.split import read_split
+from spur_mpm.device import resolve_device
 from spur_mpm.losses.reconstruction import ReconstructionLoss
 from spur_mpm.metrics.image_metrics import psnr, ssim
 from spur_mpm.models.registry import build_model, count_parameters, get_arm
@@ -226,8 +227,8 @@ def _mean(v: list[float]) -> float | None:
 
 def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
                  resume: bool = False) -> dict:
-    device = torch.device(cfg["run"].get("device", "cuda")
-                          if torch.cuda.is_available() else "cpu")
+    # Refuses a silent CPU fallback: see spur_mpm/device.py for the incident.
+    device = resolve_device(cfg, purpose="training")
     seed = int(cfg["run"]["seed"])
     set_seed(seed)
 

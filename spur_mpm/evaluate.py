@@ -31,6 +31,7 @@ from spur_mpm.common.config import apply_overrides, load_config
 from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.data.split import read_split
+from spur_mpm.device import resolve_device
 from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
                                            split_psnr, ssim)
 from spur_mpm.metrics.statistics import summarise_by_group
@@ -113,8 +114,8 @@ def _skeleton_row(pred_mask: np.ndarray, ref_mask: np.ndarray, *,
 def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
              split_name: str = "test", out_dir: Path | None = None,
              seed: int = 0, skeleton: bool = False) -> dict:
-    device = torch.device(cfg["run"].get("device", "cuda")
-                          if torch.cuda.is_available() else "cpu")
+    # Refuses a silent CPU fallback: see spur_mpm/device.py for the incident.
+    device = resolve_device(cfg, purpose="evaluation")
     arm = get_arm(arm_name)
     cache = VolumeCache.load(cfg["data"]["index"],
                               fold=int(cfg["data"].get("fold", 0)))

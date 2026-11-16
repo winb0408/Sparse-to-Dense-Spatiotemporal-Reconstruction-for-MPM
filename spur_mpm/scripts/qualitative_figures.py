@@ -70,6 +70,7 @@ from spur_mpm.common.config import load_config
 from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.data.split import read_split
+from spur_mpm.device import resolve_device
 from spur_mpm.evaluate import _feature_slice, withholds_at_eval
 from spur_mpm.models.registry import eval_features
 from spur_mpm.metrics.image_metrics import mae, psnr, split_errors, ssim
@@ -871,9 +872,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # A bare index ("2") means "cuda:2", as in evaluate / benchmark; a device
     # string ("cuda:2", "cpu") is taken as given. Resolved here because the
-    # compare branch needs it before the arm list is parsed.
-    dev = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
-    device = torch.device(f"cuda:{dev}" if str(dev).isdigit() else dev)
+    # compare branch needs it before the arm list is parsed. It goes through
+    # `resolve_device` so a dropped card fails instead of drawing every arm on
+    # the CPU (spur_mpm/device.py).
+    dev = args.device or cfg["run"].get("device", "cuda")
+    dev = f"cuda:{dev}" if str(dev).isdigit() else str(dev)
+    device = resolve_device({**cfg, "run": {**cfg.get("run", {}), "device": dev}},
+                            purpose="qualitative figures")
 
     if args.compare:
         manifest = json.loads(Path(args.compare).read_text())

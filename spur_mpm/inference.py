@@ -34,6 +34,7 @@ from torch.utils.data import DataLoader
 from spur_mpm.common.config import apply_overrides, deep_merge, load_config
 from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
+from spur_mpm.device import resolve_device
 from spur_mpm.models.registry import build_model, eval_features, get_arm
 from spur_mpm.physics.acquisition import NoiseConfig
 from spur_mpm.physics.prior import psf_source_label
@@ -53,9 +54,14 @@ def reconstruct_volume(cfg: dict, arm_name: str, ckpt: str | Path,
     t_start = time.perf_counter()
     # A bare index ("2") means "cuda:2", as in ``evaluate`` and ``benchmark``;
     # torch itself only accepts the "cuda:N" form and raises on a bare digit.
-    dev = device or (cfg["run"].get("device", "cuda")
-                     if torch.cuda.is_available() else "cpu")
-    device = torch.device(f"cuda:{dev}" if str(dev).isdigit() else dev)
+    # Either way the device goes through ``resolve_device``, so a card the
+    # driver has dropped fails here instead of silently reconstructing on the
+    # CPU (a whole-volume pass is 24x slower there).
+    requested = device if device is not None else cfg["run"].get("device", "cuda")
+    requested = f"cuda:{requested}" if str(requested).isdigit() else str(requested)
+    device = resolve_device(
+        {**cfg, "run": {**cfg.get("run", {}), "device": requested}},
+        purpose="volume reconstruction")
     arm = get_arm(arm_name)
     cache = VolumeCache.load(cfg["data"]["index"],
                               fold=int(cfg["data"].get("fold", 0)))
