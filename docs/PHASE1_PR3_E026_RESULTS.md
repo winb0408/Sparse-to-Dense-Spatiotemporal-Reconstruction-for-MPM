@@ -148,12 +148,19 @@ implied:
 |---|---|
 | `I0` | **done** — `psnr_missing` 25.2246, `e_missing` 0.0435, Dice 0.6256, clDice 0.6003 |
 | `W0_full3d` | **done** — identical to `I0` in every field except `arm` |
-| `W0_legacy` | `NOT_RUN` — its evaluation was running when GPU 2 fell off the bus (2026-11-13 21:44, `docs/evidence/gpu2_falloff_20261113/INCIDENT.md`) |
+| `W0_legacy` | **done** (2026-11-14 09:53) — `psnr_missing` 25.22464868, i.e. the same as `I0` to 2.3e-8 dB |
 | `P2_ResidualI` | `NOT_RUN` |
 | `P3_interp` | `NOT_RUN` |
 | `P3_wiener` | `NOT_RUN` |
 | analysis for the `real` group | `NOT_RUN` |
 | analysis for the `matched_synthetic` group | **partial** — `structure_I0` done (§3.1); the other five reports, the three `compare_structure` pairs and the qualitative figures are queued |
+
+All three floors now exist, and they are the third independent confirmation of
+§2's operator-order finding at this context length: `I0` 25.2246487021,
+`W0_full3d` 25.2246487021 (identical to every printed digit), `W0_legacy`
+25.2246486795 — a difference of **2.3e-8 dB** between the two Wiener orderings,
+against the 1.24e-7 centre-plane prediction measured on a training volume. On
+real data at `T = 3` the ordering is not a variable.
 
 The floors were re-run on the frozen train-only selection, i.e. no test animal
 touched the kernel choice. Two facts constrain what the remaining arms can show,
