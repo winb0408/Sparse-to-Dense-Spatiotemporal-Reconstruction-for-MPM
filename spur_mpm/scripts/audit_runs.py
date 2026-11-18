@@ -92,6 +92,10 @@ POLICY: tuple[tuple[str, str, str], ...] = (
     ("runs/E026_psras_condition", "B",
      "PR3 historical-condition re-check; its matched_synthetic null is evidence "
      "(docs/PHASE1_PR3_E026_RESULTS.md)"),
+    ("runs/_invalid", "B",
+     "quarantined runs that are not results; kept as evidence for the guard "
+     "they motivated (runs/_invalid/20261114_cpu_fallback/README.md explains "
+     "spur_mpm/device.py)"),
     ("runs/E001", "B",
      "parameter-free baselines on the old cohort; superseded, still correct"),
     ("runs/E002", "C",
