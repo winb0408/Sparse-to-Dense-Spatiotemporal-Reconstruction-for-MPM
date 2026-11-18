@@ -122,6 +122,17 @@ eval:
   # hard : replace the output with the measured value wherever the arm was given
   #        one, applied to every trained arm alike (E005 data-consistency ablation)
   consistency_projection: none
+  # Vessel segmentation rule for the window protocol. `global` reproduces every
+  # number published before 2026-11-18; on a single 2-D window `per_plane`
+  # computes the same Otsu, and the knob exists so the summary says which rule
+  # produced the dice columns (see `structure_report`, which uses per_plane).
+  vessel_threshold_mode: global
+  # null: score every window. 0.15: drop windows whose *reference* mask fills
+  # more than 15 % of the frame -- the gate structure_report applies per plane.
+  # On this cohort the ungated window reference covers 18.65 % of the frame and
+  # the gated whole-volume one 2.18 %, so an ungated vessel score is measured
+  # against haze, not against a vessel tree (E026 §4.3).
+  vessel_max_fraction: null
 
 run:
   seed: 0

@@ -2,6 +2,11 @@
 # E026 historical-condition audit: YZ k_y=2, k_z=2 (25% retained).
 # Real data AND matched-known-PSF synthetic control; never mix claims.
 # This is a targeted mechanism study, NOT an exact CIDC25 PSRAS reproduction.
+#
+# STAGE: select | floors | train | analysis | vessel_ab | all
+#   vessel_ab re-scores existing predictions under the whole-volume vessel rule
+#   (per-plane threshold + 15 % gate) into `_perplane_test`; it is deliberately
+#   not part of `all`.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 : "${FOLD:=0}" "${SEED:=0}" "${KY:=2}" "${KZ:=2}"
@@ -104,22 +109,41 @@ run_eval() {
   local args=(--arm "$arm" --split test --out "$dir"
               "${common[@]}" --set "model.phys_control=$ctrl")
   [[ -n "$ckpt" ]] && args+=(--ckpt "$ckpt")
+  eval_guard "$dir" "$name" "${args[@]}"
+}
+# Re-score the same arm under the whole-volume vessel rule: per-plane threshold
+# and the 15 % flood gate. The published `_test` numbers are never touched; this
+# writes `_perplane_test` beside them, so the two protocols can be compared on
+# identical predictions (E026 §4.3, `STAGE=vessel_ab`).
+run_eval_perplane() {
+  local name="$1" arm="$2" ckpt="${3:-}" ctrl="${4:-none}"
+  local dir="$OUT/${name}_perplane_test"
+  local args=(--arm "$arm" --split test --out "$dir"
+              "${common[@]}" --set "model.phys_control=$ctrl"
+              --set "eval.vessel_threshold_mode=per_plane"
+              --set "eval.vessel_max_fraction=0.15")
+  [[ -n "$ckpt" ]] && args+=(--ckpt "$ckpt")
+  eval_guard "$dir" "$name" "${args[@]}"
+}
+eval_guard() {   # eval_guard <dir> <label> <evaluate args...>
+  local dir="$1" label="$2"; shift 2
+  local args=("$@")
   if [[ "$DRY" == 1 ]]; then
     printf 'DRY eval:'; printf ' %q' python -m spur_mpm.evaluate "${args[@]}"
     echo
-  else
-    # Resume, never overwrite: a finished evaluation (summary.json present) is
-    # skipped so an interrupted group can be restarted. A directory without a
-    # summary is a half-run and still refuses -- that needs a human decision.
-    if [[ -s "$dir/summary.json" ]]; then
-      echo "skip eval $name: $dir already has summary.json"
-      return 0
-    fi
-    [[ ! -e "$dir" ]] || {
-      echo "Refuse overwrite: $dir" >&2; exit 3;
-    }
-    CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.evaluate "${args[@]}"
+    return 0
   fi
+  # Resume, never overwrite: a finished evaluation (summary.json present) is
+  # skipped so an interrupted group can be restarted. A directory without a
+  # summary is a half-run and still refuses -- that needs a human decision.
+  if [[ -s "$dir/summary.json" ]]; then
+    echo "skip eval $label: $dir already has summary.json"
+    return 0
+  fi
+  [[ ! -e "$dir" ]] || {
+    echo "Refuse overwrite: $dir" >&2; exit 3;
+  }
+  CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.evaluate "${args[@]}"
 }
 run_train() {
   local name="$1" arm="$2" ctrl="$3" aux="$4"
@@ -289,6 +313,28 @@ if [[ "$STAGE" == analysis || "$STAGE" == all ]]; then
       > "$OUT/logs/qualfig_interp.log" 2>&1 \
       || echo "qualitative figures (interp_only) failed" >&2
   fi
+fi
+
+# ---- vessel_ab: the same predictions, scored under the whole-volume rule ------
+# `STAGE=vessel_ab` answers one question and changes nothing published: does the
+# window protocol, scored on the reference the whole-volume protocol uses (per
+# plane + 15 % flood gate), reproduce the whole-volume ranking? It re-evaluates
+# the arms that already exist and writes `_perplane_test` beside `_test`.
+# It is NOT part of `all`: a protocol A/B is a decision the owner asks for, not
+# something a rerun of the group should quietly perform.
+if [[ "$STAGE" == vessel_ab ]]; then
+  [[ "$DRY" == 1 || -n "$GPU" ]] || {
+    echo "Set GPU=<owned GPU index> for vessel_ab (it re-scores on the GPU)"
+    exit 2
+  }
+  run_eval_perplane "${TAG}_I0" P2_I0
+  run_eval_perplane "${TAG}_W0_full3d" P2_W0
+  run_eval_perplane "${TAG}_W0_legacy" P3_Wlegacy
+  run_eval_perplane "${TAG}_ResidualI" P2_ResidualI "$OUT/${TAG}_ResidualI/best.pt"
+  run_eval_perplane "${TAG}_P3_interp" P3_DualAdaptive \
+    "$OUT/${TAG}_P3_interp/best.pt" interp_only
+  run_eval_perplane "${TAG}_P3_wiener" P3_DualAdaptive \
+    "$OUT/${TAG}_P3_wiener/best.pt"
 fi
 
 echo "E026 $TAG finished. No runs were removed. Keep correct negative results."

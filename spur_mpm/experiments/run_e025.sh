@@ -89,6 +89,24 @@ run_eval () {
               "${common[@]}" --set "data.patch_hw=[256,256]"
               --set "model.phys_control=$ctrl")
   [[ -n "$ckpt" ]] && args+=(--ckpt "$ckpt")
+  eval_guard "${name}_test" "$name" "${args[@]}"
+}
+# The same predictions scored under the whole-volume vessel rule (per-plane
+# threshold + 15 % flood gate), written beside `_test` so the published numbers
+# stay untouched. See `STAGE=vessel_ab` at the bottom and E026 §4.3.
+run_eval_perplane () {
+  local name="$1" arm="$2" ckpt="${3:-}" ctrl="${4:-none}"
+  local args=(--arm "$arm" --split test --out "$OUT/${name}_perplane_test"
+              "${common[@]}" --set "data.patch_hw=[256,256]"
+              --set "model.phys_control=$ctrl"
+              --set "eval.vessel_threshold_mode=per_plane"
+              --set "eval.vessel_max_fraction=0.15")
+  [[ -n "$ckpt" ]] && args+=(--ckpt "$ckpt")
+  eval_guard "${name}_perplane_test" "$name" "${args[@]}"
+}
+eval_guard () {   # eval_guard <subdir> <label> <evaluate args...>
+  local sub="$1" label="$2"; shift 2
+  local args=("$@")
   if [[ "$DRY" == "1" ]]; then
     printf 'DRY eval: %q ' python -m spur_mpm.evaluate "${args[@]}"
     echo; return 0
@@ -96,8 +114,8 @@ run_eval () {
   # Resume, never overwrite: skip an evaluation that already wrote its summary
   # so an interrupted group can be restarted. A directory without one is a
   # half-run and is left for a human to inspect.
-  if [[ -s "$OUT/${name}_test/summary.json" ]]; then
-    echo "skip eval $name: $OUT/${name}_test already has summary.json"
+  if [[ -s "$OUT/$sub/summary.json" ]]; then
+    echo "skip eval $label: $OUT/$sub already has summary.json"
     return 0
   fi
   CUDA_VISIBLE_DEVICES="$GPU" timeout "$JOB_TIMEOUT" python -m spur_mpm.evaluate "${args[@]}"
@@ -245,6 +263,24 @@ if [[ "$STAGE" == "analysis" || "$STAGE" == "all" ]]; then
       > "$OUT/logs/qualfig_interp.log" 2>&1 \
       || echo "qualitative figures (interp_only) failed" >&2
   fi
+fi
+
+# ---- vessel_ab: the same predictions under the whole-volume vessel rule ------
+# Re-scores the arms that already exist with a per-plane threshold and the 15 %
+# flood gate, writing `_perplane_test` beside `_test`. Not part of `all`: a
+# protocol A/B is asked for, not performed by a rerun.
+if [[ "$STAGE" == "vessel_ab" ]]; then
+  run_eval_perplane "${tag}_P2_I0" P2_I0
+  run_eval_perplane "${tag}_P2_W0" P2_W0
+  for variant in residual dual_interp dual_wiener; do
+    case "$variant" in
+      residual) arm=P2_ResidualI; ctrl=none;;
+      dual_interp) arm=P3_DualAdaptive; ctrl=interp_only;;
+      dual_wiener) arm=P3_DualAdaptive; ctrl=none;;
+    esac
+    name="${tag}_$variant"
+    run_eval_perplane "$name" "$arm" "$OUT/$name/best.pt" "$ctrl"
+  done
 fi
 
 echo "E025 stage=$STAGE finished. Preserve every correct positive/negative run."
