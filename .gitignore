@@ -27,6 +27,11 @@ spur_mpm/figures/**/*.png
 spur_mpm/figures/**/*.pdf
 spur_mpm/figures/**/*.svg
 
+# --- credentials: never commit, whatever a future `git add -A` thinks ---
+github token.txt
+*token*.txt
+.env
+
 # --- editor / OS ---
 .DS_Store
 .vscode/
