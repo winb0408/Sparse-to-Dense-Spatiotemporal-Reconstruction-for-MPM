@@ -2863,3 +2863,28 @@ README 同时写明读图规则：图上的 Dice 是**未门控窗口口径**（
   已重启（`runs/VESSEL_AB_queue_20261119_2029.log`）。
 - 项目负责人提供的 token 文件已加入 `.gitignore`（`github token.txt`、`*token*.txt`、`.env`），
   确保任何一次 `git add -A` 都不会把凭据写进历史；PR #3 描述已用该 token 更新为 11-18 执行状态。
+
+## 2026-11-19 21:0x｜分支盘点与 PR 对账：主干是 PUR-MPM，PR3 栈在 PR2 上
+
+负责人问了三件事，逐一核过并留下书面记录：
+
+1. **推送位置**：`origin`（`winb0408/Sparse-to-Dense-Spatiotemporal-Reconstruction-for-MPM`）的
+   `feature/phase1-adaptive-prior-pr3-20261112`，即 PR #3 的 head，位置正确。
+2. **为什么不是直接对 `PUR-MPM`**：PR 是栈式的——PR #2（26 提交）base 是 `PUR-MPM`，
+   PR #3（59 提交）base 是 PR2 的分支，到主干合计 85 提交。`git merge-base --is-ancestor`
+   证实 PR2 是 PR3 的祖先。若现在改 PR3 的 base，评审查到的会是 85 个提交、PR2 的改动重复出现。
+   负责人确认：**保持栈式，PR2 接受后再 rebase + retarget**。
+3. **上一轮 PR 是否逐条回复**：GitHub 上 PR #1/#2/#3 的 review 线程与 inline 评论**都是 0**，
+   没有漏回复的评论；上一轮的逐条答复是贴在 PR #1 的一条汇总评论（11-10），文末 6 项未完成。
+   核完后在 PR #3 补了一条对账评论（`#issuecomment-7009664268`）：
+   - **已闭环 3 项**：A6（`test_run_ladder_gpu.py` 9 条，随 `0ef3b21`）、D2（`tolerance_sweep.out`
+     六档容差表）、以及整卷复算扩展；
+   - **部分 1 项**：B4 旧 checkpoint 重评——E002 S0/S1×3 折已完成，**E009 一组从未跑**；
+   - **仍未做 2 项**：D3 ImageJ 人工抽检、C5 另外三卷的冻结视角图；另加 Fig. 1/S1 未合成。
+
+**分支说明**：新增 `docs/BRANCHES.md`。要点：仓库默认分支是 `main`（只有 4 月初始化提交），
+真正主干是 `PUR-MPM`，建议把默认分支改为 `PUR-MPM`（改的是仓库设置，**未执行**，等负责人点头）；
+`review/phase1-supervised-fixes-20261103` 已完全并入主干，`dev` / `review-v4-20261019` / `PSRAS`
+分别有 4 / 22 / 21 个提交不在主干里——**负责人决定不删任何分支**，只做说明。
+另记录一处本地偏差：本地 PR2 分支比远端多一个 `cbdc99c`（E024 文档），内容已以 `e8384ed`
+进入 PR3，等价重复；未做 reset，留待决定。
