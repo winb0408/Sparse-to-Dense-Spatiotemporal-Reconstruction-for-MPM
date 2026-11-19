@@ -2888,3 +2888,37 @@ README 同时写明读图规则：图上的 Dice 是**未门控窗口口径**（
 分别有 4 / 22 / 21 个提交不在主干里——**负责人决定不删任何分支**，只做说明。
 另记录一处本地偏差：本地 PR2 分支比远端多一个 `cbdc99c`（E024 文档），内容已以 `e8384ed`
 进入 PR3，等价重复；未做 reset，留待决定。
+
+## 2026-11-20｜E027 接手：PUR-MPM 整合、文献 PSF 预检、Fig. 2 伪彩预览
+
+按 Issue #4 的 M0–M4 执行，**全部提交直接落在 `PUR-MPM`**，不新开分支/PR。
+
+**M0（整合与审查）**：`PUR-MPM` 的 `ed060f0` 是 PR3 分支的祖先，所以整合只能是 fast-forward
+（136 文件、28.8k 行）。真正需要"选择性"的是审完之后判什么能留。四个已知 review P0 全部落在代码里：
+
+| 项 | 结论 | 提交 |
+|---|---|---|
+| P0-4 血管门控 | 窗口口径的 15 % 门控**从未生效**（非 3-D 输入直接返回 0），两次"门控重跑"与未门控逐位相同 | `a6c0a08` |
+| P0-2 `interp_only` | `u_physics = |W0−I0|/(…)` 是反卷积算出来的，非 identity 核时控制臂会拿到处理臂的输出 | `572dff2` |
+| P0-3 2-D OTF | `acquisition.py` 调用未 import 的 `gaussian_otf_2d`；`wiener_deconv_3d` 对 2-D 输入静默留洞 | `572dff2` |
+| P0-1 算子顺序 | 结论对、**解释错**（长度 3 的 FFT 没有 Nyquist 频点）；补相位拆分与 3 条测试 | `bb89198` |
+| PSF 来源标签 | `unlabelled_identity_assumed` 曾被允许描述非恒等核；新增 `literature_bead_fwhm_gaussian` | `22ae2dd` |
+
+测试 **445 passed**。被污染的两次 "gated" 评测移入 `runs/_invalid/20261119_vessel_gate_noop/`。
+
+**M1（文献 PSF 预检，负结果）**：Stas et al., JBO 31(1):016004 (2026) 的 0.20 µm 微球
+FWHM 0.87/4.59 µm → σ=(0.3695, 1.9492) µm → 本网格 **0.377 px / 0.390 z-step**；轴向 FWHM
+小于 5 µm 的 z 步（每个 FWHM 只有 0.92 个采样点），核几乎就是 δ。但 Wiener 初值仍让缺失区
+MAE 恶化 **+57 %（Y-75 %）/ +80 %（YZ-75 %）**、PSNR 降 3.9/5.2 dB：σ=0.377 px 的高斯在
+Nyquist 处 H 仍有 0.507，Wiener 增益 1.6–1.9×，而插值的条带能量恰好堆在那里；λ 还把 DC 压到
+1/(1+λ)（除掉后误差更大）。按停止规则：不放大 PSF、不重训 `DualW_paper`。
+
+**M2（Fig. 2 伪彩预览）**：`8a04d08`。三协议 × 六列（Dense/Sparse/Interpolation/W0_paper/
+ResidualI/Proposed），magenta 顺序伪彩 + 青色标缺失 + 每协议一个冻结 LUT + 物理比例尺 +
+XZ 按物理纵横比。Y-50 % 无 checkpoint 的两列画成灰底 **NOT RUN**（不借别的协议）。
+误差图只在未测量体素上着色并印 MAE：Y-50 % 0.0546→0.1263、Y-75 % 0.0557→0.1055、
+YZ-75 % 0.0546→0.1213，与 M1 一致。图由 `reports/paper_structure_v1/rois/*.npz` 缓存渲染，
+换 ROI/排版不需要重新推理。
+
+Issue #4 已回两条：M0+M1（[#issuecomment-7013559690](https://github.com/winb0408/Sparse-to-Dense-Spatiotemporal-Reconstruction-for-MPM/issues/4#issuecomment-7013559690)）、
+M2 实际图（[#issuecomment-7014650382](https://github.com/winb0408/Sparse-to-Dense-Spatiotemporal-Reconstruction-for-MPM/issues/4#issuecomment-7014650382)）。
