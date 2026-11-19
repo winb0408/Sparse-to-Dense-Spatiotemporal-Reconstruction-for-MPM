@@ -1,0 +1,205 @@
+{
+  "issue": 4,
+  "experiment": "SPUR-E027",
+  "source": {
+    "citation": "Stas et al., J. Biomed. Opt. 31(1):016004 (2026)",
+    "doi": "10.1117/1.JBO.31.1.016004",
+    "section": "Methods 2.1 and Fig. 1b",
+    "label": "literature_bead_fwhm_gaussian",
+    "bead_diameter_um": 0.2,
+    "n_beads": 5,
+    "fwhm_xy_um": 0.87,
+    "fwhm_xy_sem_um": 0.12,
+    "fwhm_z_um": 4.59,
+    "fwhm_z_sem_um": 0.48,
+    "conversion": "sigma = FWHM / (2*sqrt(2*ln2)) = FWHM / 2.35482"
+  },
+  "grid": {
+    "voxel_xy_um": 0.98,
+    "z_step_um": 5.0,
+    "axial_fwhm_over_step": 0.9179999999999999
+  },
+  "protocol": {
+    "mode": "yz",
+    "ky": 2,
+    "kz": 2,
+    "retained_fraction_measured": 0.25
+  },
+  "kernels": {
+    "paper": {
+      "sigma_xy_px": 0.3769948807400901,
+      "sigma_z_px": 0.38983870633220075,
+      "is_identity": false,
+      "lateral_weights_3tap": [
+        0.027997189706949793,
+        0.9440041598692418,
+        0.027997189706949793
+      ],
+      "axial_weights_3tap": [
+        0.034669472247970415,
+        0.9306574708327021,
+        0.034669472247970415
+      ],
+      "centre_voxel_fraction": 0.8293496851725511,
+      "axial_pm1_fraction": 0.06179097422003398
+    },
+    "identity": {
+      "sigma_xy_px": 0.0,
+      "sigma_z_px": 0.0,
+      "is_identity": true,
+      "lateral_weights_3tap": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "axial_weights_3tap": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "centre_voxel_fraction": 1.0,
+      "axial_pm1_fraction": 0.0
+    }
+  },
+  "lambda_selection": {
+    "rule": "training volume only",
+    "volume": "M1_FOVII_S1_vessels",
+    "rows": [
+      {
+        "dc_gain": 0.9950246810913086,
+        "mean_abs_delta_missing_dc_normalised": 0.08489467948675156,
+        "mae_w0_missing_dc_normalised": 0.09507304430007935,
+        "psnr_w0_missing_dc_normalised": 17.092006415510333,
+        "windows_or_voxels_missing": 39714816,
+        "mean_abs_delta_all": 0.08394058793783188,
+        "mean_abs_delta_missing": 0.08361679315567017,
+        "p95_abs_delta_missing": 0.30502086877822876,
+        "mae_i0_missing": 0.04256617650389671,
+        "mae_w0_missing": 0.09400852769613266,
+        "psnr_i0_missing": 24.659326889680653,
+        "psnr_w0_missing": 17.196606450964143,
+        "measured_region_std": 0.09461307525634766,
+        "w0_below_zero_fraction": 0.00010605613784034653,
+        "w0_above_ref_max_fraction": 0.04871396735163018,
+        "max_w0_minus_i0": 0.6987897753715515,
+        "lam": 0.005,
+        "volume": "M1_FOVII_S1_vessels"
+      },
+      {
+        "dc_gain": 0.9900989532470703,
+        "mean_abs_delta_missing_dc_normalised": 0.08238574117422104,
+        "mae_w0_missing_dc_normalised": 0.09290388971567154,
+        "psnr_w0_missing_dc_normalised": 17.30239315929922,
+        "windows_or_voxels_missing": 39714816,
+        "mean_abs_delta_all": 0.08017472177743912,
+        "mean_abs_delta_missing": 0.07986734062433243,
+        "p95_abs_delta_missing": 0.2914518117904663,
+        "mae_i0_missing": 0.04256617650389671,
+        "mae_w0_missing": 0.09082842618227005,
+        "psnr_i0_missing": 24.659326889680653,
+        "psnr_w0_missing": 17.5133911781539,
+        "measured_region_std": 0.09035629034042358,
+        "w0_below_zero_fraction": 9.143942653542698e-05,
+        "w0_above_ref_max_fraction": 0.04803804831929726,
+        "max_w0_minus_i0": 0.6637087464332581,
+        "lam": 0.01,
+        "volume": "M1_FOVII_S1_vessels"
+      },
+      {
+        "dc_gain": 0.9523811340332031,
+        "mean_abs_delta_missing_dc_normalised": 0.06537748873233795,
+        "mae_w0_missing_dc_normalised": 0.0788230448961258,
+        "psnr_w0_missing_dc_normalised": 18.83040866884853,
+        "windows_or_voxels_missing": 39714816,
+        "mean_abs_delta_all": 0.05427950620651245,
+        "mean_abs_delta_missing": 0.0540713332593441,
+        "p95_abs_delta_missing": 0.19768142700195312,
+        "mae_i0_missing": 0.04256617650389671,
+        "mae_w0_missing": 0.07040330022573471,
+        "psnr_i0_missing": 24.659326889680653,
+        "psnr_w0_missing": 19.932877704836656,
+        "measured_region_std": 0.06129783019423485,
+        "w0_below_zero_fraction": 3.282150419631807e-05,
+        "w0_above_ref_max_fraction": 0.042406818654277534,
+        "max_w0_minus_i0": 0.44119900465011597,
+        "lam": 0.05,
+        "volume": "M1_FOVII_S1_vessels"
+      }
+    ],
+    "chosen_lam": 0.05
+  },
+  "test": {
+    "volume": "M2_FOVII_S1_vessels",
+    "rows": [
+      {
+        "dc_gain": 1.0,
+        "mean_abs_delta_missing_dc_normalised": 0.0,
+        "mae_w0_missing_dc_normalised": 0.050500571727752686,
+        "psnr_w0_missing_dc_normalised": 23.485243782172343,
+        "windows_or_voxels_missing": 39845888,
+        "mean_abs_delta_all": 0.0,
+        "mean_abs_delta_missing": 0.0,
+        "p95_abs_delta_missing": 0.0,
+        "mae_i0_missing": 0.050500571727752686,
+        "mae_w0_missing": 0.050500571727752686,
+        "psnr_i0_missing": 23.485243782172343,
+        "psnr_w0_missing": 23.485243782172343,
+        "measured_region_std": 0.0,
+        "w0_below_zero_fraction": 0.0,
+        "w0_above_ref_max_fraction": 0.0,
+        "max_w0_minus_i0": 0.0,
+        "tag": "I0_identity",
+        "lam": 0.05,
+        "volume": "M2_FOVII_S1_vessels"
+      },
+      {
+        "dc_gain": 0.9523811340332031,
+        "mean_abs_delta_missing_dc_normalised": 0.09267086535692215,
+        "mae_w0_missing_dc_normalised": 0.10353101044893265,
+        "psnr_w0_missing_dc_normalised": 17.11577845804093,
+        "windows_or_voxels_missing": 39845888,
+        "mean_abs_delta_all": 0.07676184922456741,
+        "mean_abs_delta_missing": 0.07664076238870621,
+        "p95_abs_delta_missing": 0.24571263790130615,
+        "mae_i0_missing": 0.050500571727752686,
+        "mae_w0_missing": 0.09086678177118301,
+        "psnr_i0_missing": 23.485243782172343,
+        "psnr_w0_missing": 18.267674820539046,
+        "measured_region_std": 0.06535373628139496,
+        "w0_below_zero_fraction": 1.95432766317734e-06,
+        "w0_above_ref_max_fraction": 0.056700983658212745,
+        "max_w0_minus_i0": 0.46405184268951416,
+        "tag": "W0_paper",
+        "lam": 0.05,
+        "volume": "M2_FOVII_S1_vessels"
+      },
+      {
+        "dc_gain": 1.0,
+        "mean_abs_delta_missing_dc_normalised": 0.0,
+        "mae_w0_missing_dc_normalised": 0.050500571727752686,
+        "psnr_w0_missing_dc_normalised": 23.485243782172343,
+        "windows_or_voxels_missing": 39845888,
+        "mean_abs_delta_all": 0.0,
+        "mean_abs_delta_missing": 0.0,
+        "p95_abs_delta_missing": 0.0,
+        "mae_i0_missing": 0.050500571727752686,
+        "mae_w0_missing": 0.050500571727752686,
+        "psnr_i0_missing": 23.485243782172343,
+        "psnr_w0_missing": 23.485243782172343,
+        "measured_region_std": 0.0,
+        "w0_below_zero_fraction": 0.0,
+        "w0_above_ref_max_fraction": 0.0,
+        "max_w0_minus_i0": 0.0,
+        "tag": "W0_identity_check",
+        "lam": 0.05,
+        "volume": "M2_FOVII_S1_vessels"
+      }
+    ],
+    "identity_assertion": {
+      "mean_abs_delta_missing": 0.0,
+      "holds": true,
+      "note": "with H = I the Wiener branch must reproduce interpolation"
+    }
+  },
+  "verdict": "The literature kernel is nearly a delta (centre voxel 0.829) yet its Wiener initialisation moves the missing voxels by 7.66e-02: missing-region MAE 0.05050 -> 0.09087 (+79.93 %), PSNR 23.485 -> 18.268 dB; DC gain 0.9524. After removing that DC factor the MAE is 0.10353 (+105.01 %), so the loss is not a brightness offset but amplified lattice-frequency artefacts (measured-region std 0.0654, 5.67 % of voxels above the reference maximum)."
+}
