@@ -31,6 +31,7 @@ from spur_mpm.common.config import apply_overrides, load_config
 from spur_mpm.common.tensors import as_reconstruction, select_centre
 from spur_mpm.data.datasets import ItemConfig, VolumeCache, VolumeWindowDataset
 from spur_mpm.data.split import read_split
+from spur_mpm.device import resolve_device
 from spur_mpm.metrics.image_metrics import (mae, psnr, split_errors,
                                            split_psnr, ssim)
 from spur_mpm.metrics.statistics import summarise_by_group
@@ -75,6 +76,42 @@ def withholds_at_eval(supervision: str, input_support: str,
     return supervision == "self" or holdout_baselines
 
 
+def vessel_settings(cfg: dict) -> tuple[str, float | None]:
+    """Read the vessel segmentation rule for the window protocol.
+
+    ``eval.vessel_threshold_mode`` is ``global`` (the default, every published
+    number before 2026-11-18) or ``per_plane``; on a single 2-D window the two
+    compute the same Otsu, so the setting exists for symmetry with
+    ``structure_report`` and to make the protocol self-describing in the summary.
+
+    ``eval.vessel_max_fraction`` is the one that changes results. ``None`` keeps
+    every window. ``0.15`` drops a window whose **reference** mask fills more
+    than 15 % of it -- the gate ``structure_report`` applies per plane, and the
+    reason it exists: a per-plane Otsu follows the brightness of a real stack, so
+    out-of-focus haze and dense bright regions come out "well perfused". Measured
+    on this cohort the ungated window reference covers **18.65 %** of the frame,
+    the whole-volume gated one **2.18 %**; a metric scored against the first is
+    not scoring a vessel tree, and the floor wins it simply by over-segmenting
+    too (E026 §4.3).
+
+    A gated window keeps its intensity metrics and loses its vessel ones, so the
+    two protocols can be compared on exactly the windows that survive the gate.
+    """
+    ev = cfg.get("eval", {}) or {}
+    mode = str(ev.get("vessel_threshold_mode", "global"))
+    if mode not in ("global", "per_plane"):
+        raise ValueError("eval.vessel_threshold_mode must be 'global' or "
+                         f"'per_plane', got {mode!r}")
+    frac = ev.get("vessel_max_fraction", None)
+    if frac is None:
+        return mode, None
+    frac = float(frac)
+    if not 0.0 < frac <= 1.0:
+        raise ValueError("eval.vessel_max_fraction must be in (0, 1] or null, "
+                         f"got {frac!r}")
+    return mode, frac
+
+
 @torch.no_grad()
 def _skeleton_row(pred_mask: np.ndarray, ref_mask: np.ndarray, *,
                   stats: bool = True, suffix: str = "") -> dict:
@@ -113,8 +150,8 @@ def _skeleton_row(pred_mask: np.ndarray, ref_mask: np.ndarray, *,
 def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
              split_name: str = "test", out_dir: Path | None = None,
              seed: int = 0, skeleton: bool = False) -> dict:
-    device = torch.device(cfg["run"].get("device", "cuda")
-                          if torch.cuda.is_available() else "cpu")
+    # Refuses a silent CPU fallback: see spur_mpm/device.py for the incident.
+    device = resolve_device(cfg, purpose="evaluation")
     arm = get_arm(arm_name)
     cache = VolumeCache.load(cfg["data"]["index"],
                               fold=int(cfg["data"].get("fold", 0)))
@@ -141,6 +178,12 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
     withhold = withholds_at_eval(arm.supervision, input_support,
                                  bool(cfg.get("eval", {}).get(
                                      "holdout_baselines", False)))
+    # The vessel segmentation rule for this evaluation. Defaults reproduce every
+    # number published before 2026-11-18 ("global", no gating); the per-plane
+    # rule with gating is the one `structure_report` uses, and running the same
+    # arms under both is the A/B that decides whether the two protocols disagree
+    # because of the network or because of the reference (E026 §4.3).
+    vessel_mode, vessel_max_fraction = vessel_settings(cfg)
     # A dual arm (E012) is *defined* by the complementary split, so it needs the
     # spec even when withholding is off: each of its branches must still be given
     # only its own half, otherwise it would be scored on an input it never saw.
@@ -155,7 +198,10 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         context = geom0.context_depth(context_z_um=float(cfg["data"]["context_z_um"]))
 
     item_cfg = ItemConfig(
-        sampling=sampling, psf=psf, noise=noise,
+        sampling=sampling, psf=psf,
+        forward_psf=PSFConfig(**cfg["physics"].get("forward_extra_psf", {})),
+        forward_psf_source=cfg["physics"].get("forward_extra_psf_source"),
+        noise=noise,
         warm_start_kind=arm.warm_start, lam=float(cfg["physics"]["lam"]),
         # "self" is what makes _make_item withhold; a self-supervised arm scored
         # with the full acquired set is built as a dense item and scored the same
@@ -197,6 +243,7 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                          f"got {projection!r}")
 
     rows: list[dict] = []
+    n_windows_gated = 0
     with torch.no_grad():
         for batch in loader:
             if model is not None:
@@ -265,23 +312,39 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
                 # tune the operating point and the two tables agree by
                 # construction.
                 seg = segment_pair(p.numpy(), t.numpy(), method="vesselness",
-                                   threshold_mode="global", match_area=True)
-                row.update(mask_vessel_metrics(seg["pred_mask"], seg["ref_mask"]))
-                row["vessel_threshold"] = seg["threshold"]
-                row["vessel_method"] = seg["segment_method"]
-                # The same prediction at an equal-area operating point. Kept in
-                # its own columns because it answers a different question: the
-                # reference-fitted numbers above include "did the prediction's
-                # vessel response keep the reference's scale", these do not.
-                area = mask_vessel_metrics(seg["pred_mask_area"], seg["ref_mask"])
-                row["dice_area"] = area["dice"]
-                row["cl_dice_area"] = area["cl_dice"]
-                # Structural verdict (opt-in): Dice answers "how much vessel",
-                # the skeleton answers "is it still a network".
-                if skeleton:
-                    row.update(_skeleton_row(seg["pred_mask"], seg["ref_mask"]))
-                    row.update(_skeleton_row(seg["pred_mask_area"], seg["ref_mask"],
-                                             stats=False, suffix="_area"))
+                                   threshold_mode=vessel_mode,
+                                   match_area=True,
+                                   max_fraction=vessel_max_fraction)
+                if seg["n_planes_gated"]:
+                    # The reference mask filled more than `vessel_max_fraction`
+                    # of this window: it is not a vessel plane. Leaving its
+                    # metrics out (rather than scoring a both-empty plane as a
+                    # perfect match) is what `structure_report` does per plane,
+                    # and what makes the two protocols comparable.
+                    row["vessel_gated"] = True
+                    n_windows_gated += 1
+                else:
+                    row.update(mask_vessel_metrics(seg["pred_mask"],
+                                                   seg["ref_mask"]))
+                    row["vessel_threshold"] = seg["threshold"]
+                    row["vessel_method"] = seg["segment_method"]
+                    # The same prediction at an equal-area operating point. Kept
+                    # in its own columns because it answers a different question:
+                    # the reference-fitted numbers above include "did the
+                    # prediction's vessel response keep the reference's scale",
+                    # these do not.
+                    area = mask_vessel_metrics(seg["pred_mask_area"],
+                                               seg["ref_mask"])
+                    row["dice_area"] = area["dice"]
+                    row["cl_dice_area"] = area["cl_dice"]
+                    # Structural verdict (opt-in): Dice answers "how much
+                    # vessel", the skeleton answers "is it still a network".
+                    if skeleton:
+                        row.update(_skeleton_row(seg["pred_mask"],
+                                                 seg["ref_mask"]))
+                        row.update(_skeleton_row(seg["pred_mask_area"],
+                                                 seg["ref_mask"], stats=False,
+                                                 suffix="_area"))
                 row["key"] = f"{row['sample_id']}_z{row['query_z']}"
                 rows.append(row)
 
@@ -318,6 +381,15 @@ def evaluate(cfg: dict, arm_name: str, ckpt: str | Path | None,
         "n_windows": len(rows),
         "n_windows_fully_measured": int(sum(bool(r.get("fully_measured"))
                                             for r in rows)),
+        # Which vessel rule produced the dice/cl_dice columns, and how many
+        # windows it excluded. Without this a gated run and an ungated run look
+        # like two numbers of the same thing.
+        "vessel_protocol": {
+            "threshold_mode": vessel_mode,
+            "max_fraction": vessel_max_fraction,
+            "n_windows_gated": n_windows_gated,
+            "n_windows_scored": len(rows) - n_windows_gated,
+        },
         "metrics": {},
     }
     for metric in ("psnr", "psnr_measured", "psnr_missing", "ssim", "mae",

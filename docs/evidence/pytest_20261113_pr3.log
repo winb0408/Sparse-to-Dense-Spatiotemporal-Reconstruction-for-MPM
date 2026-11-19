@@ -1,0 +1,207 @@
+........................................................................ [ 17%]
+.........................F.FFF.......................................... [ 35%]
+........................................................................ [ 52%]
+......................F................................................. [ 70%]
+........................................................................ [ 88%]
+.................................................                        [100%]
+=================================== FAILURES ===================================
+___________________ test_measured_arm_without_macs_prints_na ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-wjb/pytest-51/test_measured_arm_without_macs0')
+
+    def test_measured_arm_without_macs_prints_na(tmp_path):
+        # A0/A1 are real rows with a real params value but no MAC count.
+>       rows = matrix_rows()                       # the repo's own sources
+
+spur_mpm/tests/test_framework_figure.py:133: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+arms = {'A0': Arm(name='A0', features=('y', 'mask'), warm_start='bilinear', supervision='none', fusion=False, needs_training=...tures=(), phys_features=(), residual=False, use_gate=False, consistency='off', family='', branch_auxiliary=False), ...}
+numbers = {'A0': {'params_m': Number(value=0.0, source='runs/E021_ladder/benchmark_supervised.json', field='arms[A0].params_m', ...time, matching the evaluation pipeline', fallback=False, alternates=('runs/E021_ladder/complexity.json:28.19',))}, ...}
+
+    def matrix_rows(arms: dict[str, Arm] | None = None,
+                    numbers: dict[str, dict[str, Number]] | None = None
+                    ) -> list[Row]:
+        """Every arm in the registry, in band then registry order.
+    
+        Refuses to draw in either direction of inconsistency: a supervised arm with
+        no measured numbers (the figure would claim a comparison it cannot source),
+        or a self-supervised arm that *does* have numbers (the figure would call a
+        measured arm frozen).
+        """
+        arms = ARMS if arms is None else arms
+        numbers = load_numbers() if numbers is None else numbers
+        rows: list[Row] = []
+        for arm in arms.values():
+            if arm.family == "pr2" and arm.name not in numbers:
+                # Implemented, unmeasured: its own band with NOT_RUN cells. The
+                # moment a real number exists this branch stops firing and the arm
+                # joins the measured band -- no list to maintain by hand.
+                rows.append(matrix_row(arm, numbers, planned=True))
+                continue
+            frozen = group_of(arm) == "frozen"
+            if frozen and arm.name in numbers:
+                raise RuntimeError(
+                    f"{arm.name}: the registry says self-supervised (frozen) but "
+                    f"{NUM_SOURCES[0]} carries numbers for it; measure it or drop "
+                    "it from the source, do not draw it as frozen")
+            if not frozen and arm.name not in numbers:
+>               raise KeyError(
+                    f"{arm.name}: no measured numbers in "
+                    f"{[str(s) for s in NUM_SOURCES]}; add the measurement or the "
+                    "figure cannot honestly show this arm")
+E               KeyError: "P3_Wlegacy: no measured numbers in ['runs/E021_ladder/benchmark_supervised.json', 'runs/E021_ladder/complexity.json']; add the measurement or the figure cannot honestly show this arm"
+
+spur_mpm/scripts/framework_figure.py:338: KeyError
+_________________ test_every_registry_arm_appears_exactly_once _________________
+
+    def test_every_registry_arm_appears_exactly_once():
+>       rows = matrix_rows()
+
+spur_mpm/tests/test_framework_figure.py:172: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+arms = {'A0': Arm(name='A0', features=('y', 'mask'), warm_start='bilinear', supervision='none', fusion=False, needs_training=...tures=(), phys_features=(), residual=False, use_gate=False, consistency='off', family='', branch_auxiliary=False), ...}
+numbers = {'A0': {'params_m': Number(value=0.0, source='runs/E021_ladder/benchmark_supervised.json', field='arms[A0].params_m', ...time, matching the evaluation pipeline', fallback=False, alternates=('runs/E021_ladder/complexity.json:28.19',))}, ...}
+
+    def matrix_rows(arms: dict[str, Arm] | None = None,
+                    numbers: dict[str, dict[str, Number]] | None = None
+                    ) -> list[Row]:
+        """Every arm in the registry, in band then registry order.
+    
+        Refuses to draw in either direction of inconsistency: a supervised arm with
+        no measured numbers (the figure would claim a comparison it cannot source),
+        or a self-supervised arm that *does* have numbers (the figure would call a
+        measured arm frozen).
+        """
+        arms = ARMS if arms is None else arms
+        numbers = load_numbers() if numbers is None else numbers
+        rows: list[Row] = []
+        for arm in arms.values():
+            if arm.family == "pr2" and arm.name not in numbers:
+                # Implemented, unmeasured: its own band with NOT_RUN cells. The
+                # moment a real number exists this branch stops firing and the arm
+                # joins the measured band -- no list to maintain by hand.
+                rows.append(matrix_row(arm, numbers, planned=True))
+                continue
+            frozen = group_of(arm) == "frozen"
+            if frozen and arm.name in numbers:
+                raise RuntimeError(
+                    f"{arm.name}: the registry says self-supervised (frozen) but "
+                    f"{NUM_SOURCES[0]} carries numbers for it; measure it or drop "
+                    "it from the source, do not draw it as frozen")
+            if not frozen and arm.name not in numbers:
+>               raise KeyError(
+                    f"{arm.name}: no measured numbers in "
+                    f"{[str(s) for s in NUM_SOURCES]}; add the measurement or the "
+                    "figure cannot honestly show this arm")
+E               KeyError: "P3_Wlegacy: no measured numbers in ['runs/E021_ladder/benchmark_supervised.json', 'runs/E021_ladder/complexity.json']; add the measurement or the figure cannot honestly show this arm"
+
+spur_mpm/scripts/framework_figure.py:338: KeyError
+_________________________ test_blocks_cover_every_row __________________________
+
+    def test_blocks_cover_every_row():
+>       rows = matrix_rows()
+
+spur_mpm/tests/test_framework_figure.py:179: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+arms = {'A0': Arm(name='A0', features=('y', 'mask'), warm_start='bilinear', supervision='none', fusion=False, needs_training=...tures=(), phys_features=(), residual=False, use_gate=False, consistency='off', family='', branch_auxiliary=False), ...}
+numbers = {'A0': {'params_m': Number(value=0.0, source='runs/E021_ladder/benchmark_supervised.json', field='arms[A0].params_m', ...time, matching the evaluation pipeline', fallback=False, alternates=('runs/E021_ladder/complexity.json:28.19',))}, ...}
+
+    def matrix_rows(arms: dict[str, Arm] | None = None,
+                    numbers: dict[str, dict[str, Number]] | None = None
+                    ) -> list[Row]:
+        """Every arm in the registry, in band then registry order.
+    
+        Refuses to draw in either direction of inconsistency: a supervised arm with
+        no measured numbers (the figure would claim a comparison it cannot source),
+        or a self-supervised arm that *does* have numbers (the figure would call a
+        measured arm frozen).
+        """
+        arms = ARMS if arms is None else arms
+        numbers = load_numbers() if numbers is None else numbers
+        rows: list[Row] = []
+        for arm in arms.values():
+            if arm.family == "pr2" and arm.name not in numbers:
+                # Implemented, unmeasured: its own band with NOT_RUN cells. The
+                # moment a real number exists this branch stops firing and the arm
+                # joins the measured band -- no list to maintain by hand.
+                rows.append(matrix_row(arm, numbers, planned=True))
+                continue
+            frozen = group_of(arm) == "frozen"
+            if frozen and arm.name in numbers:
+                raise RuntimeError(
+                    f"{arm.name}: the registry says self-supervised (frozen) but "
+                    f"{NUM_SOURCES[0]} carries numbers for it; measure it or drop "
+                    "it from the source, do not draw it as frozen")
+            if not frozen and arm.name not in numbers:
+>               raise KeyError(
+                    f"{arm.name}: no measured numbers in "
+                    f"{[str(s) for s in NUM_SOURCES]}; add the measurement or the "
+                    "figure cannot honestly show this arm")
+E               KeyError: "P3_Wlegacy: no measured numbers in ['runs/E021_ladder/benchmark_supervised.json', 'runs/E021_ladder/complexity.json']; add the measurement or the figure cannot honestly show this arm"
+
+spur_mpm/scripts/framework_figure.py:338: KeyError
+________________ test_frozen_rows_say_frozen_rather_than_blank _________________
+
+    def test_frozen_rows_say_frozen_rather_than_blank():
+>       rows = {r.arm.name: r for r in matrix_rows()}
+
+spur_mpm/tests/test_framework_figure.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+arms = {'A0': Arm(name='A0', features=('y', 'mask'), warm_start='bilinear', supervision='none', fusion=False, needs_training=...tures=(), phys_features=(), residual=False, use_gate=False, consistency='off', family='', branch_auxiliary=False), ...}
+numbers = {'A0': {'params_m': Number(value=0.0, source='runs/E021_ladder/benchmark_supervised.json', field='arms[A0].params_m', ...time, matching the evaluation pipeline', fallback=False, alternates=('runs/E021_ladder/complexity.json:28.19',))}, ...}
+
+    def matrix_rows(arms: dict[str, Arm] | None = None,
+                    numbers: dict[str, dict[str, Number]] | None = None
+                    ) -> list[Row]:
+        """Every arm in the registry, in band then registry order.
+    
+        Refuses to draw in either direction of inconsistency: a supervised arm with
+        no measured numbers (the figure would claim a comparison it cannot source),
+        or a self-supervised arm that *does* have numbers (the figure would call a
+        measured arm frozen).
+        """
+        arms = ARMS if arms is None else arms
+        numbers = load_numbers() if numbers is None else numbers
+        rows: list[Row] = []
+        for arm in arms.values():
+            if arm.family == "pr2" and arm.name not in numbers:
+                # Implemented, unmeasured: its own band with NOT_RUN cells. The
+                # moment a real number exists this branch stops firing and the arm
+                # joins the measured band -- no list to maintain by hand.
+                rows.append(matrix_row(arm, numbers, planned=True))
+                continue
+            frozen = group_of(arm) == "frozen"
+            if frozen and arm.name in numbers:
+                raise RuntimeError(
+                    f"{arm.name}: the registry says self-supervised (frozen) but "
+                    f"{NUM_SOURCES[0]} carries numbers for it; measure it or drop "
+                    "it from the source, do not draw it as frozen")
+            if not frozen and arm.name not in numbers:
+>               raise KeyError(
+                    f"{arm.name}: no measured numbers in "
+                    f"{[str(s) for s in NUM_SOURCES]}; add the measurement or the "
+                    "figure cannot honestly show this arm")
+E               KeyError: "P3_Wlegacy: no measured numbers in ['runs/E021_ladder/benchmark_supervised.json', 'runs/E021_ladder/complexity.json']; add the measurement or the figure cannot honestly show this arm"
+
+spur_mpm/scripts/framework_figure.py:338: KeyError
+_______ test_matched_synthetic_yz_uses_known_h_once_and_target_remains_d _______
+
+    def test_matched_synthetic_yz_uses_known_h_once_and_target_remains_d():
+        """Virtual known-H experiment is restorative Y=M*H(D), target D."""
+        from spur_mpm.physics.acquisition import AcquisitionConfig, observe
+        from spur_mpm.physics.psf import gaussian_otf_3d
+>       from spur_mpm.physics.acquisition import blur_3d_fft
+E       ImportError: cannot import name 'blur_3d_fft' from 'spur_mpm.physics.acquisition' (/ssd1/wjb/SPUR-MPM/spur_mpm/physics/acquisition.py)
+
+spur_mpm/tests/test_pr3_adaptive_prior.py:142: ImportError
+=========================== short test summary info ============================
+FAILED spur_mpm/tests/test_framework_figure.py::test_measured_arm_without_macs_prints_na
+FAILED spur_mpm/tests/test_framework_figure.py::test_every_registry_arm_appears_exactly_once
+FAILED spur_mpm/tests/test_framework_figure.py::test_blocks_cover_every_row
+FAILED spur_mpm/tests/test_framework_figure.py::test_frozen_rows_say_frozen_rather_than_blank
+FAILED spur_mpm/tests/test_pr3_adaptive_prior.py::test_matched_synthetic_yz_uses_known_h_once_and_target_remains_d
+5 failed, 404 passed in 182.24s (0:03:02)

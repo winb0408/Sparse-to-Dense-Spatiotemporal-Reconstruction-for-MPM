@@ -220,7 +220,8 @@ def mask_geometry(mask: np.ndarray) -> dict:
         "measured_fraction": _round(m.mean(), 4),
         "kept_y_rows": int(rows.sum()),
         "y_period": step,
-        "x_dense": bool(kept.size and m[:, kept, :].all()),
+        "x_dense": bool(kept.size and len(visited) and
+                        visited[:, kept, :].all()),
         "y_dense": bool(dense_rows.all()),
         "z_dense": bool(planes.all()),
         "z_planes_measured": int(planes.sum()),
@@ -348,11 +349,14 @@ def protocol_columns(spec: dict, mask: np.ndarray) -> list[dict]:
         # Row coverage measured *within the planes that were visited*: a row of a
         # skipped plane is unmeasured for a different reason (the whole plane is
         # gone), and mixing the two would make every row look half measured.
-        visited = m.any(axis=2)
-        cov = np.zeros(h)
-        denom = max(int(visited.sum()), 1)
+        # Coverage of one Y row among genuinely visited Z planes.
+        # The old code broadcast (Z,W) against (Z,H) and divided by the
+        # number of visited *rows*, producing 0% even for measured rows.
+        visited_planes = m.any(axis=(1, 2))
+        cov = np.zeros(h, dtype=np.float64)
+        denom = max(int(visited_planes.sum()) * w, 1)
         for yi in range(h):
-            cov[yi] = (m[:, yi, :] & visited).sum() / (denom * w)
+            cov[yi] = float(m[visited_planes, yi, :].sum()) / denom
         want = np.flatnonzero(cov >= cov.max() - 1e-9)
         lack = np.flatnonzero(cov <= cov.min() + 1e-9)
         ym = _nearest(want, int(spec["y_view"]))

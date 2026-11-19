@@ -1,0 +1,14 @@
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+........................................................................ [ 50%]
+........................................................................ [ 67%]
+........................................................................ [ 84%]
+.................................................................        [100%]
+=============================== warnings summary ===============================
+spur_mpm/tests/test_complexity.py::test_cuda_request_falls_back_to_cpu_without_a_gpu
+spur_mpm/tests/test_dual_branch_contract.py::test_the_physics_controls_actually_change_the_output
+  /data2/wjb/anaconda3/envs/threePM/lib/python3.10/site-packages/torch/cuda/__init__.py:734: UserWarning: Can't initialize NVML
+    warnings.warn("Can't initialize NVML")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+425 passed, 2 warnings in 339.52s (0:05:39)

@@ -42,6 +42,7 @@ from spur_mpm.data.datasets import (
     VolumeWindowDataset,
 )
 from spur_mpm.data.split import read_split
+from spur_mpm.device import resolve_device
 from spur_mpm.losses.reconstruction import ReconstructionLoss
 from spur_mpm.metrics.image_metrics import psnr, ssim
 from spur_mpm.models.registry import build_model, count_parameters, get_arm
@@ -51,9 +52,26 @@ from spur_mpm.physics.psf import PSFConfig
 from spur_mpm.physics.sampling import SamplingSpec
 from spur_mpm.physics.acquisition import NoiseConfig
 
-__all__ = ["main", "run_training"]
+__all__ = ["main", "run_training", "branch_aux_weights"]
 
 DEFAULTS = Path(__file__).parent / "configs" / "base.yaml"
+
+
+def branch_aux_weights(cfg: dict, arm) -> tuple[float, float]:
+    """The PR3 per-branch auxiliary weights, refused where they cannot apply.
+
+    Named and separated from ``run_training`` so the refusal is testable without
+    building a dataset: a positive weight on an arm that has no auxiliary heads
+    would otherwise be silently ignored, and the run would look like a PR3
+    experiment in its config while training nothing of the sort.
+    """
+    aux_obs = float(cfg["loss"].get("branch_obs_weight", 0.0))
+    aux_phys = float(cfg["loss"].get("branch_phys_weight", 0.0))
+    if aux_obs < 0 or aux_phys < 0:
+        raise ValueError("branch auxiliary weights must be nonnegative")
+    if (aux_obs or aux_phys) and not arm.branch_auxiliary:
+        raise ValueError("branch auxiliary weights require a PR3 auxiliary arm")
+    return aux_obs, aux_phys
 
 
 def build_components(cfg: dict, arm_name: str, seed: int):
@@ -82,7 +100,10 @@ def build_components(cfg: dict, arm_name: str, seed: int):
                           seed=seed) if withhold else None
 
     item_cfg = ItemConfig(
-        sampling=sampling, psf=psf, noise=noise,
+        sampling=sampling, psf=psf,
+        forward_psf=PSFConfig(**cfg["physics"].get("forward_extra_psf", {})),
+        forward_psf_source=cfg["physics"].get("forward_extra_psf_source"),
+        noise=noise,
         warm_start_kind=arm.warm_start, lam=float(cfg["physics"]["lam"]),
         features=arm.features, supervision=arm.supervision, holdout=holdout,
         dual=arm.dual,
@@ -206,8 +227,8 @@ def _mean(v: list[float]) -> float | None:
 
 def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
                  resume: bool = False) -> dict:
-    device = torch.device(cfg["run"].get("device", "cuda")
-                          if torch.cuda.is_available() else "cpu")
+    # Refuses a silent CPU fallback: see spur_mpm/device.py for the incident.
+    device = resolve_device(cfg, purpose="training")
     seed = int(cfg["run"]["seed"])
     set_seed(seed)
 
@@ -258,6 +279,7 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
     opt = torch.optim.AdamW(model.parameters(), lr=float(cfg["train"]["lr"]),
                             weight_decay=float(cfg["train"]["weight_decay"]))
     agree = float(cfg["loss"].get("dual_agree", 0.0))
+    aux_obs, aux_phys = branch_aux_weights(cfg, arm)
     steps = int(cfg["train"]["steps"])
     warmup = int(cfg["train"].get("warmup_steps", 0))
     accum = max(1, int(cfg["train"].get("accum", 1)))
@@ -328,8 +350,8 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
             pred = 0.5 * (pred_a + pred_b)
         else:
             with torch.autocast(device.type, enabled=amp and device.type == "cuda"):
-                out = model(x)
-            out = as_reconstruction(out).float()
+                out_payload = model(x)
+            out = as_reconstruction(out_payload).float()
             pred = _select_centre(out, batch["center_index"])
 
             if arm.supervision == "self":
@@ -341,6 +363,29 @@ def run_training(cfg: dict, arm_name: str, out_root: Path, name: str | None,
             else:
                 res = train_crit(pred, batch["target"].to(device))
                 loss = res["loss"]
+                # Optional PR3 branch-specific supervision; primary objective
+                # remains the original L1 + MS-SSIM. Observation head improves
+                # direct sparse reconstruction; physics head learns to correct
+                # the candidate instead of being forced to copy its artifacts.
+                if arm.branch_auxiliary and (aux_obs or aux_phys):
+                    truth = batch["target"].to(device)
+                    aux = out_payload.get("aux", {})
+                    for key, weight, label in (
+                            ("observation_prediction", aux_obs, "branch_obs_l1"),
+                            ("physics_prediction", aux_phys, "branch_phys_l1")):
+                        if weight > 0:
+                            if key not in aux:
+                                raise RuntimeError(f"required PR3 auxiliary output {key} missing")
+                            a_pred = _select_centre(aux[key].float(),
+                                                     batch["center_index"])
+                            # Missing area only; measured values should not
+                            # dominate what the two branches learn to fill.
+                            missing = 1.0 - batch["acq_mask"].to(device)
+                            denom = missing.sum().clamp_min(1.0)
+                            auxiliary = ((a_pred - truth).abs() * missing).sum() / denom
+                            loss = loss + weight * auxiliary
+                            res[label] = auxiliary.detach()
+                    res["loss"] = loss
 
         if step % accum == 0:
             opt.zero_grad(set_to_none=True)

@@ -67,6 +67,7 @@ from spur_mpm.physics.wiener import WARM_START_MODES
 __all__ = [
     "NA", "FROZEN", "NOT_RUN", "REGISTRY", "ARCHIVE", "NUM_SOURCES",
     "Column", "Number", "Cell", "Row", "Block", "COLUMNS", "GROUPS",
+    "PLANNED_FAMILIES",
     "load_numbers", "format_number", "group_of", "cell_for", "matrix_row",
     "matrix_rows", "matrix_blocks", "pipeline_facts", "provenance",
     "render_pipeline", "render_matrix", "render", "main",
@@ -217,11 +218,18 @@ GROUPS: tuple[tuple[str, str], ...] = (
     ("floors", "no-learning floors  (needs_training = False) - the reference a "
                "network has to beat"),
     ("supervised", "supervised - measured in Phase 1"),
-    ("planned", "PR2 dual-prior - implemented in code, real-data run NOT_RUN "
-                "(no free GPU; see docs/PHASE1_PR2_ACCEPTANCE.md)"),
+    ("planned", "PR2/PR3 dual-prior - implemented in code, real-data run NOT_RUN "
+                "(see docs/PHASE1_PR2_ACCEPTANCE.md and PHASE1_PR3_*)"),
     ("frozen", "self-supervised - frozen 2026-10-30, NOT measured in Phase 1 "
                "(archive/selfsup_v1)"),
 )
+
+#: Method generations whose arms are in the registry but have not been measured
+#: on real data yet. They get the ``NOT_RUN`` band instead of raising, and the
+#: moment one of them appears in a numbers source it moves to the measured band
+#: on its own. A hand-maintained list of "unmeasured arms" would drift; a family
+#: set only has to be extended when a new generation is registered.
+PLANNED_FAMILIES: tuple[str, ...] = ("pr2", "pr3")
 
 
 @dataclass(frozen=True)
@@ -289,7 +297,7 @@ def cell_for(arm: Arm, column: Column,
         # real data. Drawing a number here would be the one thing this figure
         # is built to prevent.
         return Cell(NOT_RUN, None, REGISTRY, "-",
-                    "PR2 arm implemented; real-data experiment NOT_RUN")
+                    "implemented; real-data experiment NOT_RUN")
     num = (numbers or {}).get(arm.name, {}).get(column.field)
     return Cell(format_number(num, column.field), None,
                 num.source if num else "no source",
@@ -322,7 +330,7 @@ def matrix_rows(arms: dict[str, Arm] | None = None,
     numbers = load_numbers() if numbers is None else numbers
     rows: list[Row] = []
     for arm in arms.values():
-        if arm.family == "pr2" and arm.name not in numbers:
+        if arm.family in PLANNED_FAMILIES and arm.name not in numbers:
             # Implemented, unmeasured: its own band with NOT_RUN cells. The
             # moment a real number exists this branch stops firing and the arm
             # joins the measured band -- no list to maintain by hand.
