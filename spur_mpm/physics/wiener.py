@@ -46,7 +46,15 @@ def wiener_deconv_3d(y: torch.Tensor, psf: PSFConfig, lam: float = 0.01) -> torc
     """Anisotropic Wiener deconvolution of ``[Z, H, W]`` or ``[B, Z, H, W]``.
 
     Unmeasured positions must already be filled (zero-filled input rings badly).
+
+    A 2-D input is refused: with ``y.ndim == 2`` the ``(-3, -2, -1)`` FFT below
+    would silently transform over the wrong axes (or leave a plane untransformed)
+    and return holes at zero rather than an error. A caller that means "one
+    plane" must add the axis it is claiming to have.
     """
+    if y.ndim not in (3, 4):
+        raise ValueError("wiener_deconv_3d takes [Z, H, W] or [B, Z, H, W], got "
+                         f"{y.ndim}-D; a single plane needs an explicit Z axis")
     if psf.is_identity:
         return y
     squeeze = y.ndim == 3

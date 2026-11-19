@@ -252,16 +252,25 @@ class DualPriorReconstructor(nn.Module):
         obs = self._stack(v, self.obs_features)
 
         # Parameter-matched control: the physics branch must see I0 where it
-        # would have seen W0, and therefore a zero delta. It must NOT lose
-        # anything else -- u_physics is a function of (M, H, lam), not of W0,
-        # so zeroing it would hand the control less information than the
-        # treatment for a reason that has nothing to do with the deconvolved
-        # candidate, and would flatter the treatment.
+        # would have seen W0, and therefore a zero delta.
+        #
+        # `u_physics` is zeroed as well, and that is not the same decision it
+        # looks like. It is defined in `physics_prior` as
+        # |W0 - I0| / (|I0| + |W0 - I0| + eps), i.e. it is *computed from the
+        # deconvolved candidate*: leaving it in would hand the control a map of
+        # where the treatment's Wiener solve changed the image, which is the one
+        # thing a parameter-matched control may not see. With an identity PSF
+        # the map is identically zero, so every run before E027 is unaffected;
+        # E027 is the first with a non-identity prior, which is why this
+        # is fixed here rather than left as "a function of (M, H, lam)".
+        # `u_sampling` is untouched: it comes from the mask alone.
         if self.phys_control == "interp_only":
             if "wiener" in v and "interp" in v:
                 v["wiener"] = v["interp"]
             if "phys_delta" in v:
                 v["phys_delta"] = torch.zeros_like(v["phys_delta"])
+            if "u_physics" in v:
+                v["u_physics"] = torch.zeros_like(v["u_physics"])
         phys = None
         if self.phys is not None:
             phys = self._stack(v, self.phys_features)

@@ -272,7 +272,19 @@ def _capture_phys_input(model, x):
     return seen["x"]
 
 
-def test_interp_only_differs_from_none_only_in_the_wiener_and_delta_channels():
+def test_interp_only_removes_every_channel_that_encodes_the_deconvolution():
+    """The matched control must not see the treatment's Wiener result, in any form.
+
+    This test used to assert the opposite for ``u_physics``, on the reading that
+    the channel is "a function of (M, H, lam), not of W0". That reading is wrong:
+    ``physics_prior`` defines ``u_physics = |W0 - I0| / (|I0| + |W0 - I0| + eps)``,
+    so it *is* computed from the deconvolved candidate -- a map of where the
+    Wiener solve changed the image. With an identity PSF the map is identically
+    zero, which is why every E024-E026 comparison was unaffected and the old
+    test passed on random noise that never contained a zero delta. E027 is the
+    first run with a non-identity prior (a literature bead-FWHM Gaussian), and
+    there the control would have carried the treatment's output into the gate.
+    """
     feat = ARMS["P3_DualAdaptive"].features
     hw = 16
     torch.manual_seed(0)
@@ -289,15 +301,15 @@ def test_interp_only_differs_from_none_only_in_the_wiener_and_delta_channels():
     phys = ARMS["P3_DualAdaptive"].phys_features
     at = {f: a[:, i * t:(i + 1) * t] for i, f in enumerate(phys)}
     bt = {f: b[:, i * t:(i + 1) * t] for i, f in enumerate(phys)}
+    # What the control is still allowed to see: the interpolation and the mask.
     assert torch.equal(at["interp"], bt["interp"])
     assert torch.equal(at["mask"], bt["mask"])
-    # u_physics is a function of (M, H, lam), NOT of W0: the control keeps it,
-    # otherwise the control would know strictly less than the treatment for a
-    # reason unrelated to the deconvolved candidate.
-    assert torch.equal(at["u_physics"], bt["u_physics"])
+    # What it may not: the deconvolved candidate, the delta, or any map derived
+    # from them.
     assert not torch.equal(at["wiener"], bt["wiener"])
     assert torch.equal(bt["wiener"], bt["interp"])
     assert torch.equal(bt["phys_delta"], torch.zeros_like(bt["phys_delta"]))
+    assert torch.equal(bt["u_physics"], torch.zeros_like(bt["u_physics"]))
 
 
 @pytest.mark.parametrize("center", [0, 1, 2])

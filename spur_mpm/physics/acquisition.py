@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from spur_mpm.physics.psf import PSFConfig, gaussian_otf_3d
+from spur_mpm.physics.psf import PSFConfig, gaussian_otf_2d, gaussian_otf_3d
 from spur_mpm.physics.sampling import SamplingSpec
 
 __all__ = ["NoiseConfig", "AcquisitionConfig", "Observation", "observe", "apply_otf"]

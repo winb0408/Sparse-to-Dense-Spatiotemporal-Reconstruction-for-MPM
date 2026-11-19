@@ -1,0 +1,106 @@
+# SPUR-E027 — literature bead-FWHM PSF candidate and the structure-paper figures
+# (GitHub Issue #4).
+#
+# This config exists so that a figure run and a floor run can name one protocol
+# and one prior *explicitly*. It does NOT change `base.yaml`: the identity
+# default there stays identity, and no old checkpoint or config is overwritten.
+#
+# The prior below is a **literature-derived Gaussian approximation**, not a
+# per-volume calibration and not a measured PSF stack for these vessels. Its
+# provenance is carried in `physics.prior_psf_provenance` and lands in every
+# run's `config.yaml`, so a figure can say where the kernel came from.
+#
+# Strict image domain: real data is Y = M * D with target D. The kernel enters
+# the **Wiener initialisation only**. It is never applied as an extra forward
+# blur to D, and no claim of improved optical resolution may be built on it.
+experiment: SPUR-E027
+
+model:
+  arm: P3_DualAdaptive
+
+# Default protocol: YZ-75 % (k_y = 2, k_z = 2), the same budget as E026. The
+# paper figures also use Y-75 % (ky=4, kz=1) and optionally Y-50 % (ky=2, kz=1);
+# those are chosen on the command line (`--set sampling.*`), because a config
+# file can only hold one.
+sampling:
+  mode: yz
+  ky: 2
+  kz: 2
+
+data:
+  # The E020 Dryad cohort, named here so a direct train.py/evaluate.py call
+  # cannot fall back to the E000 audit split (different fold mapping).
+  index: data_local/dryad_cache/index_cohort.json
+  split: spur_mpm/experiments/E020_cohort/split.json
+  context_slices: 3          # T = 2*k_z - 1 for the YZ protocol
+  patch_hw: [256, 256]
+
+train:
+  steps: 3000                # only used if a DualW_paper arm is actually run
+  batch: 8
+
+loss:
+  l1: 1.0
+  ms_ssim: 0.5
+  branch_obs_weight: 0.05
+  branch_phys_weight: 0.05
+
+physics:
+  # `literature_bead_fwhm_gaussian` is a provenance label of its own: not
+  # `calibrated_optical` (that means per-sample calibration, which this is not)
+  # and not `estimated_from_data` (that means MSE-selected on training animals,
+  # which E026/E025 did and which returned identity).
+  psf_source: literature_bead_fwhm_gaussian
+  forward_extra_psf_source: null    # never: the recorded stacks are already blurred
+  psf:
+    sigma_xy_um: 0.36946            # 0.87 um FWHM / 2.35482
+    sigma_z_um: 1.94940             # 4.59 um FWHM / 2.35482
+    voxel_xy_um: 0.98
+    voxel_z_um: 5.0
+  lam: 0.005                        # frozen; sensitivity checked at 0.005/0.01/0.05
+  prior_psf_provenance:
+    label: literature_bead_fwhm_gaussian
+    source: "Stas et al., J. Biomed. Opt. 31(1):016004 (2026)"
+    source_doi: "10.1117/1.JBO.31.1.016004"
+    source_section: "Methods 2.1 and Fig. 1b"
+    optics: "25x NA=1.0 water immersion, 3P excitation at 1340 nm"
+    bead_diameter_um: 0.20
+    n_beads: 5
+    fwhm_xy_um: 0.87
+    fwhm_z_um: 4.59
+    fwhm_sem_xy_um: 0.12
+    fwhm_sem_z_um: 0.48
+    conversion: "sigma = FWHM / (2*sqrt(2*ln2)) = FWHM / 2.35482"
+    sigma_xy_px: 0.3770             # sigma_xy_um / 0.98
+    sigma_z_step: 0.3898            # sigma_z_um / 5.0
+    grid_note: >-
+      The axial FWHM (4.59 um) is smaller than the 5 um z step, i.e. 0.92
+      samples per FWHM. On this grid the discrete kernel puts ~93 % of its mass
+      in the centre voxel, so the prior is close to a delta and may legitimately
+      produce no visible change; a null result is a result.
+    status: working_approximation_not_per_volume_calibration
+
+eval:
+  input_support: full
+  # One structure definition for every figure and table in this issue. The
+  # ungated global-Otsu window rule scores against a reference filling 18.65 %
+  # of the frame; the gated per-plane rule against 2.18 % (E026 section 4.3).
+  vessel_threshold_mode: per_plane
+  vessel_max_fraction: 0.15
+
+# Figure settings, read only by `spur_mpm/scripts/paper_figures/`. Kept here so
+# a rendered figure and the run it came from share one config hash.
+figures:
+  style: nature_methods_v1
+  vessel_colormap: magenta     # black -> deep magenta -> hot pink -> warm white
+  error_colormap: magma
+  missing_color: "#22d3ee"     # cyan: never measured, never a dark background
+  mask_color: "#22d3ee"
+  width_mm_double: 183
+  width_mm_single: 89
+  dpi_preview: 300
+  dpi_print: 600
+  font_pt: 8
+  letter_pt: 9
+  scalebar_um: [50]
+  lut_window: frozen_from_reference   # same window for every arm in a panel
