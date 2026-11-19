@@ -54,13 +54,20 @@ def run(*, index: str, split: str, fold: int, lam: float, depths: list[int],
     rows = []
     for depth in depths:
         ds_all = _dataset(cache, sid, geom, known, 2, 2, lam, "P2_W0", depth)
-        ds_leg = _dataset(cache, sid, geom, known, 2, 2, lam, "P3_Wlegacy", depth)
-        # Both datasets hold the same window list; take a spread of phases.
+        # The feature order is what makes `inputs[:n]` = y and `inputs[n:2n]` =
+        # mask. It is asserted rather than assumed: the first version of this
+        # script read the slices on faith and also built a second dataset it
+        # never used, which would have hidden a reordering silently.
+        feats = tuple(get_arm("P2_W0").features)
+        if feats[:2] != ("y", "mask"):
+            raise SystemExit(f"expected ('y','mask') as the first two features, "
+                             f"got {feats}")
+        # Take a spread of lattice phases across the window list.
         idxs = np.linspace(0, len(ds_all) - 1, min(max_windows, len(ds_all)))
         diffs, ce, we, in_ws = [], [], [], []
         by_phase: dict[str, list[float]] = {}
         for i in idxs.astype(int):
-            a, b = ds_all[i], ds_leg[i]
+            a = ds_all[i]
             n = depth
             m = a["inputs"][n:2 * n].bool()
             centre = int(a["center_index"])

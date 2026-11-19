@@ -27,15 +27,21 @@ Checked in this order, each on the real evaluation path:
 1. `evaluate.py` builds the `ItemConfig` from `arm.warm_start` (`warm_start_kind=arm.warm_start`) —
    confirmed by reading the code and by printing the value at run time:
    `P2_W0 → wiener_fill_all`, `P3_Wlegacy → wiener_fill_first`.
-2. `VolumeWindowDataset` really hands the two arms **different** inputs
-   (`inputs identical False`), so the warm start is not being skipped or cached.
+2. `VolumeWindowDataset` really hands the two arms **different** inputs — but
+   only in one channel, and that channel is the warm start itself (`x0`); `y`
+   and `mask` are bit-identical between `P2_W0` and `P3_Wlegacy`. Stated
+   precisely because the first version of this check said "`inputs identical
+   False`", which is true and circular: the difference it found *is* the
+   operator under test. (Verified 2026-11-19 on `M1_FOVII_S1_vessels`: `y` and
+   `mask` identical, `x0` differs by 1.9e-3 max.)
 3. The dataset window at an odd query plane really is `[measured, missing, measured]`:
    `query_z=7, window_z0=6 → per-plane measured fraction [0.5, 0.0, 0.5]`,
    i.e. the lattice phase comes from `z0 % kz` and the centre plane is genuinely
    missing — the case where the two orders are supposed to diverge.
 4. Calling both warm starts on that same item: the **centre plane** (the only
-   plane an evaluation scores) differs by `1.24e-7`, while the measured
-   neighbour planes differ by `9.1e-5`.
+   plane an evaluation scores) differs by `1.34e-7` (re-measured 2026-11-19;
+   the first version of this note said 1.24e-7, which came from a different
+   window), while the measured neighbour planes differ by `9.1e-5`.
 
 So the operators do differ; they differ on planes nothing is scored on.
 
