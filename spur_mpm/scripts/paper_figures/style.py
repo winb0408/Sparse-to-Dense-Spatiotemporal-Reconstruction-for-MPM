@@ -38,7 +38,9 @@ VESSEL_CMAP = LinearSegmentedColormap.from_list(
      (0.60, "#d81e8a"), (0.80, "#ff6ab5"), (1.00, "#fff2f8")],
 )
 ERROR_CMAP = matplotlib.colormaps["magma"].copy()
-ERROR_CMAP.set_bad("#ffffff")
+# Measured voxels are neutral grey, not white: white washes the map out
+# and reads as "no error" when the truth is "not scored here".
+ERROR_CMAP.set_bad("#d9d9d9")
 
 #: Never measured. Far from every colour the vessel ramp produces.
 MISSING = "#22d3ee"
@@ -75,10 +77,19 @@ def apply_style(font_pt: float = 8.0) -> None:
 
 
 def panel_letter(ax, letter: str, *, x: float = 0.012, y: float = 0.985,
-                 size: float = 9.0, color: str = "black") -> None:
-    """Lowercase panel letter, top-left, drawn in axes coordinates."""
-    ax.text(x, y, letter, transform=ax.transAxes, ha="left", va="top",
-            fontsize=size, fontweight="bold", color=color)
+                 size: float = 9.0, color: str = "black",
+                 outline: str | None = None) -> None:
+    """Lowercase panel letter, top-left, drawn in axes coordinates.
+
+    Over a micrograph the letter needs an outline, not a second colour choice:
+    white-on-magenta disappears wherever the vessel is bright, black-on-cyan
+    disappears where the mask is dense. A stroked glyph survives both.
+    """
+    import matplotlib.patheffects as pe
+    text = ax.text(x, y, letter, transform=ax.transAxes, ha="left", va="top",
+                   fontsize=size, fontweight="bold", color=color)
+    if outline:
+        text.set_path_effects([pe.withStroke(linewidth=2.0, foreground=outline)])
 
 
 def add_scalebar(ax, um_per_px: float, bar_um: float, *, label: str | None = None,

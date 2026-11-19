@@ -95,11 +95,17 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sample", default="M2_FOVII_S1_vessels")
     ap.add_argument("--fold", type=int, default=0)
-    ap.add_argument("--z0", type=int, default=89)
-    ap.add_argument("--z1", type=int, default=113)
+    # The slab is centred on a **measured** plane for the kz = 2 protocol: with a
+    # lattice phase of 0 the odd planes are entirely unmeasured, and a figure
+    # whose XY panel is 100 % holes cannot show an in-plane comparison. z = 100
+    # is measured for kz = 2 and is fully measured for kz = 1.
+    ap.add_argument("--z0", type=int, default=88)
+    ap.add_argument("--z1", type=int, default=112)
     ap.add_argument("--protocols", nargs="+", default=list(PROTOCOLS))
     ap.add_argument("--arms", default="none", choices=["none", "gpu"],
                     help="'gpu' runs the trained arms too (needs a free card)")
+    ap.add_argument("--reuse", action="store_true",
+                    help="re-crop existing recon_*.npy instead of re-running inference")
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
 
@@ -129,10 +135,20 @@ def main() -> None:
                  "arms": {}}
 
         for name, (arm, ckpt) in ARMS.get(key, {}).items():
+            stem = a.out / f"recon_{key}_{name}"
+            cached = Path(f"{stem}.npy")
             if a.arms != "gpu" or not Path(ckpt).exists():
                 entry["arms"][name] = {"arm": arm, "ckpt": ckpt,
                                        "state": "NOT_RUN" if not Path(ckpt).exists()
                                                 else "cached_elsewhere"}
+                continue
+            if a.reuse and cached.exists():
+                # Re-crop from a previous reconstruction: the slab boundaries are
+                # a display choice, not a computation, so moving them must not
+                # cost another 203-plane inference pass.
+                arrays[name] = np.load(cached)
+                entry["arms"][name] = {"arm": arm, "ckpt": ckpt, "state": "RUN",
+                                       "reused": True}
                 continue
             ov = [f"sampling.mode={proto['mode']}", f"sampling.ky={proto['ky']}",
                   f"sampling.kz={proto['kz']}",
