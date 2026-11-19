@@ -108,3 +108,18 @@ def test_the_summary_records_which_rule_was_used():
     for field in ("threshold_mode", "max_fraction", "n_windows_gated",
                   "n_windows_scored"):
         assert f'"{field}"' in src, field
+
+
+def test_a_literature_kernel_is_a_label_of_its_own():
+    """Issue #4: the bead-FWHM Gaussian may not borrow another licence."""
+    import pytest as _pytest
+    from spur_mpm.physics.prior import PSF_SOURCES, _source_for
+    from spur_mpm.physics.psf import PSFConfig
+
+    paper = PSFConfig(0.36946, 1.9494, 0.98, 5.0)
+    assert _source_for(paper, "literature_bead_fwhm_gaussian") == \
+        "literature_bead_fwhm_gaussian"
+    assert "literature_bead_fwhm_gaussian" in PSF_SOURCES
+    # And an assumed-identity label cannot describe a kernel that blurs.
+    with _pytest.raises(ValueError, match="unlabelled_identity_assumed"):
+        _source_for(paper, "unlabelled_identity_assumed")

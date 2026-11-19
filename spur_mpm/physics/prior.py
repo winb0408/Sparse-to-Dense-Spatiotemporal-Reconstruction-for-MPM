@@ -58,11 +58,23 @@ __all__ = [
 #: deliberately *not* spelled like the calibrated one: a summary produced with
 #: it must never be quotable as "calibrated optics".
 PSF_SOURCES = ("identity", "calibrated_optical", "synthetic_extra_degradation",
-               "estimated_from_data", "unlabelled_identity_assumed")
+               "estimated_from_data", "literature_bead_fwhm_gaussian",
+               "unlabelled_identity_assumed")
 
 
 def _source_for(psf: PSFConfig, psf_source: str | None) -> str:
-    """Name the optical model, and refuse to invent one."""
+    """Name the optical model, and refuse to invent one.
+
+    ``literature_bead_fwhm_gaussian`` (Issue #4) says "a Gaussian fitted to a
+    FWHM published for this microscope, not calibrated per sample". It is a
+    fourth licence, and it is deliberately not spelled like either
+    ``calibrated_optical`` (per-sample measurement) or ``estimated_from_data``
+    (MSE-selected on training volumes, which is what E026/E025 did).
+
+    ``unlabelled_identity_assumed`` is only legal for an identity kernel: it
+    means "we did not say, and nothing happened", so pairing it with a
+    non-identity H used to smuggle an unlabelled blur past this guard.
+    """
     if psf_source is not None and psf_source not in PSF_SOURCES:
         raise ValueError(f"unknown psf_source {psf_source!r}; expected one of "
                          f"{PSF_SOURCES}")
@@ -71,10 +83,15 @@ def _source_for(psf: PSFConfig, psf_source: str | None) -> str:
     if psf_source in (None, "identity"):
         raise ValueError(
             "a non-identity PSF needs an explicit psf_source "
-            "('calibrated_optical', 'synthetic_extra_degradation' or "
-            "'estimated_from_data'): they license different conclusions, and an "
-            "unlabelled H is how a degradation stress test ends up in the main "
-            "table")
+            "('calibrated_optical', 'synthetic_extra_degradation', "
+            "'estimated_from_data' or 'literature_bead_fwhm_gaussian'): they "
+            "license different conclusions, and an unlabelled H is how a "
+            "degradation stress test ends up in the main table")
+    if psf_source == "unlabelled_identity_assumed":
+        raise ValueError(
+            "psf_source='unlabelled_identity_assumed' with a non-identity PSF: "
+            "that label states the identity was assumed, so it cannot describe "
+            "a kernel that blurs; name where the kernel came from")
     return psf_source
 
 
