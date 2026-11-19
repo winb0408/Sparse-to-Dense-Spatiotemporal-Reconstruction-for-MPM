@@ -17,6 +17,9 @@
 
 ## 2. 定性对比图
 
+**入库供审阅的版本**在 [`docs/figures/pr3/`](figures/pr3/README.md)（5 张，JPEG，合计约 12 MB；
+原图与 `.npz` 不入库）。下面列出本地全分辨率路径。
+
 每组两轮，**共用同一套冻结视角**（样本 `M2_FOVII_S1_vessels`，z = 101，y = x = 128，
 ROI [160, 0, 96]，zoom 96 µm，全 z MIP）。两轮的原因是 `phys_control` 属于模型属性：
 `P3_wiener` 与 `P3_interp` 不能共用一张图而不被错标。
