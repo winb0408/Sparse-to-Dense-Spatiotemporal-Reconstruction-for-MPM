@@ -47,27 +47,51 @@ computes both warm starts from the identical input, and reports the centre-plane
 disagreement. 24 windows spanning both lattice phases per row, λ = 0.01,
 H = σ (1.0, 1.5) px:
 
-| T | n windows | centre mean&#124;Δ&#124; | centre max&#124;Δ&#124; |
-|---|---|---|---|
-| 3 (E026 protocol) | 24 | 3.2e-08 | 1.1e-07 |
-| 5 | 24 | 3.7e-03 | 3.1e-02 |
-| 7 | 24 | 1.0e-02 | 7.9e-02 |
-| 9 | 24 | 1.7e-02 | 2.5e-01 |
-| 15 | 24 | 1.4e-02 | 1.7e-01 |
+| T | n windows | centre mean&#124;Δ&#124; | centre max&#124;Δ&#124; | centre **measured** (n) | centre **missing** (n) |
+|---|---|---|---|---|---|
+| 3 (E026 protocol) | 24 | 3.2e-08 | 1.1e-07 | 3.6e-08 (13) | 2.8e-08 (11) |
+| 5 | 24 | 3.7e-03 | 3.1e-02 | **6.8e-03** (13) | 3.6e-08 (11) |
+| 7 | 24 | 1.0e-02 | 7.9e-02 | 1.3e-02 (13) | 6.6e-03 (11) |
+| 9 | 24 | 1.7e-02 | 2.5e-01 | 2.4e-02 (13) | 9.4e-03 (11) |
+| 15 | 24 | 1.4e-02 | 1.7e-01 | 1.9e-02 (13) | 6.9e-03 (11) |
 
-The ordering difference is **zero at the protocol's context and grows with T**.
-The E026 preflight, which ran on a 16-plane stack, therefore reported a
-difference (0.003019 vs 0.003770 `mse_missing`, `mean|Δ|` = 0.13) that the
-actual evaluation windows cannot exhibit.
+The ordering difference is **zero at the protocol's context and grows with T**,
+and the split by lattice phase says where the growth lives: at T = 5 the
+measured-centre windows differ by 6.8e-3 while the missing-centre windows are
+still exact to float32. Mixing the two classes into one mean (as the first
+version of this table did) hides that. The E026 preflight, which ran on a
+16-plane stack, therefore reported a difference (0.003019 vs 0.003770
+`mse_missing`, `mean|Δ|` = 0.13) that the actual evaluation windows cannot
+exhibit.
 
-Mechanistically this is consistent with the axial direction being under-resolved
-at T = 3: with only three samples along Z the axial OTF is sampled at DC and the
-Nyquist pair only, and after the fill the missing plane is a linear interpolation
-between the two measured knots — the same object in both orders. We state the
-measurement, not a derivation: the sweep is the evidence, and it is reproducible
-with the script above.
+**Why the two orders coincide exactly at T = 3** (corrected 2026-11-19; the
+first version of this paragraph said "the axial OTF is sampled at DC and the
+Nyquist pair", which is wrong for a length-3 transform):
 
-Evidence: `docs/evidence/e026_operator_context_20261113/operator_context.json`.
+- A length-3 FFT along Z has frequencies `f_z ∈ {0, +1/3, −1/3}` — there is no
+  Nyquist bin at all.
+- After the fill, the missing plane inside a 3-plane window is a **linear
+  interpolation between the two measured knots**, so the window's Z-profile is
+  either constant (measured centre) or the three-point ramp `[A, (A+B)/2, B]`.
+- For either profile the `±1/3` Fourier coefficients are **equal and opposite**,
+  and the Gaussian OTF is **even in f_z**, so the `±1/3` contributions to the
+  centre sample cancel for any `σ_z`. The 3-D operator's centre plane therefore
+  equals the lateral-only Wiener applied to the interpolated plane — which is
+  precisely the historical order. The equality is structural, not a numerical
+  accident, and it holds for every lattice phase.
+- Growth with T follows because a longer window admits interior frequencies
+  where the two orders genuinely differ; the missing-centre class stays exact
+  until the window also contains enough measured planes for the axial fill to
+  stop being a two-knot interpolation (T = 7 onward).
+
+The argument is now pinned by a test
+(`test_operator_order.py::test_the_two_wiener_orders_agree_on_the_centre_plane_at_t3`),
+which is what makes it safe to state as a derivation rather than as a
+measurement alone.
+
+Evidence: `docs/evidence/e026_operator_context_20261113/operator_context.json`
+(original sweep) and `runs/E026_psras_condition/operator_context_phase/operator_context.json`
+(phase-split re-run, 2026-11-19).
 
 ## 4. Consequence for E026 reporting (binding on the results document)
 

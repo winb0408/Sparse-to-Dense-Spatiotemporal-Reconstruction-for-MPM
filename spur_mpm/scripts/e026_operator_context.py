@@ -58,6 +58,7 @@ def run(*, index: str, split: str, fold: int, lam: float, depths: list[int],
         # Both datasets hold the same window list; take a spread of phases.
         idxs = np.linspace(0, len(ds_all) - 1, min(max_windows, len(ds_all)))
         diffs, ce, we, in_ws = [], [], [], []
+        by_phase: dict[str, list[float]] = {}
         for i in idxs.astype(int):
             a, b = ds_all[i], ds_leg[i]
             n = depth
@@ -69,13 +70,24 @@ def run(*, index: str, split: str, fold: int, lam: float, depths: list[int],
                             mode=get_arm("P3_Wlegacy").warm_start)
             diffs.append(float((wa[centre] - wb[centre]).abs().mean()))
             ce.append(float((~m).float().mean()))
+            # The lattice phase decides whether the centre plane was measured or
+            # filled, and the two classes behave differently: a measured centre
+            # is deconvolved directly, a missing one inherits an interpolation.
+            # Mixing them into one mean hid that at T = 5 (measured ~7e-3,
+            # missing ~4e-8).
+            phase = "measured" if bool(m[centre].any()) else "missing"
+            by_phase.setdefault(phase, []).append(diffs[-1])
             in_ws.append(int(m[centre].any()))
         rows.append({"context_depth": depth,
                      "n_windows": int(len(idxs)),
                      "centre_mean_abs_diff_mean": float(np.mean(diffs)),
                      "centre_mean_abs_diff_max": float(np.max(diffs)),
                      "centre_measured_frac": float(np.mean(in_ws)),
-                     "missing_frac": float(np.mean(ce))})
+                     "missing_frac": float(np.mean(ce)),
+                     "by_centre_phase": {
+                         k: {"n": len(v), "mean_abs_diff": float(np.mean(v)),
+                             "max_abs_diff": float(np.max(v))}
+                         for k, v in by_phase.items() if v}})
     summary = {"kind": "diagnostic", "volume": sid, "fold": fold, "lam": lam,
                "protocol": {"mode": "yz", "ky": 2, "kz": 2},
                "rows": rows,
