@@ -262,11 +262,25 @@ def _gate_flooded_planes(pred_mask: np.ndarray, ref_mask: np.ndarray,
     scoring it would measure the threshold's failure. The decision uses the
     reference only, and both masks are emptied together, so the comparison stays
     like-for-like.
+
+    A 2-D array is **one plane**, not "not a stack". The window protocol scores
+    one centre plane at a time and needs exactly this rule; an early version
+    returned early for anything that was not 3-D, which made the gate a silent
+    no-op in `evaluate.py` -- two re-scored evaluations came back numerically
+    identical to the ungated ones with `n_windows_gated = 0` against a reference
+    that covers 18.65 % of the frame. A guard that answers "0" when it has not
+    looked is worse than no guard, so anything that is not 2-D or 3-D now raises.
     """
     if not (0.0 < max_fraction <= 1.0):
         raise ValueError(f"max_fraction must be in (0, 1], got {max_fraction}")
+    if ref_mask.ndim == 2:
+        if float(np.asarray(ref_mask, dtype=bool).mean()) <= max_fraction:
+            return pred_mask, ref_mask, 0
+        return (np.zeros_like(pred_mask, dtype=bool),
+                np.zeros_like(ref_mask, dtype=bool), 1)
     if ref_mask.ndim != 3:
-        return pred_mask, ref_mask, 0
+        raise ValueError("_gate_flooded_planes takes one plane (2-D) or a stack "
+                         f"(3-D), got {ref_mask.ndim}-D")
     fraction = ref_mask.reshape(ref_mask.shape[0], -1).mean(axis=1)
     bad = np.flatnonzero(fraction > max_fraction)
     if bad.size == 0:
