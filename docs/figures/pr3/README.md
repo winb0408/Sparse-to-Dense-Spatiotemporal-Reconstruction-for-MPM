@@ -31,7 +31,7 @@ zoom 96 µm；MIP 覆盖全部 203 层。spec 冻结在各自的 `viewspec_*.jso
 |---|---|---|
 | [`e026_real_qualitative.jpg`](e026_real_qualitative.jpg) | `I0`、`W0full`、`W0leg`、`ResidI`、`P3_W` | **主图**。真实数据、恒等核选核结果。三行地板是**同一幅图**（恒等核下三个算子等价）；两行训练臂明显更"淡"——血管画得少而准，这是窗口口径 Dice 下降、整卷口径精确率上升的同一个现象 |
 | [`e026_real_qualitative_control.jpg`](e026_real_qualitative_control.jpg) | `I0`、`ResidI`、`P3_int` | **控制臂那一轮**。`P3_int`（`phys_control=interp_only`）与上一张的 `P3_W` 是同一幅图——构造性退化 `P3_interp ≡ P3_wiener` 的视觉版本；两轮分开渲染是因为 `phys_control` 属于模型属性，不能共用一张图而不被错标 |
-| [`e026_real_error_missing.jpg`](e026_real_error_missing.jpg) | 同上 | **误差图**，按"已测量 / 缺失"分区着色。真实数据上训练臂在缺失区的误差带更暗，对应 `psnr_missing` +1.4 dB |
+| [`e026_real_error_missing.jpg`](e026_real_error_missing.jpg) | 同主图五臂，另加一行 **Measured** 对照 | **误差图**：`\|pred − reference\|`，**只在缺失体素上**着色，青色 = 从未测量；所有行共用一个色标（0 → 0.3077），所以行间可直接比较。误差集中在血管边缘而不是弥散在组织里；各格印着该裁剪区的缺失区 MAE：地板 `I0`/`W0full`/`W0leg` 的 XY 为 0.0550，`ResidI`/`P3_W` 为 0.0493，XZ 0.0491/0.0507 → 0.0417/0.0416。差别是"小几个千分位"，与全量的 MAE −15 % 一致，**不是一个肉眼洪流式的差距**，不要把亮度差读成效应大小 |
 | [`e026_matched_synthetic_qualitative.jpg`](e026_matched_synthetic_qualitative.jpg) | 同主图五臂 | **已知核合成条件**。这里 `W0full`/`W0leg` 与 `I0` **不再相同**——被告知的模糊确实被反卷积了（`W0 − I0` 整卷 +0.063 Dice），这是 E026 里物理通道唯一一次产生可测效果；`W0leg` 与 `W0full` 仍逐位相同（T=3 算子顺序退化） |
 | [`e025_y_k4_qualitative.jpg`](e025_y_k4_qualitative.jpg) | 同主图五臂 | **单轴 75 % 缺失负对照**。列数为 7（Y 单轴没有 YZ/XZ 的测量面配对），条带方向与 YZ 组不同；结论与主图同构 |
 
