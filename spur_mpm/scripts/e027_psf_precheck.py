@@ -146,8 +146,21 @@ def compare(dense, y, mask, psf, lam, geom) -> dict:
     d = np.abs(w0 - i0)
     dn = np.abs(w0n - i0)
     ref_max = float(dense.max())
+    # Is the harm the kernel, or the recipe "fill first, then deconvolve"?
+    # The same kernel inside a mask-aware inverse answers that, and it is the
+    # operator this project already has (`iterdc`).
+    iterdc = {}
+    for steps in (8, 32):
+        x = warm_start(yt, mt, psf, lam, mode=f"iterdc:{lam}:{steps}").numpy()
+        iterdc[f"iterdc_{steps}"] = {
+            "steps": steps,
+            "mae_missing": float(np.abs(x - dense)[miss].mean()) if miss.any() else 0.0,
+            "psnr_missing": _psnr(x, dense, miss),
+            "mean_abs_delta_vs_i0_missing": float(np.abs(x - i0)[miss].mean()) if miss.any() else 0.0,
+        }
     return {
         "dc_gain": gain,
+        "iterdc": iterdc,
         "mean_abs_delta_missing_dc_normalised": float(dn[miss].mean()) if miss.any() else 0.0,
         "mae_w0_missing_dc_normalised": float(np.abs(w0n - dense)[miss].mean()) if miss.any() else 0.0,
         "psnr_w0_missing_dc_normalised": _psnr(w0n, dense, miss),

@@ -67,6 +67,20 @@
     "rows": [
       {
         "dc_gain": 0.9950246810913086,
+        "iterdc": {
+          "iterdc_8": {
+            "steps": 8,
+            "mae_missing": 0.045844513922929764,
+            "psnr_missing": 23.95662605490863,
+            "mean_abs_delta_vs_i0_missing": 0.006418136414140463
+          },
+          "iterdc_32": {
+            "steps": 32,
+            "mae_missing": 0.0496346578001976,
+            "psnr_missing": 23.065862744259135,
+            "mean_abs_delta_vs_i0_missing": 0.02300329878926277
+          }
+        },
         "mean_abs_delta_missing_dc_normalised": 0.06530715525150299,
         "mae_w0_missing_dc_normalised": 0.08934342116117477,
         "psnr_w0_missing_dc_normalised": 17.8739060801616,
@@ -87,6 +101,20 @@
       },
       {
         "dc_gain": 0.9900989532470703,
+        "iterdc": {
+          "iterdc_8": {
+            "steps": 8,
+            "mae_missing": 0.04651666432619095,
+            "psnr_missing": 23.791754967142467,
+            "mean_abs_delta_vs_i0_missing": 0.012134894728660583
+          },
+          "iterdc_32": {
+            "steps": 32,
+            "mae_missing": 0.05808073654770851,
+            "psnr_missing": 21.264894503515734,
+            "mean_abs_delta_vs_i0_missing": 0.0425340011715889
+          }
+        },
         "mean_abs_delta_missing_dc_normalised": 0.0629008486866951,
         "mae_w0_missing_dc_normalised": 0.08707322925329208,
         "psnr_w0_missing_dc_normalised": 18.095312564249344,
@@ -107,6 +135,20 @@
       },
       {
         "dc_gain": 0.9523811340332031,
+        "iterdc": {
+          "iterdc_8": {
+            "steps": 8,
+            "mae_missing": 0.06266984343528748,
+            "psnr_missing": 20.42706451364831,
+            "mean_abs_delta_vs_i0_missing": 0.051343176513910294
+          },
+          "iterdc_32": {
+            "steps": 32,
+            "mae_missing": 0.12409123033285141,
+            "psnr_missing": 14.453561587992548,
+            "mean_abs_delta_vs_i0_missing": 0.12371448427438736
+          }
+        },
         "mean_abs_delta_missing_dc_normalised": 0.04938206449151039,
         "mae_w0_missing_dc_normalised": 0.07465844601392746,
         "psnr_w0_missing_dc_normalised": 19.47906160859553,
@@ -133,6 +175,20 @@
     "rows": [
       {
         "dc_gain": 1.0,
+        "iterdc": {
+          "iterdc_8": {
+            "steps": 8,
+            "mae_missing": 0.08616979420185089,
+            "psnr_missing": 18.378047086003267,
+            "mean_abs_delta_vs_i0_missing": 0.07908740639686584
+          },
+          "iterdc_32": {
+            "steps": 32,
+            "mae_missing": 0.19341415166854858,
+            "psnr_missing": 11.917725260755375,
+            "mean_abs_delta_vs_i0_missing": 0.19337046146392822
+          }
+        },
         "mean_abs_delta_missing_dc_normalised": 0.0,
         "mae_w0_missing_dc_normalised": 0.053442105650901794,
         "psnr_w0_missing_dc_normalised": 22.88124881515821,
@@ -154,6 +210,20 @@
       },
       {
         "dc_gain": 0.9523811340332031,
+        "iterdc": {
+          "iterdc_8": {
+            "steps": 8,
+            "mae_missing": 0.08227698504924774,
+            "psnr_missing": 18.78652197547931,
+            "mean_abs_delta_vs_i0_missing": 0.07266761362552643
+          },
+          "iterdc_32": {
+            "steps": 32,
+            "mae_missing": 0.17525450885295868,
+            "psnr_missing": 12.65232219980675,
+            "mean_abs_delta_vs_i0_missing": 0.1751026213169098
+          }
+        },
         "mean_abs_delta_missing_dc_normalised": 0.06829375773668289,
         "mae_w0_missing_dc_normalised": 0.09345221519470215,
         "psnr_w0_missing_dc_normalised": 17.938309203936925,
@@ -175,6 +245,20 @@
       },
       {
         "dc_gain": 1.0,
+        "iterdc": {
+          "iterdc_8": {
+            "steps": 8,
+            "mae_missing": 0.08616979420185089,
+            "psnr_missing": 18.378047086003267,
+            "mean_abs_delta_vs_i0_missing": 0.07908740639686584
+          },
+          "iterdc_32": {
+            "steps": 32,
+            "mae_missing": 0.19341415166854858,
+            "psnr_missing": 11.917725260755375,
+            "mean_abs_delta_vs_i0_missing": 0.19337046146392822
+          }
+        },
         "mean_abs_delta_missing_dc_normalised": 0.0,
         "mae_w0_missing_dc_normalised": 0.053442105650901794,
         "psnr_w0_missing_dc_normalised": 22.88124881515821,
